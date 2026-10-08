@@ -18,6 +18,15 @@ python3 -m http.server 3000
 
 To open a specific map, add the seed to the URL: `http://localhost:3000/?seed=ABCD-1234`. The URL updates whenever a new map is generated, so you can share a link or reload and get the same map.
 
+Single-file build (all JS and CSS inlined; Google Fonts with a system-font fallback):
+
+```bash
+npm run bundle       # → dist/iron-meridian.html (opens straight from disk, no server needed)
+                     #   dist/iron-meridian.fragment.html (same, without <html>/<head>/<body>, for hosts that add their own)
+```
+
+The multi-file source is the real project. `dist/` is generated output and isn't committed.
+
 Map generation sanity check (200 seeds; checks land counts, connected nations, symmetric adjacency, city ratio, picking, unique names and determinism):
 
 ```bash
@@ -43,6 +52,7 @@ styles.css        Tactical HUD theme, responsive layout
 package.json      npm start / npm test
 tools/
   check-map.mjs   Headless generator checks across many seeds
+  bundle.mjs      Inlines everything into one HTML file (dist/)
 js/
   main.js         Bootstrap + game loop; wires modules; camera framing; `systems` hook
   map.js          Pure world generation (no DOM): seeded RNG, noise, Voronoi,

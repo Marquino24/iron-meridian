@@ -86,9 +86,13 @@ function loadMap(seed) {
   camera.y = f.y;
   camera.zoom = camera.targetZoom = f.zoom;
   renderer.requestRender();
-  const url = new URL(window.location.href);
-  url.searchParams.set('seed', s);
-  history.replaceState(null, '', url);
+  // Reflect the seed in the URL so a reload/share reproduces the map.
+  // Sandboxed embeds can refuse this, which is harmless.
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('seed', s);
+    history.replaceState(null, '', url);
+  } catch { /* ignore */ }
 }
 
 const ui = new UI(state, {
@@ -153,7 +157,9 @@ renderer.resize();
 
 // --- Boot ---
 
-loadMap(new URLSearchParams(window.location.search).get('seed'));
+let initialSeed = null;
+try { initialSeed = new URLSearchParams(window.location.search).get('seed'); } catch { /* ignore */ }
+loadMap(initialSeed);
 
 // --- Main loop ---
 
