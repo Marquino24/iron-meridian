@@ -1,0 +1,11 @@
+{
+  "name": "iron-meridian",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-based real-time grand strategy game (step 1: map & nations)",
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve -l 3000 .",
+    "test": "node tools/check-map.mjs"
+  }
+}

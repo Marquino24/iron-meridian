@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Iron Meridian</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1l7 7-7 7-7-7z' fill='%23ffb547'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- World map. Everything else is a DOM overlay. -->
+  <canvas id="map-canvas" aria-label="Strategic map"></canvas>
+  <div class="screen-fx" aria-hidden="true"></div>
+
+  <div id="hud" class="setup">
+    <header id="topbar">
+      <div class="brand"><span class="brand-mark">◆</span>IRON<b>MERIDIAN</b></div>
+
+      <div class="player-badge">
+        <canvas id="player-flag" class="flag" data-w="36" data-h="24"></canvas>
+        <div>
+          <div class="eyebrow">IN COMMAND</div>
+          <div id="player-name">—</div>
+        </div>
+      </div>
+
+      <div class="clock">
+        <div class="clock-readout">
+          <span id="clock-day" class="clock-day">DAY 001</span>
+          <span id="clock-date">14 MAR 2031</span>
+          <span id="clock-time" class="clock-time">06:00Z</span>
+        </div>
+        <div id="speed-group" class="speed-group" role="group" aria-label="Game speed"></div>
+      </div>
+
+      <button id="btn-menu" type="button" class="btn ghost small">MENU</button>
+    </header>
+
+    <aside id="province-panel" class="panel" aria-hidden="true"></aside>
+
+    <footer id="statusbar">
+      <span><i>GRID</i> <b id="status-grid">—</b></span>
+      <span class="grow"><i>TARGET</i> <b id="status-province">—</b></span>
+      <span><b id="status-zoom">ZOOM 1.00×</b></span>
+      <span><b id="status-perf">— FPS</b></span>
+      <span class="hide-sm"><i>SEED</i> <b id="status-seed">—</b></span>
+    </footer>
+  </div>
+
+  <section id="start-screen" class="start">
+    <div class="start-card">
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.1</div>
+      <h1>IRON<span>MERIDIAN</span></h1>
+      <p class="tagline">Select a nation to assume command. Click a card or any territory on the map.</p>
+
+      <div class="seed-row">
+        <label for="seed-input">MAP SEED</label>
+        <input id="seed-input" spellcheck="false" autocomplete="off" maxlength="32">
+        <button id="btn-load-seed" type="button" class="btn ghost" title="Generate the map for this seed">LOAD</button>
+        <button id="btn-new-map" type="button" class="btn">NEW MAP</button>
+      </div>
+
+      <div id="map-stats" class="map-stats"></div>
+      <div id="nation-grid" class="nation-grid"></div>
+
+      <button id="btn-deploy" type="button" class="btn primary" disabled>SELECT A NATION</button>
+      <p class="hint">DRAG to pan · SCROLL / PINCH to zoom · WASD / ARROWS · ESC deselect · SPACE pause</p>
+    </div>
+  </section>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
