@@ -19,6 +19,8 @@ import { GameState } from './state.js';
 import { Renderer } from './render.js';
 import { Camera, InputController } from './camera.js';
 import { UI } from './ui.js';
+import { AuthService, authEnabled } from './auth.js';
+import { Launcher } from './launcher.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
@@ -220,6 +222,16 @@ try { savedEra = localStorage.getItem('im:era'); } catch { /* ignore */ }
 const initialEra = [params.get('era'), params.get('seed') ? 'fictional' : null, savedEra, DEFAULT_ERA]
   .find((id) => id && ERAS.some((e) => e.id === id));
 loadEra(initialEra, params.get('seed'));
+
+// --- Sign-in and beta gate ---
+// Flow: sign-in → beta gate → era/nation select. The map loads behind the
+// launcher meanwhile. Without Supabase settings (js/config.js) or in the
+// dev preview build, the game opens directly.
+state.events.on('phase', (phase) => document.body.classList.toggle('in-game', phase === 'playing'));
+if (authEnabled()) {
+  const launcher = new Launcher(new AuthService());
+  launcher.run();
+}
 
 // --- Main loop ---
 

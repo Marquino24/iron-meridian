@@ -1,0 +1,10 @@
+:root { color-scheme: dark; --bg: #05080a; --text: #c9d4d4; --dim: #7d8f93; --accent: #ffb547; --line: rgba(120,170,180,0.22); }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Rajdhani", "Segoe UI", system-ui, sans-serif; }
+main { max-width: 68ch; margin: 0 auto; padding: 48px 20px 64px; }
+h1 { font-size: 34px; line-height: 1.1; letter-spacing: 0.06em; color: #f0ead8; margin: 0 0 4px; }
+h2 { font-size: 20px; color: var(--accent); margin: 28px 0 6px; letter-spacing: 0.04em; }
+.meta { color: var(--dim); font-size: 14px; margin: 0 0 24px; }
+a { color: #6fd3e0; }
+ul { padding-left: 20px; }
+footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--dim); }

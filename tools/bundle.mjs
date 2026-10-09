@@ -21,13 +21,15 @@ const IMPORT_RE = /^import\s*\{([^}]*)\}\s*from\s*['"]\.\/([\w-]+)\.js['"];?\s*$
 const EXPORT_RE = /^export\s+(?:async\s+)?(?:function\*?|class|const|let)\s+([\w$]+)/gm;
 
 const modules = new Map(); // name → { deps, code, exports }
+/** Module file name → valid JS identifier ('brand-icons' → '__brand_icons'). */
+const ident = (name) => `__${name.replace(/[^\w$]/g, '_')}`;
 function load(name) {
   if (modules.has(name)) return;
   let src = read(`js/${name}.js`);
   const deps = [];
   src = src.replace(IMPORT_RE, (_, names, dep) => {
     deps.push(dep);
-    return `const {${names}} = __${dep};`;
+    return `const {${names}} = ${ident(dep)};`;
   });
   const exports = [...src.matchAll(EXPORT_RE)].map((m) => m[1]);
   src = src.replace(/^export\s+/gm, '');
@@ -47,7 +49,7 @@ visit('main');
 
 const js = order.map((n) => {
   const m = modules.get(n);
-  return `// ---- js/${n}.js ----\nconst __${n} = (() => {\n${m.code}\nreturn { ${m.exports.join(', ')} };\n})();`;
+  return `// ---- js/${n}.js ----\nconst ${ident(n)} = (() => {\n${m.code}\nreturn { ${m.exports.join(', ')} };\n})();`;
 }).join('\n\n');
 
 // Pull <head> links and <body> markup out of index.html, inline the CSS and JS.
@@ -76,6 +78,8 @@ const inner = [
   `<style>\n${css}</style>`,
   body,
   ...eraTags,
+  // The single-file build is the dev preview: no sign-in (it can't reach Supabase anyway).
+  '<script>window.__IM_PREVIEW__ = true;</script>',
   `<script type="module">\n${safeJs}\n</script>`,
 ].join('\n');
 

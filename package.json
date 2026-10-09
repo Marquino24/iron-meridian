@@ -6,13 +6,18 @@
   "type": "module",
   "scripts": {
     "start": "npx --yes serve -l 3000 .",
-    "test": "node tools/check-map.mjs && node tools/check-eras.mjs",
+    "test": "node tools/check-secrets.mjs && node tools/check-map.mjs && node tools/check-eras.mjs",
     "bundle": "node tools/bundle.mjs && node tools/bundle.mjs --fragment",
-    "build:eras": "node tools/build-eras.mjs"
+    "build:eras": "node tools/build-eras.mjs",
+    "test:policies": "sudo -u postgres bash supabase/test/run.sh",
+    "test:e2e": "node tools/e2e/launcher.test.mjs"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "d3-delaunay": "^6.0.4",
     "mapshaper": "^0.6.121",
-    "polygon-clipping": "^0.15.7"
+    "playwright-core": "1.56",
+    "polygon-clipping": "^0.15.7",
+    "simple-icons": "^13.21.0"
   }
 }

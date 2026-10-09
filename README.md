@@ -40,6 +40,21 @@ Checks: the fictional generator across 200 seeds, then every era map (province c
 npm test
 ```
 
+## Sign-in and closed beta
+
+The hosted game (GitHub Pages) requires sign-in through Supabase Auth: Google, Discord, Microsoft, GitHub, Twitch, X or an email magic link (Apple is shown as "Coming soon"). New players request beta access and wait for approval; the owner approves, denies or revokes them in the in-game **Admin** panel.
+
+- `docs/SETUP.md`: step-by-step setup of GitHub Pages, the Supabase project and every sign-in provider.
+- `docs/TESTERS.md`: what testers do to get in.
+- `supabase/schema.sql`: the beta table, owner check, triggers and row-level security. Run it once in the Supabase SQL editor.
+- `js/config.js`: the Supabase project URL and **publishable** key (public by design). Leave them empty to run without sign-in, as local development and the claude.ai preview do. Never put secret keys in any frontend file; `npm test` fails if one appears.
+
+Screen flow: sign-in → beta gate (request access / pending / access not granted) → era → nation.
+
+Who can do what is enforced by the database, not the browser: testers can only create and read their own row, the server fills in their name, email and provider and forces status to pending, and only the owner (matched by confirmed email) can change status. `npm run test:policies` runs these rules against a local PostgreSQL; `npm run test:e2e` runs the sign-in flow in a browser against a fake Supabase client.
+
+The game's files are public on GitHub Pages, so the gate controls who can play through the site; it doesn't hide the code or map data itself.
+
 ## Controls
 
 | Input | Action |
@@ -64,7 +79,17 @@ tools/
   check-map.mjs   Fictional generator checks across many seeds
   check-eras.mjs  Era map checks
   bundle.mjs      Inlines everything (code, CSS, all era data) into one HTML file (dist/)
+docs/             SETUP.md (hosting + Supabase + providers), TESTERS.md
+supabase/
+  schema.sql      Beta table, owner check, triggers, row-level security
+  test/           Policy tests on plain PostgreSQL with a mock auth schema
+vendor/           @supabase/supabase-js 2.117.3 (UMD, MIT), loaded only when sign-in is on
+privacy.html, terms.html   Linked from the sign-in screen and provider consent screens
 js/
+  config.js       Supabase URL + publishable key, provider list
+  auth.js         Supabase client wrapper: sign-in, beta row, realtime, admin queries
+  launcher.js     Sign-in screen, beta gate screens, admin panel
+  brand-icons.js  Provider logos (simple-icons, CC0)
   main.js         Bootstrap + game loop; era loading; camera framing; `systems` hook
   eras.js         Era list (labels, start dates) and era data loading
   world.js        Decodes an era file into the runtime map (same shape as map.js output)

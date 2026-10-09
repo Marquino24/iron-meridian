@@ -36,6 +36,7 @@
         <div id="speed-group" class="speed-group" role="group" aria-label="Game speed"></div>
       </div>
 
+      <button id="btn-admin-top" type="button" class="btn ghost small admin-btn" data-open-admin hidden>ADMIN</button>
       <button id="btn-menu" type="button" class="btn ghost small">MENU</button>
     </header>
 
@@ -81,8 +82,33 @@
       <button id="btn-deploy" type="button" class="btn primary" disabled>SELECT A NATION</button>
       <p class="hint">DRAG to pan · SCROLL / PINCH to zoom · WASD / ARROWS · ESC deselect · SPACE pause</p>
       <p id="data-source" class="data-source"></p>
+      <div id="account" class="account" hidden>
+        <span id="account-provider" class="account-provider"></span>
+        <span>Signed in as <b id="account-name"></b></span>
+        <button type="button" class="link-btn" data-sign-out>Sign out</button>
+      </div>
     </div>
   </section>
+
+  <!-- Sign-in and beta gate (only when Supabase is configured in js/config.js). -->
+  <section id="launcher" class="launcher" hidden aria-label="Sign in">
+    <div class="launcher-hero">
+      <div class="eyebrow">CLOSED BETA · BUILD 0.2.5</div>
+      <h1 class="launcher-title">IRON<span>MERIDIAN</span></h1>
+      <p class="launcher-sub">Real-time grand strategy across two thousand years of real borders.</p>
+      <ul class="launcher-facts">
+        <li><b>7</b><span>eras</span></li>
+        <li><b>1,000+</b><span>provinces</span></li>
+        <li><b>200</b><span>nations</span></li>
+      </ul>
+    </div>
+    <div class="launcher-panel">
+      <div id="launcher-card" class="launcher-card"></div>
+    </div>
+  </section>
+
+  <button id="btn-admin-fab" type="button" class="btn admin-fab admin-btn" data-open-admin hidden>ADMIN</button>
+  <section id="admin-panel" class="admin" hidden></section>
 
   <script type="module" src="js/main.js"></script>
 </body>
