@@ -543,7 +543,8 @@ function placeCities(rng, provinces, nations, cfg) {
 
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function createNameGenerator(rng) {
+/** Unique pronounceable place names, deterministic for a given rng. */
+export function createNameGenerator(rng) {
   const used = new Set();
   return function generate() {
     for (let tries = 0; tries < 60; tries++) {

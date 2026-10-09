@@ -7,6 +7,12 @@
   "scripts": {
     "start": "npx --yes serve -l 3000 .",
     "test": "node tools/check-map.mjs",
-    "bundle": "node tools/bundle.mjs && node tools/bundle.mjs --fragment"
+    "bundle": "node tools/bundle.mjs && node tools/bundle.mjs --fragment",
+    "build:eras": "node tools/build-eras.mjs"
+  },
+  "devDependencies": {
+    "d3-delaunay": "^6.0.4",
+    "mapshaper": "^0.6.121",
+    "polygon-clipping": "^0.15.7"
   }
 }
