@@ -20,7 +20,9 @@ import { ERAS } from './eras.js';
 const $ = (sel, root = document) => root.querySelector(sel);
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const pad = (n, w = 2) => String(n).padStart(w, '0');
-const fmtArea = (units) => `${Math.round((units * AREA_KM2_PER_UNIT) / 100) * 100} km²`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+/** Province/nation area: true km² on real maps, the fictional scale otherwise. */
+const fmtKm2 = (km2) => `${km2 >= 1000 ? Math.round(km2 / 100) * 100 : Math.max(1, Math.round(km2))} km²`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const fmtArea = (units, km2) => fmtKm2(km2 ?? units * AREA_KM2_PER_UNIT);
 const fmtYear = (y) => (y < 1000 ? `AD ${y}` : String(y));
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -194,7 +196,7 @@ export class UI {
     ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
 
     el.source.innerHTML = map.source
-      ? `Borders: <a href="${escapeHtml(map.source.url)}" target="_blank" rel="noopener">${escapeHtml(map.source.name)}</a>, ${escapeHtml(map.source.license)} · data year ${fmtYear(map.dataYear)}`
+      ? `Borders: <a href="${escapeHtml(map.source.url)}" target="_blank" rel="noopener">${escapeHtml(map.source.name)}</a>, ${escapeHtml(map.source.license)} · data year ${fmtYear(map.dataYear)} · Imagery: NASA Blue Marble, Natural Earth`
       : 'Procedurally generated world';
 
     this.renderNationList();
@@ -374,7 +376,7 @@ export class UI {
         <dt>NEIGHBORS</dt>
         <dd>${p.neighbors.length} LAND${p.seaNeighbors.length ? ` · ${p.seaNeighbors.length} SEA` : ''}</dd>
         <dt>AREA</dt>
-        <dd>${fmtArea(p.area)}</dd>
+        <dd>${fmtArea(p.area, p.areaKm2)}</dd>
         <dt>${coordLabel}</dt>
         <dd>${gridRef(map, p.center.x, p.center.y)}</dd>
         <dt>MODIFIERS</dt>

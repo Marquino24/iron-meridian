@@ -12,7 +12,13 @@
  *   seas[i] = { p: polygon, c: [x, y], nb: neighbour sea ids, cp: coastal provinces }
  */
 
-import { graticule, formatLatLon } from './projection.js';
+import { graticule, formatLatLon, unproject } from './projection.js';
+
+/**
+ * km² per world unit² at a latitude. Miller: 1 unit ≈ 10.008 km × cos(lat)
+ * east-west and 10.008 km × cos(0.8·lat) north-south.
+ */
+const km2PerUnit = (lat) => 100.16 * Math.cos((lat * Math.PI) / 180) * Math.cos((0.8 * lat * Math.PI) / 180);
 
 const TERRAIN_CODES = { p: 'plains', f: 'forest', m: 'mountains', u: 'urban' };
 
@@ -96,6 +102,7 @@ export function buildWorldMap(data, era) {
       edges: p.e,
       bbox: bboxOfRings(rings),
       area: p.a,
+      areaKm2: p.a * km2PerUnit(unproject(p.s[0] * q, p.s[1] * q).lat),
       neighbors: [...neighbors],
       seaNeighbors: [...seaNeighbors],
       coastal: seaNeighbors.size > 0,

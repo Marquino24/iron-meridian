@@ -73,12 +73,20 @@ const eraTags = existsSync(eraDir)
     `<script type="application/gzip-base64" id="era-data-${f.replace(/\.json$/, '')}">${gzipSync(readFileSync(join(eraDir, f)), { level: 9 }).toString('base64')}</script>`)
   : [];
 
+// Map imagery as data URIs, decoded only when a style needs it (js/assets.js).
+const assetDir = join(root, 'assets');
+const assetTags = existsSync(assetDir)
+  ? readdirSync(assetDir).filter((f) => f.endsWith('.webp')).sort().map((f) =>
+    `<script type="text/plain" id="asset-${f.replace(/\.webp$/, '')}">data:image/webp;base64,${readFileSync(join(assetDir, f)).toString('base64')}</script>`)
+  : [];
+
 const inner = [
   title,
   ...headLinks,
   `<style>\n${css}</style>`,
   body,
   ...eraTags,
+  ...assetTags,
   // The single-file build is the dev preview: no sign-in (it can't reach Supabase anyway).
   '<script>window.__IM_PREVIEW__ = true;</script>',
   `<script type="module">\n${safeJs}\n</script>`,
@@ -93,4 +101,4 @@ const out = fragment
 const file = join(root, 'dist', fragment ? 'iron-meridian.fragment.html' : 'iron-meridian.html');
 mkdirSync(dirname(file), { recursive: true });
 writeFileSync(file, out);
-console.log(`wrote ${file} (${(Buffer.byteLength(out) / 1024).toFixed(1)} KB; ${eraTags.length} eras; modules: ${order.join(' → ')})`);
+console.log(`wrote ${file} (${(Buffer.byteLength(out) / 1024).toFixed(1)} KB; ${eraTags.length} eras, ${assetTags.length} images; modules: ${order.join(' → ')})`);

@@ -32,6 +32,7 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   const labels = await page.$$eval('.provider-btn', (b) => b.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
   check(labels.length === 7, `7 provider buttons: ${labels.join(' | ')}`);
   check(await page.locator('[data-provider="apple"]').isDisabled(), 'Apple button disabled ("Coming soon")');
+  check((await page.locator('[data-action="demo"]').count()) === 0, 'real sign-in build shows no demo button');
   check(await gated(page), 'game hidden behind the launcher');
   await page.waitForTimeout(800);
   await shot(page, 'l1-signin');
@@ -68,12 +69,12 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   await page.evaluate(() => window.__mockDecide('u-discord.player@example.com', 'approved'));
   await page.waitForFunction(() => !document.body.classList.contains('gated'), null, { timeout: 5000 });
   check(true, 'approval arrives live → game unlocked without reload');
-  check(await page.isVisible('#account'), 'start screen shows signed-in account');
-  check(!(await page.isVisible('#btn-admin-fab')), 'no Admin button for a tester');
+  check(await page.isVisible('#main-menu') && await page.isVisible('#account'), 'approved → main menu with signed-in account');
+  check(!(await page.isVisible('#main-menu [data-open-admin]')), 'no Admin button for a tester');
   await page.reload();
   await page.waitForFunction(() => window.ironMeridian?.state.map, null, { timeout: 10000 });
   await page.waitForTimeout(600);
-  check(!(await gated(page)) && !(await page.isVisible('.provider-btn')), 'returning approved player skips sign-in');
+  check(!(await gated(page)) && !(await page.isVisible('.provider-btn')) && await page.isVisible('#main-menu'), 'returning approved player skips sign-in → main menu');
   await ctx.close();
 }
 
@@ -110,8 +111,11 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   await page.click('[data-provider="google"]');
   await page.waitForFunction(() => !document.body.classList.contains('gated'), null, { timeout: 10000 });
   check(true, 'owner goes straight in (auto-approved)');
-  check(await page.isVisible('#btn-admin-fab'), 'Admin button on the start screen');
-  await page.click('#btn-admin-fab');
+  check(await page.isVisible('#main-menu [data-open-admin]'), 'Admin in the main menu');
+  await page.click('[data-menu="single"]');
+  check(await page.isVisible('#btn-admin-fab'), 'Admin button on the era screen');
+  await page.click('#era-screen [data-back]');
+  await page.click('#main-menu [data-open-admin]');
   await page.waitForSelector('.admin-table');
   const tabs = await page.$$eval('.admin-tabs button', (b) => b.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
   const total = await page.textContent('.admin-head .total');
@@ -129,6 +133,10 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   check((await page.textContent('.admin-table')).includes('Chen Wei'), 'revoke sends a tester back to Pending');
   await shot(page, 'l6-admin-pending');
   await page.click('[data-admin="close"]');
+  await page.click('[data-menu="single"]');
+  await page.click('[data-era="ww2"]');
+  await page.waitForSelector('#start-screen:not([hidden]) .nation-row', { timeout: 15000 });
+  check(await page.isVisible('#btn-admin-fab'), 'Admin button on the nation screen');
   await page.click('.nation-row');
   await page.click('#btn-deploy');
   await page.waitForTimeout(1300);

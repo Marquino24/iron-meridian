@@ -254,7 +254,29 @@ loadEra(initialEra, params.get('seed'));
 
 // --- Settings applied to the renderer and page ---
 
+// When quality is on Auto, watch real frame times while the map moves and
+// drop to Low for this session if they stay under ~40 fps (older tablets).
+let autoLowered = false;
+const motion = { time: 0, frames: 0 };
+function adaptQuality(dt) {
+  if (!settings.qualityIsAuto || autoLowered || renderer.quality === 'low') return;
+  if (!renderer.cameraMoving()) return;
+  // Accumulate across gestures: ~2 s of panning/zooming is enough to judge.
+  motion.time += dt;
+  motion.frames++;
+  if (motion.time < 2) return;
+  const avg = motion.time / motion.frames;
+  motion.time = 0;
+  motion.frames = 0;
+  if (avg > 1 / 40) {
+    autoLowered = true;
+    renderer.setQuality('low');
+    console.info(`[quality] ${(1 / avg).toFixed(0)} fps while moving: switched to Low for this session`);
+  }
+}
+
 function applySettings() {
+  autoLowered = false;
   renderer.setQuality(settings.quality);
   document.documentElement.style.setProperty('--ui-scale', settings.uiScale);
 }
@@ -346,6 +368,7 @@ function frame(now) {
   for (const system of systems) system.update(state, gameHours);
 
   renderer.render();
+  adaptQuality(dt);
   ui.update(dt, { zoomRel: camera.zoom / camera.refZoom, frameMs: renderer.lastFrameMs });
   requestAnimationFrame(frame);
 }

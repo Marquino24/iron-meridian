@@ -95,7 +95,7 @@ export class Screens {
     for (const q of QUALITIES) document.getElementById(`set-q-${q}`).checked = s.quality === q;
     const device = { phone: 'phone', tablet: 'tablet', desktop: 'computer' }[deviceClass()];
     document.getElementById('quality-note').textContent = s.qualityIsAuto
-      ? `Picked automatically for this ${device}. Low keeps phones and older tablets smooth.`
+      ? `Picked automatically for this ${device}, and lowered by itself if the map gets choppy. Low keeps phones and older tablets smooth.`
       : 'Low keeps phones and older tablets smooth.';
     const scale = document.getElementById('set-ui-scale');
     scale.value = s.values.uiScale;

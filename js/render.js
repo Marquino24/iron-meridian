@@ -508,8 +508,12 @@ export class Renderer {
     const px = 1 / z;
 
     const use = this.layerUsable();
-    if (!use) this.rebuildLayer();
-    else if (use === 'scaled') this.dirty = true; // redraw crisply once the camera stops
+    if (!use) {
+      // Mid-gesture: a quick low-resolution layer now, the sharp one when the camera settles.
+      const fast = this.cameraMoving();
+      this.rebuildLayer(fast);
+      if (fast) this.dirty = true;
+    } else if (use === 'scaled') this.dirty = true; // redraw crisply once the camera stops
     this.prevCam = { x: cam.x, y: cam.y, zoom: z };
 
     // Blit the static layer.
@@ -583,21 +587,25 @@ export class Renderer {
     const ix = Math.max(0, Math.min(v.x1, L.x + hw) - Math.max(v.x0, L.x - hw));
     const iy = Math.max(0, Math.min(v.y1, L.y + hh) - Math.max(v.y0, L.y - hh));
     const coverage = (ix * iy) / ((v.x1 - v.x0) * (v.y1 - v.y0));
-    if (Math.abs(ratio - 1) < 1e-9 && coverage > 0.9999) return 'exact';
-    // "Moving" includes short pauses mid-gesture: only redraw after 150 ms of stillness.
-    const p = this.prevCam;
-    const now = performance.now();
-    if (!p || p.x !== cam.x || p.y !== cam.y || p.zoom !== cam.zoom) this.lastMoveAt = now;
-    const moving = now - (this.lastMoveAt ?? 0) < 150;
-    return moving && ratio > 0.33 && ratio < 3 && coverage > 0.55 ? 'scaled' : null;
+    const moving = this.cameraMoving();
+    if (Math.abs(ratio - 1) < 1e-9 && coverage > 0.9999) return L.fast && !moving ? null : 'exact';
+    return moving && ratio > 0.33 && ratio < 3 && coverage > 0.45 ? 'scaled' : null;
   }
 
-  rebuildLayer() {
+  /** True while the camera moved within the last 150 ms (short pauses mid-gesture count). */
+  cameraMoving() {
+    const cam = this.camera, p = this.prevCam;
+    const now = performance.now();
+    if (!p || p.x !== cam.x || p.y !== cam.y || p.zoom !== cam.zoom) this.lastMoveAt = now;
+    return now - (this.lastMoveAt ?? 0) < 150;
+  }
+
+  rebuildLayer(fast = false) {
     const cam = this.camera;
     const PAD = QUALITY[this.quality].pad;
     const w = Math.ceil(cam.viewW * (1 + 2 * PAD)), h = Math.ceil(cam.viewH * (1 + 2 * PAD));
     // iOS caps canvas area at ~16.7 MP; keep well under it.
-    const ldpr = Math.min(this.dpr, Math.sqrt(14e6 / (w * h)));
+    const ldpr = Math.min(fast ? 1 : this.dpr, Math.sqrt(14e6 / (w * h)));
     if (!this.layer) {
       this.layer = document.createElement('canvas');
       this.layerCtx = this.layer.getContext('2d', { alpha: false });
@@ -607,7 +615,7 @@ export class Renderer {
       this.layer.width = pw;
       this.layer.height = ph;
     }
-    this.layerFrame = { x: cam.x, y: cam.y, zoom: cam.zoom, w, h, dpr: ldpr };
+    this.layerFrame = { x: cam.x, y: cam.y, zoom: cam.zoom, w, h, dpr: ldpr, fast };
     this.drawStatic(this.layerCtx, this.layerFrame);
     this.layerValid = true;
     this.layerBuilds = (this.layerBuilds ?? 0) + 1;
@@ -618,7 +626,7 @@ export class Renderer {
     const { cache, state } = this;
     const map = state.map;
     const L = this.look();
-    const fx = QUALITY[this.quality].effects;
+    const fx = QUALITY[this.quality].effects && !F.fast;
     const z = F.zoom;
     const px = 1 / z;
     const view = { x0: F.x - F.w / 2 / z, y0: F.y - F.h / 2 / z, x1: F.x + F.w / 2 / z, y1: F.y + F.h / 2 / z };

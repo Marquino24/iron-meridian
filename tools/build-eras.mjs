@@ -806,7 +806,7 @@ async function buildEra(era, places) {
       n: p.name,
       t: p.terrain[0],
       s: [Math.round(p.seed.x / Q), Math.round(p.seed.y / Q)],
-      a: Math.round(p.area),
+      a: Math.round(p.area * 10) / 10,
       r: p.rings.map(encRing),
       e: p.edges,
     };
@@ -847,7 +847,7 @@ async function buildEra(era, places) {
     `${provOut.filter((p) => p.c).length} cities, ${seas.length} sea zones, ${(json.length / 1024).toFixed(0)} KB, ${((Date.now() - t0) / 1000).toFixed(1)} s`,
   );
   console.log(`     capitals: ${stats.capitalsCurated} curated, ${stats.capitalsFromNE} Natural Earth, ${stats.capitalsGenerated} generated`);
-  if (stats.splitRegions !== undefined) console.log(`     regions split: ${stats.splitRegions}, cities sharing a region (not shown): ${stats.citiesDropped}`);
+  if (stats.splitRegions !== undefined) console.log(`     regions split: ${stats.splitRegions}, tiny regions merged: ${stats.tinyMerged}, cities sharing a region (not shown): ${stats.citiesDropped}`);
   if (stats.unplaced.length) console.log(`     not placed: ${stats.unplaced.join('; ')}`);
   if (missingMajors.length) console.log(`     WARNING missing majors: ${missingMajors.join(', ')}`);
   return { id: era.id, provinces: land, nations: nations.length, kb: json.length / 1024 };
@@ -876,6 +876,26 @@ function interiorCenter(mp) {
  */
 function buildAdmin1Provinces(rng, countries, units, provinces, stats) {
   const byKey = new Map(countries.map((c, i) => [c.key, i]));
+  // Regions smaller than the map's coordinate precision (San Marino's
+  // municipalities, tiny parishes) merge into the nearest region of the same
+  // country. A micro-nation that is a single region stays as it is.
+  const TINY = 0.8;
+  const centerOf = (u) => { const [x0, y0, x1, y1] = bboxOf(u.rings); return { x: (x0 + x1) / 2, y: (y0 + y1) / 2 }; };
+  let merged = 0;
+  for (const u of units.filter((x) => x.area < TINY).sort((a, b) => a.area - b.area)) {
+    if (u.mergedInto) continue;
+    const c = centerOf(u);
+    const others = units.filter((o) => o !== u && o.sov === u.sov && !o.mergedInto);
+    if (!others.length) continue;
+    const target = others.sort((a, b) => Math.hypot(centerOf(a).x - c.x, centerOf(a).y - c.y) - Math.hypot(centerOf(b).x - c.x, centerOf(b).y - c.y))[0];
+    target.mp = openMultiPolygon(polygonClipping.union(target.mp.map((poly) => poly.map(closeRing)), u.mp.map((poly) => poly.map(closeRing))));
+    target.rings = target.mp.flat();
+    target.area += u.area;
+    u.mergedInto = target;
+    merged++;
+  }
+  units = units.filter((u) => !u.mergedInto);
+  stats.tinyMerged = merged;
   stats.splitRegions = 0;
   stats.citiesDropped = 0;
   for (const u of units) {

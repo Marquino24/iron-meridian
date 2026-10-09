@@ -348,18 +348,23 @@ html, body {
 
 /* ---------- Start screen ---------- */
 
-.start {
-  position: fixed;
+.screen { position: fixed; inset: 0 0 var(--status-h) 0; z-index: 20; pointer-events: none; zoom: var(--ui-scale, 1); }
+.screen > * { pointer-events: auto; }
+.side-panel {
+  position: absolute;
   top: 0;
   left: 0;
-  bottom: var(--status-h);
+  bottom: 0;
   width: min(480px, 100%);
-  padding: 20px;
+  padding: calc(20px + var(--safe-top)) 20px 20px;
   overflow-y: auto;
-  background: linear-gradient(90deg, rgba(4, 7, 9, 0.96) 70%, rgba(4, 7, 9, 0.75));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: linear-gradient(90deg, rgba(4, 7, 9, 0.96) 70%, rgba(4, 7, 9, 0.78));
   border-right: 1px solid var(--line);
-  transition: transform 0.35s ease, opacity 0.35s ease;
 }
+.start { }
 .start.hidden { transform: translateX(-105%); opacity: 0; pointer-events: none; }
 .start-card { display: flex; flex-direction: column; gap: 16px; }
 
@@ -562,7 +567,7 @@ html, body {
    Launcher (sign-in + beta gate)
    ========================================================================= */
 
-body.gated #start-screen,
+body.gated .screen,
 body.gated #hud { visibility: hidden; }
 
 .launcher {
@@ -832,4 +837,141 @@ body.in-game .admin-fab { display: none !important; }
   .admin-table td { border: 0; padding: 3px 0; }
   .actions { justify-content: flex-start; padding-top: 8px !important; }
   .admin-tabs button { padding: 8px 8px; font-size: 13px; }
+}
+
+
+/* =========================================================================
+   Screens: main menu, era, settings
+   ========================================================================= */
+
+#hud, .launcher, .admin, .admin-fab, .style-toggle { zoom: var(--ui-scale, 1); }
+
+.screen-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.back-btn {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--cyan);
+  background: rgba(111, 211, 224, 0.06);
+  border: 1px solid rgba(111, 211, 224, 0.35);
+  padding: 7px 14px 7px 10px;
+  cursor: pointer;
+}
+.back-btn:hover { background: rgba(111, 211, 224, 0.16); color: #c9f5fb; }
+.back-btn:focus-visible, .menu-item:focus-visible, .seg label:focus-within, .style-toggle button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.screen-title { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 0.04em; color: #f0ead8; line-height: 1.05; text-wrap: balance; }
+
+/* Main menu */
+.menu .menu-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(520px, 100%);
+  padding: calc(40px + var(--safe-top)) 48px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  background: linear-gradient(90deg, rgba(4, 7, 9, 0.94) 0%, rgba(4, 7, 9, 0.82) 70%, rgba(4, 7, 9, 0));
+  overflow-y: auto;
+}
+.menu-title { margin: 0 0 8px; font-size: clamp(48px, 7vw, 84px); line-height: 0.9; font-weight: 700; letter-spacing: 0.12em; color: #f0ead8; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6); }
+.menu-title span { display: block; color: var(--accent); }
+.menu-list { display: flex; flex-direction: column; gap: 6px; max-width: 380px; }
+.menu-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  text-align: left;
+  font-family: var(--font-ui);
+  color: var(--text);
+  background: rgba(14, 22, 27, 0.75);
+  border: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.menu-item span { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.menu-item small { font-size: 12px; color: var(--text-dim); letter-spacing: 0.04em; }
+.menu-item em { font-style: normal; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); border: 1px solid var(--line); padding: 2px 6px; }
+.menu-item:hover:not(:disabled) { background: rgba(26, 38, 45, 0.92); border-left-color: var(--accent); transform: translateX(3px); }
+.menu-item.primary { border-left-color: var(--accent); background: rgba(40, 32, 16, 0.85); }
+.menu-item.primary span { color: var(--accent); }
+.menu-item.resume { border-left-color: var(--green); }
+.menu-item.resume span { color: var(--green); }
+.menu-item:disabled { cursor: not-allowed; opacity: 0.55; }
+.menu-item.admin-item span { color: var(--accent); }
+.menu-item.quiet { background: transparent; }
+.menu-item.quiet span { font-size: 15px; color: var(--text-dim); }
+@media (prefers-reduced-motion: reduce) { .menu-item { transition: none; } .menu-item:hover:not(:disabled) { transform: none; } }
+.menu .account { justify-content: flex-start; margin-top: auto; }
+
+/* Era list */
+.era-list { display: flex; flex-direction: column; gap: 8px; }
+.era-list .era-card { padding: 12px 14px; gap: 4px; border-left: 3px solid var(--line); }
+.era-list .era-card .era-name { font-size: 20px; }
+.era-list .era-card .era-year { font-size: 11px; }
+.era-blurb { font-size: 13px; line-height: 1.35; color: var(--text-dim); font-weight: 500; }
+.era-list .era-card:hover { border-left-color: var(--accent); }
+.era-list .era-card.selected { border-left-color: var(--accent); }
+
+/* Settings */
+.settings { display: flex; flex-direction: column; gap: 18px; }
+.settings fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
+.settings legend { padding: 0; margin-bottom: 8px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-dim); }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.seg span { display: block; padding: 9px 6px; text-align: center; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; color: var(--text-dim); border-left: 1px solid var(--line); }
+.seg label:first-child span { border-left: 0; }
+.seg input:checked + span { color: #1a1206; background: var(--accent); }
+.setting-note { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.4; }
+.range-row { display: flex; align-items: center; gap: 12px; }
+.range-row input { flex: 1; accent-color: var(--accent); }
+.range-row output { font-family: var(--font-mono); font-size: 13px; color: var(--cyan); min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+#settings-reset { align-self: flex-start; }
+
+/* In-game map style toggle */
+.style-toggle {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--status-h) + 12px + var(--safe-bottom));
+  z-index: 15;
+  display: flex;
+  border: 1px solid var(--line-strong);
+  background: rgba(8, 13, 16, 0.9);
+}
+.style-toggle button {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--line);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.style-toggle button:first-child { border-left: 0; }
+.style-toggle button:hover { color: var(--text); }
+.style-toggle button.active { color: #1a1206; background: var(--accent); }
+body:not(.in-game) .style-toggle { display: none; }
+body.in-game .panel.open ~ .style-toggle { right: calc(320px + 24px); }
+
+/* Admin floating button only on era / nation / settings screens */
+body:not([data-screen="era"]):not([data-screen="nation"]):not([data-screen="settings"]) .admin-fab { display: none !important; }
+
+/* Demo sign-in (preview build only) */
+.demo-box { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid rgba(255, 181, 71, 0.5); background: rgba(40, 32, 16, 0.6); }
+.demo-box p { margin: 0; font-size: 14px; line-height: 1.4; }
+
+@media (max-width: 760px) {
+  .menu .menu-panel { width: 100%; padding: calc(28px + var(--safe-top)) 20px 20px; background: rgba(4, 7, 9, 0.86); }
+  .menu-title { font-size: 46px; }
+  .side-panel { width: 100%; background: rgba(4, 7, 9, 0.92); }
+  .style-toggle { left: 8px; right: auto; bottom: calc(var(--status-h) + 8px + var(--safe-bottom)); }
+  .style-toggle button { padding: 7px 9px; font-size: 12px; }
+  body.in-game .panel.open ~ .style-toggle { display: none; }
 }

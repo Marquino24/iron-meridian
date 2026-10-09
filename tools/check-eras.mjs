@@ -11,7 +11,7 @@ for (const era of ERAS.filter((e) => !e.fictional)) {
   const map = buildWorldMap(data, era);
   const P = map.provinces;
   const errs = [];
-  if (P.length < 800 || P.length > 1200) errs.push(`province count ${P.length}`);
+  if (P.length < 3000 || P.length > 4500) errs.push(`province count ${P.length}`);
   const owned = new Map();
   for (const p of P) {
     if (!p.rings.length || p.rings.some((r) => r.length < 3)) errs.push(`bad rings ${p.id}`);
@@ -23,7 +23,8 @@ for (const era of ERAS.filter((e) => !e.fictional)) {
   }
   if (map.nations.filter((n) => n.major).length < 6) errs.push('fewer than 6 major powers');
   let pickMiss = 0;
-  for (const p of P) if (map.pickAt(p.center.x, p.center.y) !== p.id) pickMiss++;
+  // Provinces under ~1 world unit² (micro-states like the Vatican) are below click precision.
+  for (const p of P) if (p.area >= 1 && map.pickAt(p.center.x, p.center.y) !== p.id) pickMiss++;
   if (pickMiss > P.length * 0.01) errs.push(`picking misses ${pickMiss}`);
   let asym = 0;
   for (const p of P) for (const n of p.neighbors) if (!P[n].neighbors.includes(p.id)) asym++;
