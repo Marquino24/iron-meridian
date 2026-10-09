@@ -15,6 +15,11 @@
  *   'focus:nation'    (nationId)           — nation highlighted on the start screen
  *   'province:owner'  ({ provinceId, from, to })
  *   'clock:speed'     (speed)
+ *   'select:army'     (armyId)             — army chosen on the map (-1 = none)
+ *
+ * Emitted by the simulation systems (economy.js, armies.js, combat.js):
+ *   'economy', 'armies', 'war' ({a, b}), 'battle:end' (battle),
+ *   'feed' ({ kind, tone, text, battleId?, node? }) — the event feed
  */
 
 /** Tiny pub/sub. `on` returns an unsubscribe function. */
@@ -49,6 +54,7 @@ export class GameState {
     this.hoveredProvinceId = -1;
     this.selectedProvinceId = -1;
     this.focusedNationId = -1;
+    this.selectedArmyId = -1;
     this.clock = { time: START_DATE, start: START_DATE, speed: 1 };
   }
 
@@ -81,6 +87,7 @@ export class GameState {
     this.hoveredProvinceId = -1;
     this.selectedProvinceId = -1;
     this.focusedNationId = -1;
+    this.selectedArmyId = -1;
     // Real-world eras start on their own date; the fictional world on START_DATE.
     this.clock.start = this.clock.time = map.startDate ?? START_DATE;
     this.events.emit('map:loaded', map);
@@ -107,9 +114,17 @@ export class GameState {
   }
 
   setSelected(id) {
+    if (id >= 0) this.setSelectedArmy(-1);
     if (id === this.selectedProvinceId) return;
     this.selectedProvinceId = id;
     this.events.emit('select', id);
+  }
+
+  /** Select an army (the side panel shows it instead of the province). */
+  setSelectedArmy(id) {
+    if (id === this.selectedArmyId) return;
+    this.selectedArmyId = id;
+    this.events.emit('select:army', id);
   }
 
   setFocusedNation(id) {

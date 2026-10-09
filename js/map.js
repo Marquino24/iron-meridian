@@ -448,7 +448,7 @@ function placeCapitals(rng, members, k) {
 }
 
 /** Minimal binary heap keyed by priority. */
-class MinHeap {
+export class MinHeap {
   constructor() { this.items = []; }
   get size() { return this.items.length; }
   push(value, priority) {

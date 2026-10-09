@@ -27,6 +27,12 @@
         </div>
       </div>
 
+      <div id="resources" class="resources" role="group" aria-label="Treasury and manpower">
+        <button type="button" class="res" aria-describedby="res-tip"><span class="res-ico money">◉</span><span class="res-body"><span class="eyebrow">MONEY</span><b id="res-money">0</b></span><small id="res-money-inc">+0/d</small></button>
+        <button type="button" class="res" aria-describedby="res-tip"><span class="res-ico manpower">♟</span><span class="res-body"><span class="eyebrow">MANPOWER</span><b id="res-manpower">0</b></span><small id="res-manpower-inc">+0/d</small></button>
+        <div id="res-tip" class="res-tip" role="tooltip" hidden></div>
+      </div>
+
       <div class="clock">
         <div class="clock-readout">
           <span id="clock-day" class="clock-day">DAY 001</span>
@@ -41,6 +47,9 @@
     </header>
 
     <aside id="province-panel" class="panel" aria-hidden="true"></aside>
+
+    <section id="feed" class="feed" aria-label="Events" aria-live="polite"><ul id="feed-list"></ul></section>
+    <div id="toast" class="toast" role="status" hidden></div>
 
     <div id="style-toggle" class="style-toggle" role="radiogroup" aria-label="Map style">
       <button type="button" role="radio" data-style="political">Political</button>
@@ -60,7 +69,7 @@
   <!-- Main menu: game-launcher style over the slowly panning map. -->
   <section id="main-menu" class="screen menu" hidden aria-label="Main menu">
     <div class="menu-panel screen-left">
-      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.2.6</div>
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.3.0</div>
       <h1 class="menu-title">IRON<span>MERIDIAN</span></h1>
       <nav class="menu-list" aria-label="Main menu">
         <button type="button" class="menu-item resume" data-menu="resume" hidden><span>Resume game</span><small id="resume-detail"></small></button>
@@ -175,7 +184,7 @@
   <!-- Sign-in and beta gate. Without Supabase settings (dev preview) it offers a demo sign-in. -->
   <section id="launcher" class="launcher" hidden aria-label="Sign in">
     <div class="launcher-hero">
-      <div class="eyebrow">CLOSED BETA · BUILD 0.2.6</div>
+      <div class="eyebrow">CLOSED BETA · BUILD 0.3.0</div>
       <h1 class="launcher-title">IRON<span>MERIDIAN</span></h1>
       <p class="launcher-sub">Real-time grand strategy across two thousand years of real borders.</p>
       <ul class="launcher-facts">
@@ -188,6 +197,8 @@
       <div id="launcher-card" class="launcher-card"></div>
     </div>
   </section>
+
+  <section id="battle-report" class="report" hidden></section>
 
   <button id="btn-admin-fab" type="button" class="btn admin-fab admin-btn" data-open-admin hidden>ADMIN</button>
   <section id="admin-panel" class="admin" hidden></section>

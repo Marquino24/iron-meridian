@@ -2,7 +2,7 @@
 
 A browser-based real-time grand strategy game. Vanilla JavaScript (ES modules) and HTML Canvas, with no frameworks and no build step.
 
-**Step 1 scope:** procedurally generated map, 6 nations, pan/zoom, province inspection, nation select.
+**Current scope (step 3):** real-world maps in seven eras, sign-in and closed beta, and now armies, war and conquest paid for by a basic economy.
 
 ## Run
 
@@ -57,6 +57,39 @@ Who can do what is enforced by the database, not the browser: testers can only c
 
 The game's files are public on GitHub Pages, so the gate controls who can play through the site; it doesn't hide the code or map data itself.
 
+## Armies, war and economy
+
+**Economy.** Every nation has Money and Manpower. Each province yields money daily: 1 share for ordinary land, 3 for a city, 5 for a capital (10 money per share per day). Population follows the same shares and yields manpower (120 per share per day); the map data has no real population figures. A nation whose capital is held by an enemy produces at half rate. Income arrives every game hour; hover or tap the top bar for the daily breakdown. Everyone starts with about ten days of income. Armies have no upkeep yet.
+
+**Clock.** 1 real second = 1 game hour at 1×; pause / 1× / 2× / 4×.
+
+**Units.** Each era has four units in the same four roles, rock-paper-scissors style: infantry beats mobile, mobile beats ranged, ranged beats infantry (×1.5 damage, ×0.67 the other way). Ships move only through sea zones.
+
+| Era | Infantry | Mobile | Ranged | Naval |
+|---|---|---|---|---|
+| Roman | Legion | Cavalry | Archers | Trireme |
+| Medieval | Men-at-arms | Knights | Longbowmen | Cog |
+| WWI | Infantry | Cavalry | Artillery | Dreadnought |
+| WWII | Infantry | Tank | Artillery | Destroyer |
+| Cold War | Mech Infantry | Main Battle Tank | Artillery | Frigate |
+| Modern / Fictional | Infantry | MBT | Rocket Artillery | Destroyer |
+
+Full stats are in `js/units.js` (attack, defense, HP, speed in km/h, money + manpower cost, build hours).
+
+**Armies.** Every nation starts with a garrison in its capital (bigger nations, bigger garrison) and in up to 12 cities; coastal major powers get a home fleet. The player also gets 1–3 field armies near its borders. Click a counter to open its panel (units with HP, split selected / split in half, merge with armies in the same place, stop), then click a province to march there. The route follows neighbouring provinces (fastest by distance × terrain move cost ÷ the slowest unit's speed) and shows its ETA, also as a preview while you hover. From a coastal province an army can embark into a sea zone and land on another coast: slow (era transport speed, 6 h to board and 6 h to land) and weak if caught at sea (¼ attack, ½ defense).
+
+**Recruiting.** In a city you own, the province panel lists the era's units with stats, cost and build time. Cost is paid when queued (cancel refunds it); each city builds one unit at a time. Finished units appear there as a new army (units finishing in a row join it); ships appear in the adjacent sea zone. A captured city loses its queue.
+
+**War.** Click any foreign province to see its nation and **Declare war** (with a confirmation). Your armies can't enter a nation's land unless you're at war with it; unclaimed land is open to anyone.
+- An army entering enemy (or unclaimed) land with no enemy army there occupies it: 6 h, 12 h for a city, 24 h for a capital (progress ring on the map). Moving on resets it. An army on a longer route stops to take each enemy province it passes, then carries on.
+- If enemy armies are there, a battle starts (crossed swords). Every game hour each unit hits a random enemy unit for `8 × attack × matchup ÷ (defense × terrain) × random 0.75–1.25`; terrain (forest 1.25, urban 1.4, mountains 1.6) protects only the defender, and damaged units hit softer. Below 20% strength an army retreats to a safe neighbouring province (or fights on if there's none). The battle ends when one side has no armies left.
+- Taking a capital halves that nation's production. A nation that loses its last province is conquered, and its remaining armies disband.
+- AI nations don't act yet; their garrisons defend and retreat.
+
+**Feedback.** The event feed (bottom left) lists wars, battles, captures and finished units; click an entry to open its battle report (units fielded and lost on each side) or fly to the place. Clicking crossed swords opens the live report.
+
+`npm test` includes `tools/check-war.mjs`, a headless run of the simulation: the German Reich conquering Czechoslovakia (9 provinces, about 20 game days = 8 real minutes at 1×), Italy landing in Albania by sea, recruitment timing, split/merge, capital loss, and spawning plus pathfinding in every era. `tools/e2e/war.test.mjs` plays the same war through the UI in a browser (desktop and phone).
+
 ## Map styles and settings
 
 - **Political:** flat nation colours with terrain symbols. Roman and Medieval eras draw it as an old parchment map.
@@ -73,7 +106,9 @@ Switch styles in game (bottom right); the default is in **Settings**, along with
 | Scroll wheel / pinch / trackpad pinch | Zoom toward the cursor |
 | WASD / arrow keys, `+` / `-` | Pan / zoom |
 | Click a province | Inspect it (on the start screen, clicking picks that nation) |
-| Esc | Deselect |
+| Click an army counter | Select it; then click a province or sea zone to move, or an enemy counter to attack it |
+| Click crossed swords / a feed entry | Battle report |
+| Esc | Deselect (army first, then province) |
 | Space | Pause / resume the clock |
 
 ## File structure
@@ -118,6 +153,14 @@ js/
   camera.js       Camera (smooth zoom, inertia, fly-to, clamping) and
                   InputController (pointer events, pinch, wheel, keys)
   ui.js           DOM HUD: start screen, top bar/clock, province panel, status bar
+  units.js        Era rosters (unit stats) and the rock-paper-scissors matchups
+  economy.js      Money and Manpower per nation, daily income, capital-lost penalty
+  armies.js       Armies and fleets: spawning, land+sea movement graph, pathfinding,
+                  marching, split/merge, recruitment queues
+  combat.js       Wars, hourly battles, retreats, occupation, capture, conquest
+  render-units.js Army counters, routes with ETA, battle and occupation markers, hit testing
+  command-ui.js   Money/manpower bar, army panel, recruit/war sections of the province panel
+  feed.js         Event feed and battle report popup
 ```
 
 ## Data model (from `generateMap(seed)`)
@@ -130,10 +173,9 @@ js/
 
 ## Extending in later steps
 
-- **Simulation systems** (economy, units, AI, research): add an object with `update(state, gameHours)` to `systems` in `main.js`. It runs every frame with the in-game hours elapsed (0 while paused).
+- **Simulation systems** (AI and research next): add an object with `update(state, gameHours)` to `systems` in `main.js`, next to the economy, armies and combat. It runs every frame with the in-game hours elapsed (0 while paused). An AI can use the same calls the UI does: `armies.order()`, `armies.recruit()`, `combat.declareWar()`.
 - **State changes:** add methods to `GameState` that mutate data and `emit` an event. `setOwner()` is the template: the renderer rebuilds borders and colours on `province:owner`, and the panel re-renders.
-- **New map layers** (units, fronts, supply lines): draw them in `Renderer.render()` between the province layer and the screen-space overlay. Call `renderer.requestRender()` whenever they change.
-- **Pathfinding:** `province.neighbors` plus `TERRAIN[...].moveCost`. The `MinHeap` in `map.js` is ready to reuse.
+- **New map layers** (fronts, supply lines): draw them in `Renderer.render()` between the province layer and the screen-space overlay, as `render-units.js` does. Call `renderer.requestRender()` whenever they change.
 
 ## Era data
 

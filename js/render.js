@@ -18,6 +18,8 @@
  *   rebuildOwnership() — depends on province owners (on conquest etc.)
  */
 
+import { drawRoutes, drawForces } from './render-units.js';
+
 const COLORS = {
   void: '#040709',
   ocean: '#0a1820',
@@ -329,12 +331,14 @@ export class Renderer {
     this.images = {};              // style imagery, filled by setImage()
     this.hasLetterSpacing = 'letterSpacing' in this.ctx;
     this.lastFrameMs = 0;
+    this.sim = null;               // { armies, combat }, set by main.js
+    this.hits = [];                // clickable counters/battles from the last frame
 
     const redraw = () => this.requestRender();
     const relayer = () => this.invalidateLayer();
     state.events.on('map:loaded', () => this.buildGeometry());
     state.events.on('province:owner', () => this.rebuildOwnership());
-    for (const evt of ['hover', 'select']) state.events.on(evt, redraw);
+    for (const evt of ['hover', 'select', 'select:army', 'armies', 'war']) state.events.on(evt, redraw);
     for (const evt of ['focus:nation', 'player', 'phase']) state.events.on(evt, relayer);
     document.fonts?.ready.then(redraw);
   }
@@ -563,9 +567,12 @@ export class Renderer {
       ctx.stroke(paths[sel]);
     }
 
+    drawRoutes(this, ctx, px);
+
     // Screen-space overlay: icons and labels stay a constant pixel size.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.drawOverlay(state.map.provinceScale * z);
+    drawForces(this);
 
     this.lastFrameMs = performance.now() - t0;
     return true;

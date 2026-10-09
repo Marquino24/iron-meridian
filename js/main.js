@@ -24,14 +24,27 @@ import { Settings } from './settings.js';
 import { Screens } from './menu.js';
 import { loadImagery } from './assets.js';
 import { Launcher } from './launcher.js';
+import { Economy } from './economy.js';
+import { Armies } from './armies.js';
+import { Combat } from './combat.js';
+import { CommandUI } from './command-ui.js';
+import { Feed } from './feed.js';
+import { hitTest } from './render-units.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
 const camera = new Camera();
 const renderer = new Renderer(canvas, camera, state);
 
-/** Simulation systems, run in order each frame. Empty in step 1. */
-const systems = [];
+// Simulation: economy → recruitment and movement → battles and occupation.
+const economy = new Economy(state);
+const armies = new Armies(state, economy);
+const combat = new Combat(state, armies);
+const sim = { economy, armies, combat };
+renderer.sim = sim;
+
+/** Simulation systems, run in order each frame with the game hours elapsed. */
+const systems = [economy, armies, combat];
 
 // --- Camera framing ---------------------------------------------------------
 
@@ -51,7 +64,7 @@ function hudInsets() {
     if (!narrow && panel) ins.left = panel.getBoundingClientRect().right;
   } else {
     ins.top = hudEls.topbar.offsetHeight;
-    if (state.selectedProvinceId >= 0) {
+    if (state.selectedProvinceId >= 0 || state.selectedArmyId >= 0) {
       if (narrow) ins.bottom += hudEls.panel.offsetHeight + 8;
       else ins.right = hudEls.panel.offsetWidth + 12;
     }
@@ -159,7 +172,8 @@ const settings = new Settings();
 
 /** Picking an era opens the nation screen once its map is ready. */
 async function chooseEra(id) {
-  if (state.map?.era?.id === id && !getEra(id).fictional) {
+  // Reuse the loaded map unless a game was already played on it.
+  if (state.map?.era?.id === id && !getEra(id).fictional && !armies.started) {
     screens.show('nation');
     focusOverview();
     return;
@@ -185,6 +199,8 @@ const ui = new UI(state, {
   },
   deploy(id) {
     state.setPlayerNation(id);
+    economy.start();
+    armies.spawnInitial(id);
     state.setFocusedNation(-1);
     screens.gameInProgress = true;
     screens.show('game');
@@ -202,6 +218,7 @@ const ui = new UI(state, {
   // In-game MENU: pause and go to the main menu (Resume brings you back).
   returnToMenu() {
     state.setSelected(-1);
+    state.setSelectedArmy(-1);
     pausedSpeed = state.clock.speed;
     state.setSpeed(0);
     state.setPhase('setup');
@@ -210,11 +227,52 @@ const ui = new UI(state, {
   },
 });
 
+// --- Orders, notices, event feed ---
+
+const toastEl = document.getElementById('toast');
+let toastTimer = 0;
+/** Short message near the top of the map (order errors, confirmations). */
+function notice(text) {
+  toastEl.textContent = text;
+  toastEl.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2800);
+}
+
+function orderMove(army, node) {
+  const r = armies.order(army.id, node);
+  if (r.error) notice(r.peace != null ? `${r.error} Open one of its provinces to do it.` : r.error);
+  armies.preview = null;
+  renderer.requestRender();
+}
+
+/** Fly the camera to a province or sea zone without changing the selection. */
+function focusNode(node) {
+  const p = armies.pos?.[node];
+  if (!p) return;
+  focusOn(p.x, p.y, Math.max(camera.zoom, detailZoom(70)), 0.6);
+}
+
+const feed = new Feed(state, sim, { focusNode });
+ui.command = new CommandUI(state, sim, {
+  focusNode,
+  openBattle: (id) => feed.open(id),
+  rerender: () => { ui.renderProvincePanel(); renderer.requestRender(); },
+  notice,
+});
+
 const input = new InputController(canvas, camera, {
   onHover(sx, sy) {
     const w = camera.screenToWorld(sx, sy);
-    state.setHovered(pickProvince(state.map, w.x, w.y));
+    const id = pickProvince(state.map, w.x, w.y);
+    state.setHovered(id);
     ui.setCursor(w);
+    // Route preview with ETA while one of your armies is selected.
+    const sel = armies.list.get(state.selectedArmyId);
+    if (sel && sel.nation === state.playerNationId && state.phase === 'playing' && !hitTest(renderer, sx, sy)) {
+      armies.setPreview(sel.id, armies.targetAt(sel, id, w.x, w.y));
+    } else armies.preview = null;
+    renderer.requestRender();
   },
   onLeave() {
     state.setHovered(-1);
@@ -228,9 +286,28 @@ const input = new InputController(canvas, camera, {
     if (state.phase === 'setup') {
       const owner = state.getProvince(id)?.owner ?? -1;
       if (owner >= 0) ui.choosePendingNation(owner);
-    } else {
-      state.setSelected(id);
+      return;
     }
+    const hit = hitTest(renderer, sx, sy);
+    const sel = armies.list.get(state.selectedArmyId);
+    const commanding = sel && sel.nation === state.playerNationId;
+    if (hit?.kind === 'battle') { feed.open(hit.id); return; }
+    if (hit?.kind === 'army') {
+      const target = armies.list.get(hit.id);
+      // With one of your armies selected, clicking an enemy counter attacks it.
+      if (commanding && target && target.nation !== sel.nation) { orderMove(sel, target.seg ? target.seg.to : target.node); return; }
+      state.setSelected(-1);
+      state.setSelectedArmy(hit.id === state.selectedArmyId ? -1 : hit.id);
+      return;
+    }
+    if (commanding) {
+      const node = armies.targetAt(sel, id, w.x, w.y);
+      if (node < 0) { notice(sel.kind === 'naval' ? 'Fleets can only sail through sea zones.' : 'Pick a province or a sea zone.'); return; }
+      orderMove(sel, node);
+      return;
+    }
+    if (id < 0) state.setSelectedArmy(-1);
+    state.setSelected(id);
   },
 });
 
@@ -341,8 +418,23 @@ function ambientPan(dt) {
   renderer.requestRender();
 }
 
+// Keep a newly selected army in view (on phones the panel covers the lower part of the map).
+state.events.on('select:army', (id) => {
+  const a = armies.list.get(id);
+  if (!a || state.phase !== 'playing') return;
+  requestAnimationFrame(() => {
+    const p = armies.armyPos(a);
+    const s = camera.worldToScreen(p.x, p.y);
+    const i = hudInsets();
+    const m = 40;
+    if (s.x < i.left + m || s.x > camera.viewW - i.right - m || s.y < i.top + m || s.y > camera.viewH - i.bottom - m) focusOn(p.x, p.y, camera.zoom, 0.5);
+  });
+});
 state.events.on('phase', (phase) => document.body.classList.toggle('in-game', phase === 'playing'));
-state.events.on('map:loaded', () => { if (screens.ambient) menuCamera(); });
+state.events.on('map:loaded', () => {
+  screens.gameInProgress = false; // a new map ends any game in progress
+  if (screens.ambient) menuCamera();
+});
 
 // Real sign-in when Supabase is configured; otherwise (claude.ai preview,
 // local dev) a demo sign-in that fakes an approved owner on this device.
@@ -366,6 +458,8 @@ function frame(now) {
 
   const gameHours = state.tick(dt);
   for (const system of systems) system.update(state, gameHours);
+  if (gameHours > 0 && armies.list.size) renderer.requestRender(); // armies move, battles pulse
+  feed.update(dt);
 
   renderer.render();
   adaptQuality(dt);
@@ -375,4 +469,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed };

@@ -61,6 +61,7 @@ export class UI {
     this.fpsTime = 0;
     this.statusTimer = 0;
     this.nationStats = [];
+    this.command = null; // CommandUI (armies, recruiting, war), attached by main.js
 
     this.el = {
       hud: $('#hud'),
@@ -99,8 +100,7 @@ export class UI {
     ev.on('map:loaded', () => this.onMapLoaded());
     ev.on('phase', (phase) => this.onPhase(phase));
     ev.on('player', () => this.renderPlayer());
-    ev.on('select', () => this.renderProvincePanel());
-    ev.on('province:owner', () => this.renderProvincePanel());
+    for (const e of ['select', 'select:army', 'province:owner', 'war']) ev.on(e, () => this.renderProvincePanel());
     ev.on('hover', (id) => this.renderHoverStatus(id));
     ev.on('clock:speed', () => this.renderSpeed());
   }
@@ -290,7 +290,10 @@ export class UI {
     this.el.menuBtn.addEventListener('click', () => this.actions.returnToMenu());
     window.addEventListener('keydown', (e) => {
       if (e.target instanceof HTMLInputElement) return;
-      if (e.key === 'Escape') this.state.setSelected(-1);
+      if (e.key === 'Escape') {
+        if (this.state.selectedArmyId >= 0) this.state.setSelectedArmy(-1);
+        else this.state.setSelected(-1);
+      }
       if (e.key === ' ' && this.state.phase === 'playing') {
         e.preventDefault();
         this.state.setSpeed(this.state.clock.speed === 0 ? 1 : 0);
@@ -316,7 +319,9 @@ export class UI {
   // --- Province panel --------------------------------------------------------
 
   bindPanel() {
+    this.el.panel.addEventListener('change', (e) => this.command?.handleChange(e));
     this.el.panel.addEventListener('click', (e) => {
+      if (this.command?.handleClick(e)) return;
       if (e.target.closest('[data-action="close"]')) this.state.setSelected(-1);
       const nb = e.target.closest('[data-province]');
       if (nb) this.actions.focusProvince(Number(nb.dataset.province));
@@ -326,10 +331,20 @@ export class UI {
   renderProvincePanel() {
     const { state, el } = this;
     const p = state.getProvince(state.selectedProvinceId);
-    const open = !!p && state.phase === 'playing';
+    const army = this.command?.sim.armies.list.get(state.selectedArmyId);
+    const open = (!!p || !!army) && state.phase === 'playing';
     el.panel.classList.toggle('open', open);
+    el.panel.classList.toggle('army-mode', !!army);
     el.panel.setAttribute('aria-hidden', String(!open));
-    if (!open) return;
+    if (!open) { this.command?.markRendered(); this.panelKey = ''; return; }
+    // A different province or army starts at the top; live refreshes keep the scroll position.
+    const key = army ? `a${army.id}` : `p${p.id}`;
+    if (key !== this.panelKey) { this.panelKey = key; el.panel.scrollTop = 0; }
+    if (army) {
+      el.panel.innerHTML = this.command.armyHtml(army);
+      this.command.markRendered();
+      return;
+    }
 
     const map = state.map;
     const owner = state.getNation(p.owner);
@@ -382,9 +397,11 @@ export class UI {
         <dt>MODIFIERS</dt>
         <dd>DEF ×${terrain.defense.toFixed(2)} · MOVE ×${terrain.moveCost.toFixed(2)}</dd>
       </dl>
+      ${this.command ? this.command.provinceHtml(p) : ''}
       <div class="section-title">ADJACENT PROVINCES</div>
       <ul class="neighbor-list">${neighbors || '<li class="empty">None — island province</li>'}</ul>`;
     if (owner) el.panel.querySelector('.flag-slot').replaceWith(flagCanvas(owner.flag, 24, 16));
+    this.command?.markRendered();
   }
 
   // --- Status bar & per-frame ------------------------------------------------
@@ -422,6 +439,8 @@ export class UI {
       this.el.clockDate.textContent = `${pad(t.getUTCDate())} ${MONTHS[t.getUTCMonth()]} ${fmtYear(t.getUTCFullYear())}`;
       this.el.clockTime.textContent = `${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}Z`;
     }
+
+    if (this.state.phase === 'playing' && this.command?.update(dt, this.el.panel)) this.renderProvincePanel();
 
     this.fpsFrames++;
     this.fpsTime += dt;
