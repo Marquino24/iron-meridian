@@ -9,7 +9,7 @@
 //   node tools/bundle.mjs            → full HTML document
 //   node tools/bundle.mjs --fragment → no <html>/<head>/<body> wrapper (for hosts that add their own)
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -63,11 +63,19 @@ const body = html
 const css = read('styles.css');
 const safeJs = js.replace(/<\/script/gi, '<\\/script');
 
+// Era data: one inert JSON block per era, parsed only when that era is chosen.
+const eraDir = join(root, 'data/eras');
+const eraTags = existsSync(eraDir)
+  ? readdirSync(eraDir).filter((f) => f.endsWith('.json')).sort().map((f) =>
+    `<script type="application/json" id="era-data-${f.replace(/\.json$/, '')}">${readFileSync(join(eraDir, f), 'utf8').replace(/</g, '\\u003c')}</script>`)
+  : [];
+
 const inner = [
   title,
   ...headLinks,
   `<style>\n${css}</style>`,
   body,
+  ...eraTags,
   `<script type="module">\n${safeJs}\n</script>`,
 ].join('\n');
 
@@ -80,4 +88,4 @@ const out = fragment
 const file = join(root, 'dist', fragment ? 'iron-meridian.fragment.html' : 'iron-meridian.html');
 mkdirSync(dirname(file), { recursive: true });
 writeFileSync(file, out);
-console.log(`wrote ${file} (${(out.length / 1024).toFixed(1)} KB; modules: ${order.join(' → ')})`);
+console.log(`wrote ${file} (${(Buffer.byteLength(out) / 1024).toFixed(1)} KB; ${eraTags.length} eras; modules: ${order.join(' → ')})`);

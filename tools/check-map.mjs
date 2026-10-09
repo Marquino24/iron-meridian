@@ -19,7 +19,7 @@ for (let s = 0; s < 200; s++) {
     if (own.length < 8) errs.push('tiny nation ' + own.length);
   }
   const cities = P.filter(p=>p.isCity).length; if (Math.abs(cities/P.length - 0.15) > 0.03) errs.push('cities '+cities);
-  for (const p of P.slice(0,20)) if (pickProvince(m, p.site.x, p.site.y) !== p.id) errs.push('pick');
+  for (const p of P.slice(0,20)) if (pickProvince(m, p.site.x, p.site.y) !== p.id || !p.rings?.[0]?.length) errs.push('pick');
   if (new Set(P.map(p=>p.name)).size !== P.length) errs.push('dupe names');
   if (errs.length) { bad++; console.log(seed, [...new Set(errs)].join(', ')); }
 }

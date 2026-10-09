@@ -49,7 +49,7 @@ export class GameState {
     this.hoveredProvinceId = -1;
     this.selectedProvinceId = -1;
     this.focusedNationId = -1;
-    this.clock = { time: START_DATE, speed: 1 };
+    this.clock = { time: START_DATE, start: START_DATE, speed: 1 };
   }
 
   // --- Accessors -----------------------------------------------------------
@@ -58,6 +58,7 @@ export class GameState {
   get nations() { return this.map ? this.map.nations : []; }
   getProvince(id) { return id >= 0 ? this.provinces[id] ?? null : null; }
   getNation(id) { return id >= 0 ? this.nations[id] ?? null : null; }
+  get era() { return this.map?.era ?? null; }
   get playerNation() { return this.getNation(this.playerNationId); }
 
   provincesOf(nationId) { return this.provinces.filter((p) => p.owner === nationId); }
@@ -80,7 +81,8 @@ export class GameState {
     this.hoveredProvinceId = -1;
     this.selectedProvinceId = -1;
     this.focusedNationId = -1;
-    this.clock.time = START_DATE;
+    // Real-world eras start on their own date; the fictional world on START_DATE.
+    this.clock.start = this.clock.time = map.startDate ?? START_DATE;
     this.events.emit('map:loaded', map);
     this.events.emit('phase', this.phase);
   }

@@ -269,6 +269,8 @@ function displayName(era, group) {
 
 function shortName(era, group, name) {
   if (era.shortNames?.[group.key]) return era.shortNames[group.key];
+  // A curated long name ("French Republic") keeps the dataset's short key ("France") for map labels.
+  if (era.names?.[group.key] && era.source === 'hb') return group.key;
   return name
     .replace(/^(The )?(Kingdom|Empire|Republic|Principality|Grand Duchy|Duchy|Sultanate|Emirate|Free State|Dominion|Commonwealth|Union|Federation) of (the )?/i, '')
     .replace(/,.*$/, '');
@@ -368,6 +370,19 @@ async function buildEra(era, places) {
     return null;
   };
 
+  /** Nearest point of a specific country within `maxR` units (for capitals near a border). */
+  const nearestInCountry = (x, y, ci, maxR = 30) => {
+    if (countryAt(x, y) === ci) return { x, y, country: ci };
+    for (let r = 1; r <= maxR; r += r < 6 ? 1 : 2) {
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+        if (countryAt(px, py) === ci) return { x: px, y: py, country: ci };
+      }
+    }
+    return null;
+  };
+
   // --- Capitals ---------------------------------------------------------------
   const stats = { capitalsCurated: 0, capitalsFromNE: 0, capitalsGenerated: 0, unplaced: [] };
   const nationCountries = countries.filter((c) => !c.unclaimed);
@@ -380,8 +395,8 @@ async function buildEra(era, places) {
     const cur = era.capitals?.[c.key];
     if (cur) {
       const pt = project(cur[2], cur[1]);
-      const s = snapToLand(pt.x, pt.y, ci);
-      if (s && s.country === ci) { cap = { name: cur[0], x: s.x, y: s.y }; stats.capitalsCurated++; }
+      const s = nearestInCountry(pt.x, pt.y, ci);
+      if (s) { cap = { name: cur[0], x: s.x, y: s.y }; stats.capitalsCurated++; }
       else stats.unplaced.push(`${c.key} capital ${cur[0]}`);
     }
     if (!cap && era.id !== 'rome' && era.id !== 'medieval') {
@@ -424,8 +439,28 @@ async function buildEra(era, places) {
     added++;
   }
 
+  // Big countries get at least a few of their own largest cities, even when
+  // they are missing from the global top list (e.g. the USSR in 1938).
+  if (!era.cities) {
+    const ranked = places.filter((p) => (FOUNDED[p.key] ?? 0) <= eraYear).sort((a, b) => b.pop - a.pop);
+    for (const [ci, c] of countries.entries()) {
+      if (c.unclaimed) continue;
+      const want = Math.min(8, Math.floor(Math.pow(c.area, 0.5) / 55));
+      for (const p of ranked) {
+        if (c.cities.length >= want) break;
+        const pt = project(p.lon, p.lat);
+        if (pt.x < c.bbox[0] || pt.x > c.bbox[2] || pt.y < c.bbox[1] || pt.y > c.bbox[3]) continue;
+        const s = snapToLand(pt.x, pt.y, ci);
+        if (!s || s.country !== ci) continue;
+        if (allCities().some((o) => Math.hypot(o.x - s.x, o.y - s.y) < CFG.cityMergeDist * 1.5)) continue;
+        c.cities.push({ name: eraCityName(era, p), x: s.x, y: s.y, capital: false, priority: 500 });
+      }
+    }
+  }
+
   // --- Province counts per country ------------------------------------------------
-  const weight = (c) => Math.pow(Math.max(c.area, 1), CFG.sizeExponent);
+  // Unclaimed land (peoples/cultures) gets fewer, larger provinces so states get the detail.
+  const weight = (c) => Math.pow(Math.max(c.area, 1), CFG.sizeExponent) * (c.unclaimed ? 0.3 : 1);
   const countFor = (c, k) => Math.max(1, c.cities.length, Math.round(k * weight(c)));
   let lo = 0, hi = 10;
   for (let it = 0; it < 50; it++) {
@@ -642,8 +677,26 @@ async function buildEra(era, places) {
     }
     return out;
   };
+  /** A point safely inside the (quantized) province, near its seed. */
+  const interiorPoint = (p) => {
+    const qr = p.rings.map((r) => r.map(([x, y]) => [Math.round(x / Q) * Q, Math.round(y / Q) * Q]));
+    const inside = (x, y) => pointInRings(Math.round(x / Q) * Q, Math.round(y / Q) * Q, qr);
+    if (inside(p.seed.x, p.seed.y)) return p.seed;
+    let best = null, bd = Infinity;
+    const [x0, y0, x1, y1] = p.bbox;
+    const step = Math.max((x1 - x0) / 24, (y1 - y0) / 24, Q);
+    for (let x = x0 + step / 2; x < x1; x += step) for (let y = y0 + step / 2; y < y1; y += step) {
+      if (!inside(x, y)) continue;
+      // Prefer points near the seed but not hugging an edge.
+      const edgeOk = inside(x + step / 3, y) && inside(x - step / 3, y) && inside(x, y + step / 3) && inside(x, y - step / 3);
+      const d = Math.hypot(x - p.seed.x, y - p.seed.y) * (edgeOk ? 1 : 3);
+      if (d < bd) { bd = d; best = { x, y }; }
+    }
+    return best ?? p.seed;
+  };
   const provOut = provinces.map((p) => {
     const owner = nationOfCountry.get(p.country) ?? -1;
+    p.seed = interiorPoint(p);
     const o = {
       o: owner,
       n: p.name,
@@ -654,7 +707,7 @@ async function buildEra(era, places) {
       e: p.edges,
     };
     if (p.city) o.c = p.city.capital ? 2 : 1;
-    if (owner < 0) o.g = countries[p.country].key.slice(1);
+    if (owner < 0 && countries[p.country].key !== '~Unknown') o.g = countries[p.country].key.slice(1);
     return o;
   });
   nations.forEach((n, i) => {

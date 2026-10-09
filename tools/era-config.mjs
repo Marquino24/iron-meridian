@@ -147,6 +147,7 @@ export const ERAS = [
     aliases: {},
     majors: ['Roman Empire', 'Parthian Empire', 'Han', 'Kushan Empire', 'Satavahanihara', 'Axum', 'Koguryo', 'Saka Kingdom'],
     names: { Han: 'Han Empire', Satavahanihara: 'Satavahana Empire', Koguryo: 'Goguryeo', 'S. Xiongnu': 'Southern Xiongnu' },
+    shortNames: { Han: 'Han Empire', Satavahanihara: 'Satavahana', Koguryo: 'Goguryeo', 'S. Xiongnu': 'S. Xiongnu' },
     colors: { 'Roman Empire': '#9b2d30', 'Parthian Empire': '#3f6a8a', Han: '#c9963a', 'Kushan Empire': '#7f5ea8', Satavahanihara: '#3e8f78', Axum: '#a8743a' },
     capitals: {
       'Roman Empire': ['Roma', 41.893, 12.483], 'Parthian Empire': ['Ctesiphon', 33.094, 44.581], Han: ["Luoyang", 34.62, 112.45],
@@ -177,6 +178,7 @@ export const ERAS = [
     aliases: {},
     majors: ['Holy Roman Empire', 'Byzantine Empire', 'France', 'Angevin Empire', 'Song Empire', 'Mongol Empire', 'Khwarazmian dynasty', 'Almohad Caliphate'],
     names: { France: 'Kingdom of France', 'Imperial Japan (Fujiwara)': 'Japan (Fujiwara)', Liao: 'Liao (Jin)', Britany: 'Brittany', Burgandy: 'Burgundy' },
+    shortNames: { 'Imperial Japan (Fujiwara)': 'Japan', Liao: 'Liao', Britany: 'Brittany', Burgandy: 'Burgundy', 'Kara Khitai Khaganate': 'Kara Khitai', 'Principality of Vladimir-Suzdal': 'Vladimir-Suzdal', 'Principality of Galicia-Volhynia': 'Galicia-Volhynia' },
     colors: { 'Holy Roman Empire': '#c9a645', 'Byzantine Empire': '#7d4fa0', France: '#4d6fb8', 'Angevin Empire': '#b5523b', 'Song Empire': '#c9783a', 'Mongol Empire': '#6b8f3e', 'Khwarazmian dynasty': '#3c8f94', 'Almohad Caliphate': '#5d8f5a' },
     capitals: {
       'Holy Roman Empire': ['Aachen', 50.776, 6.084], 'Byzantine Empire': ['Constantinople', 41.008, 28.978], France: ['Paris', 48.857, 2.352],

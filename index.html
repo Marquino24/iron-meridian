@@ -52,11 +52,14 @@
 
   <section id="start-screen" class="start">
     <div class="start-card">
-      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.1</div>
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.2</div>
       <h1>IRON<span>MERIDIAN</span></h1>
-      <p class="tagline">Select a nation to assume command. Click a card or any territory on the map.</p>
+      <p class="tagline">Choose an era, then a nation to command. Click a name or any territory on the map.</p>
 
-      <div class="seed-row">
+      <div class="section-title">ERA</div>
+      <div id="era-grid" class="era-grid" role="group" aria-label="Era"></div>
+
+      <div id="seed-row" class="seed-row" hidden>
         <label for="seed-input">MAP SEED</label>
         <input id="seed-input" spellcheck="false" autocomplete="off" maxlength="32">
         <button id="btn-load-seed" type="button" class="btn ghost" title="Generate the map for this seed">LOAD</button>
@@ -64,10 +67,20 @@
       </div>
 
       <div id="map-stats" class="map-stats"></div>
-      <div id="nation-grid" class="nation-grid"></div>
+
+      <div class="picker-head">
+        <div class="section-title">NATION</div>
+        <div id="nation-filter" class="filter-tabs" role="group" aria-label="Filter nations">
+          <button type="button" data-filter="major">MAJOR POWERS</button>
+          <button type="button" data-filter="all">ALL</button>
+        </div>
+      </div>
+      <input id="nation-search" class="nation-search" type="search" placeholder="Search nations…" autocomplete="off" spellcheck="false" aria-label="Search nations">
+      <div id="nation-list" class="nation-list" role="listbox" aria-label="Nations"></div>
 
       <button id="btn-deploy" type="button" class="btn primary" disabled>SELECT A NATION</button>
       <p class="hint">DRAG to pan · SCROLL / PINCH to zoom · WASD / ARROWS · ESC deselect · SPACE pause</p>
+      <p id="data-source" class="data-source"></p>
     </div>
   </section>
 

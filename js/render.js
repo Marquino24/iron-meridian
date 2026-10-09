@@ -1,20 +1,21 @@
 /**
  * render.js — Canvas renderer for the strategic map.
  *
- * Performance strategy (60 fps pan/zoom):
- *   - All geometry is converted once into Path2D objects (per province, per
- *     terrain, border classes). A frame is just a handful of fills/strokes
- *     under a single world transform.
- *   - Line widths are divided by zoom so borders stay crisp at any scale.
- *   - Frames are drawn only when something changed (`requestRender()`),
- *     so an idle map costs ~nothing.
+ * Performance strategy (60 fps pan/zoom with 1000+ provinces):
+ *   - Geometry is converted once into Path2D objects: one per province, one
+ *     per nation, and border/coast segments bucketed into spatial chunks.
+ *   - Level of detail by on-screen province size (`provincePx`):
+ *       zoomed out → one fill per nation, no province borders, no terrain
+ *       zoomed in  → per-province fills, culled to the viewport, terrain
+ *                    symbols and province borders fade in.
+ *   - Border chunks outside the viewport are skipped.
+ *   - Labels/icons appear only when their province or nation is big enough
+ *     on screen, and labels never overlap (greedy placement).
+ *   - Frames are drawn only when something changed (`requestRender()`).
  *
  * Cache layers:
- *   buildGeometry()   — depends only on map geometry (once per map)
- *   rebuildOwnership()— depends on province owners (on conquest etc.)
- *
- * Later steps can add layers (units, fronts, supply lines) by extending
- * render() between the province layer and the screen-space overlay.
+ *   buildGeometry()    — depends only on map geometry (once per map)
+ *   rebuildOwnership() — depends on province owners (on conquest etc.)
  */
 
 const COLORS = {
@@ -25,22 +26,26 @@ const COLORS = {
   gridMajor: 'rgba(90,165,185,0.15)',
   coastGlow: 'rgba(110,190,210,0.10)',
   coast: 'rgba(165,215,225,0.55)',
-  provinceBorder: 'rgba(6,10,12,0.4)',
+  provinceBorder: 'rgba(6,10,12,0.42)',
   nationBorderDark: 'rgba(4,6,8,0.92)',
   nationBorderLight: 'rgba(235,228,205,0.5)',
-  playerOutline: 'rgba(255,214,120,0.8)',
+  playerOutline: 'rgba(255,214,120,0.85)',
   dimOthers: 'rgba(3,6,8,0.6)',
-  hoverFill: 'rgba(255,255,255,0.10)',
-  hoverStroke: 'rgba(255,255,255,0.65)',
-  selectFill: 'rgba(255,200,80,0.14)',
+  hoverFill: 'rgba(255,255,255,0.12)',
+  hoverStroke: 'rgba(255,255,255,0.7)',
+  selectFill: 'rgba(255,200,80,0.16)',
   selectGlow: 'rgba(255,190,60,0.30)',
   select: '#ffd25a',
   label: '#ece6d2',
+  labelDim: 'rgba(214,208,190,0.7)',
   labelHalo: 'rgba(4,7,9,0.88)',
+  unclaimed: '#4d5048',
 };
 
 const FONT_UI = '"Rajdhani", "Segoe UI", system-ui, sans-serif';
-const TERRAIN_TILE = 30; // world units per terrain pattern tile
+
+/** On-screen province size (px) at which per-province detail switches on. */
+const DETAIL_PX = 26;
 
 /** How each terrain shifts the nation color: mix toward tint, then scale brightness. */
 const TERRAIN_SHADE = {
@@ -70,22 +75,70 @@ function hash01(n) {
   return (x >>> 0) / 4294967296;
 }
 
-function tracePolygon(path, poly) {
-  path.moveTo(poly[0].x, poly[0].y);
-  for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
-  path.closePath();
+function traceRings(path, rings) {
+  for (const poly of rings) {
+    if (poly.length < 3) continue;
+    path.moveTo(poly[0].x, poly[0].y);
+    for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
+    path.closePath();
+  }
 }
+
+const baseColor = (nation) => (nation ? mix(hexToRgb(nation.color), [20, 26, 30], 0.15) : hexToRgb(COLORS.unclaimed));
 
 function provinceFill(province, nation) {
-  const base = mix(hexToRgb(nation.color), [20, 26, 30], 0.15);
   const shade = TERRAIN_SHADE[province.terrain];
-  let c = shade.tint ? mix(base, shade.tint, shade.amount) : base;
+  let c = baseColor(nation);
+  if (shade.tint) c = mix(c, shade.tint, shade.amount);
   const jitter = 0.95 + hash01(province.id) * 0.1;
-  c = c.map((v) => v * shade.k * jitter);
-  return rgb(c);
+  return rgb(c.map((v) => v * shade.k * jitter));
 }
 
-/** Terrain symbol tiles, drawn at 2× and scaled so they stay crisp. */
+const intersects = (b, v) => b.x1 >= v.x0 && b.x0 <= v.x1 && b.y1 >= v.y0 && b.y0 <= v.y1;
+
+/**
+ * Line segments bucketed into a spatial grid so only on-screen chunks are
+ * stroked. Each chunk tracks the real extent of its segments.
+ */
+class ChunkedPath {
+  constructor(width, height, n = 10) {
+    this.cw = width / n;
+    this.ch = height / n;
+    this.n = n;
+    this.chunks = new Map();
+  }
+  add(x1, y1, x2, y2) {
+    const gx = clamp(Math.floor((x1 + x2) / 2 / this.cw), 0, this.n - 1);
+    const gy = clamp(Math.floor((y1 + y2) / 2 / this.ch), 0, this.n - 1);
+    const key = gy * this.n + gx;
+    let c = this.chunks.get(key);
+    if (!c) {
+      c = { path: new Path2D(), x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      this.chunks.set(key, c);
+    }
+    c.path.moveTo(x1, y1);
+    c.path.lineTo(x2, y2);
+    c.x0 = Math.min(c.x0, x1, x2); c.y0 = Math.min(c.y0, y1, y2);
+    c.x1 = Math.max(c.x1, x1, x2); c.y1 = Math.max(c.y1, y1, y2);
+  }
+  stroke(ctx, view) {
+    for (const c of this.chunks.values()) if (intersects(c, view)) ctx.stroke(c.path);
+  }
+}
+
+/** Greedy non-overlapping label placement for one frame. */
+class LabelSpace {
+  constructor() { this.rects = []; }
+  claim(x, y, w, h) {
+    const r = { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 };
+    // Strict overlap: boxes that merely touch are fine.
+    for (const o of this.rects) if (r.x1 > o.x0 && r.x0 < o.x1 && r.y1 > o.y0 && r.y0 < o.y1) return false;
+    this.rects.push(r);
+    return true;
+  }
+}
+
+/** Terrain symbol tiles, drawn at 2× (64px); scaled per map in buildGeometry(). */
 function createTerrainPatterns(ctx) {
   const S = 32, R = 2;
   const make = (draw) => {
@@ -95,7 +148,6 @@ function createTerrainPatterns(ctx) {
     g.scale(R, R);
     draw(g);
     const pattern = ctx.createPattern(c, 'repeat');
-    pattern.setTransform?.(new DOMMatrix().scale(TERRAIN_TILE / (S * R)));
     return pattern;
   };
   const tree = (g, x, y) => {
@@ -205,9 +257,11 @@ export class Renderer {
     this.lastFrameMs = 0;
 
     const redraw = () => this.requestRender();
+    const relayer = () => this.invalidateLayer();
     state.events.on('map:loaded', () => this.buildGeometry());
     state.events.on('province:owner', () => this.rebuildOwnership());
-    for (const evt of ['hover', 'select', 'focus:nation', 'player', 'phase']) state.events.on(evt, redraw);
+    for (const evt of ['hover', 'select']) state.events.on(evt, redraw);
+    for (const evt of ['focus:nation', 'player', 'phase']) state.events.on(evt, relayer);
     document.fonts?.ready.then(redraw);
   }
 
@@ -220,7 +274,7 @@ export class Renderer {
     this.canvas.width = Math.max(1, Math.round(rect.width * this.dpr));
     this.canvas.height = Math.max(1, Math.round(rect.height * this.dpr));
     this.camera.setViewport(rect.width, rect.height);
-    this.requestRender();
+    this.invalidateLayer();
   }
 
   // --- Caches ----------------------------------------------------------------
@@ -229,73 +283,91 @@ export class Renderer {
     const map = this.state.map;
     const provincePaths = map.provinces.map((p) => {
       const path = new Path2D();
-      tracePolygon(path, p.polygon);
+      traceRings(path, p.rings);
       return path;
     });
 
-    const terrainPaths = { forest: new Path2D(), mountains: new Path2D(), urban: new Path2D() };
-    for (const p of map.provinces) {
-      if (terrainPaths[p.terrain]) tracePolygon(terrainPaths[p.terrain], p.polygon);
-    }
-
     const shallowPath = new Path2D();
-    for (const s of map.seaZones) if (s.coastalProvinces.length) tracePolygon(shallowPath, s.polygon);
+    for (const s of map.seaZones) if (s.coastalProvinces.length) traceRings(shallowPath, [s.polygon]);
 
-    const coastPath = new Path2D();
-    for (const b of map.borders) {
-      if (b.kind !== 'coast') continue;
-      coastPath.moveTo(b.x1, b.y1);
-      coastPath.lineTo(b.x2, b.y2);
-    }
+    const coast = new ChunkedPath(map.width, map.height);
+    for (const b of map.borders) if (b.kind === 'coast') coast.add(b.x1, b.y1, b.x2, b.y2);
 
-    const cities = map.provinces.filter((p) => p.isCity);
-    this.cache = { provincePaths, terrainPaths, shallowPath, coastPath, cities };
+    // Terrain symbols scale with the map's typical province size.
+    const tile = clamp(map.provinceScale * 0.42, 14, 40);
+    for (const pat of Object.values(this.patterns)) pat.setTransform?.(new DOMMatrix().scale(tile / 64));
+
+    const cities = map.provinces.filter((p) => p.isCity).sort((a, b) => Number(b.isCapital) - Number(a.isCapital) || b.area - a.area);
+    this.cache = { provincePaths, shallowPath, coast, cities };
     this.rebuildOwnership();
   }
 
   rebuildOwnership() {
-    const { provinces, nations, borders } = this.state.map;
+    const map = this.state.map;
+    const { provinces, nations, borders } = map;
     const c = this.cache;
     c.fills = provinces.map((p) => provinceFill(p, nations[p.owner]));
+    c.nationFills = nations.map((n) => rgb(baseColor(n)));
 
-    c.provinceBorderPath = new Path2D();
-    c.nationBorderPath = new Path2D();
+    c.provinceBorders = new ChunkedPath(map.width, map.height);
+    c.nationBorders = new ChunkedPath(map.width, map.height);
     c.nationOutlines = nations.map(() => new Path2D());
     c.nationAreas = nations.map(() => new Path2D());
-    for (const p of provinces) tracePolygon(c.nationAreas[p.owner], p.polygon);
+    c.unclaimedArea = new Path2D();
+    for (const p of provinces) traceRings(p.owner >= 0 ? c.nationAreas[p.owner] : c.unclaimedArea, p.rings);
 
     for (const b of borders) {
       const oa = provinces[b.a].owner;
       if (b.kind === 'coast') {
-        c.nationOutlines[oa].moveTo(b.x1, b.y1);
-        c.nationOutlines[oa].lineTo(b.x2, b.y2);
+        if (oa >= 0) { c.nationOutlines[oa].moveTo(b.x1, b.y1); c.nationOutlines[oa].lineTo(b.x2, b.y2); }
         continue;
       }
       const ob = provinces[b.b].owner;
-      const target = oa === ob ? c.provinceBorderPath : c.nationBorderPath;
-      target.moveTo(b.x1, b.y1);
-      target.lineTo(b.x2, b.y2);
-      if (oa !== ob) {
-        for (const o of [oa, ob]) { c.nationOutlines[o].moveTo(b.x1, b.y1); c.nationOutlines[o].lineTo(b.x2, b.y2); }
-      }
+      if (oa === ob) { c.provinceBorders.add(b.x1, b.y1, b.x2, b.y2); continue; }
+      c.nationBorders.add(b.x1, b.y1, b.x2, b.y2);
+      for (const o of [oa, ob]) if (o >= 0) { c.nationOutlines[o].moveTo(b.x1, b.y1); c.nationOutlines[o].lineTo(b.x2, b.y2); }
     }
 
-    // Nation label anchor: the non-city member province closest to the
-    // area-weighted centroid (so the label never sits on a city icon).
-    c.nationLabels = nations.map((n) => {
-      const own = provinces.filter((p) => p.owner === n.id);
+    // Labels: nations, plus named unclaimed regions (peoples/cultures in early eras).
+    const groupLabel = (members) => {
       let area = 0, cx = 0, cy = 0;
-      for (const p of own) { area += p.area; cx += p.center.x * p.area; cy += p.center.y * p.area; }
+      for (const p of members) {
+        const w = Math.max(p.area, 1); // tiny islands can round to zero area
+        area += w; cx += p.center.x * w; cy += p.center.y * w;
+      }
       cx /= area; cy /= area;
-      const candidates = own.filter((p) => !p.isCity);
-      let best = null, bd = Infinity;
-      for (const p of candidates.length ? candidates : own) {
+      const candidates = members.filter((p) => !p.isCity);
+      let best = members[0], bd = Infinity;
+      for (const p of candidates.length ? candidates : members) {
         const d = (p.center.x - cx) ** 2 + (p.center.y - cy) ** 2;
         if (d < bd) { bd = d; best = p; }
       }
       return { x: best.center.x, y: best.center.y, area };
-    });
-    this.requestRender();
+    };
+    const byOwner = nations.map(() => []);
+    const byRegion = new Map();
+    for (const p of provinces) {
+      if (p.owner >= 0) byOwner[p.owner].push(p);
+      else if (p.region) { if (!byRegion.has(p.region)) byRegion.set(p.region, []); byRegion.get(p.region).push(p); }
+    }
+    // Nation labels sit on the homeland: the provinces connected to the capital
+    // (so "FRANCE" is in France, not in the Sahara).
+    const homeland = (n, members) => {
+      const cap = provinces[n.capitalId];
+      if (!cap || cap.owner !== n.id) return members;
+      const seen = new Set([cap.id]);
+      const stack = [cap.id];
+      while (stack.length) {
+        for (const nb of provinces[stack.pop()].neighbors) {
+          if (!seen.has(nb) && provinces[nb].owner === n.id) { seen.add(nb); stack.push(nb); }
+        }
+      }
+      return members.filter((p) => seen.has(p.id));
+    };
+    c.nationLabels = nations.map((n, i) => (byOwner[i].length ? { ...groupLabel(homeland(n, byOwner[i])), text: n.shortName.toUpperCase(), nation: n } : null));
+    c.regionLabels = [...byRegion].map(([name, members]) => ({ ...groupLabel(members), text: name }));
+    c.labelOrder = c.nationLabels.filter(Boolean).sort((a, b) => b.area - a.area);
+    this.invalidateLayer();
   }
 
   /** World position for a nation's label / camera focus. */
@@ -303,100 +375,82 @@ export class Renderer {
     return this.cache?.nationLabels[nationId] ?? null;
   }
 
+  /** Visible world rectangle (with a margin). */
+  viewRect(margin = 0) {
+    const cam = this.camera;
+    const tl = cam.screenToWorld(-margin, -margin), br = cam.screenToWorld(cam.viewW + margin, cam.viewH + margin);
+    return { x0: tl.x, y0: tl.y, x1: br.x, y1: br.y };
+  }
+
   // --- Frame -----------------------------------------------------------------
 
-  /** Draws a frame if anything changed. Returns true if it drew. */
+  /** Static layer must be redrawn (ownership, focus, player, map, size changed). */
+  invalidateLayer() {
+    this.layerValid = false;
+    this.requestRender();
+  }
+
+  /**
+   * Draws a frame if anything changed. Returns true if it drew.
+   *
+   * The static map (ocean, land, terrain, borders) lives in an off-screen
+   * layer covering the view plus a margin. Panning just blits it at an
+   * offset; while zooming it is blitted scaled, then redrawn crisply once the
+   * zoom settles. Hover, selection, icons and labels are drawn live on top.
+   */
   render() {
     if (!this.dirty || !this.cache) return false;
     this.dirty = false;
     const t0 = performance.now();
 
     const { ctx, camera: cam, dpr, cache, state } = this;
-    const map = state.map;
     const z = cam.zoom;
-    const px = 1 / z; // one CSS pixel in world units
+    const px = 1 / z;
 
-    // Background outside the world.
+    const use = this.layerUsable();
+    if (!use) this.rebuildLayer();
+    else if (use === 'scaled') this.dirty = true; // redraw crisply once the camera stops
+    this.prevCam = { x: cam.x, y: cam.y, zoom: z };
+
+    // Blit the static layer.
+    const L = this.layerFrame;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = COLORS.void;
-    ctx.fillRect(0, 0, cam.viewW, cam.viewH);
+    if (use === 'scaled') {
+      ctx.fillStyle = COLORS.void;
+      ctx.fillRect(0, 0, cam.viewW, cam.viewH);
+    }
+    // Copy only the visible part of the layer (much cheaper than the whole bitmap).
+    const v = this.viewRect(1);
+    const lx0 = L.x - L.w / 2 / L.zoom, ly0 = L.y - L.h / 2 / L.zoom;
+    const ix0 = Math.max(v.x0, lx0), iy0 = Math.max(v.y0, ly0);
+    const ix1 = Math.min(v.x1, lx0 + L.w / L.zoom), iy1 = Math.min(v.y1, ly0 + L.h / L.zoom);
+    if (ix1 > ix0 && iy1 > iy0) {
+      const s = L.zoom * L.dpr;
+      const d = cam.worldToScreen(ix0, iy0);
+      ctx.imageSmoothingEnabled = use === 'scaled';
+      ctx.imageSmoothingQuality = 'low';
+      ctx.drawImage(this.layer, (ix0 - lx0) * s, (iy0 - ly0) * s, (ix1 - ix0) * s, (iy1 - iy0) * s, d.x, d.y, (ix1 - ix0) * z, (iy1 - iy0) * z);
+      ctx.imageSmoothingEnabled = true;
+    }
 
-    // World transform.
+    // Dynamic world-space layer.
     const ox = cam.viewW / 2 - cam.x * z, oy = cam.viewH / 2 - cam.y * z;
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * ox, dpr * oy);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-
-    // Ocean, tactical grid, shallow water, coastal glow.
-    ctx.fillStyle = COLORS.ocean;
-    ctx.fillRect(0, 0, map.width, map.height);
-    this.drawGrid(px);
-    ctx.fillStyle = COLORS.shallow;
-    ctx.fill(cache.shallowPath);
-    ctx.strokeStyle = COLORS.coastGlow;
-    ctx.lineWidth = 12 * px;
-    ctx.stroke(cache.coastPath);
-
-    // Provinces.
     const paths = cache.provincePaths;
-    for (let i = 0; i < paths.length; i++) {
-      ctx.fillStyle = cache.fills[i];
-      ctx.fill(paths[i]);
-    }
-
-    // Terrain symbols.
-    ctx.globalAlpha = 0.55;
-    for (const t of ['forest', 'mountains', 'urban']) {
-      ctx.fillStyle = this.patterns[t];
-      ctx.fill(cache.terrainPaths[t]);
-    }
-    ctx.globalAlpha = 1;
-
-    // Start screen: dim every nation except the one being previewed.
-    const focus = state.phase === 'setup' ? state.focusedNationId : -1;
-    if (focus >= 0) {
-      ctx.fillStyle = COLORS.dimOthers;
-      cache.nationAreas.forEach((path, i) => { if (i !== focus) ctx.fill(path); });
-    }
-
-    // Borders: province (thin) → nation (thick, two-tone) → coastline.
-    ctx.strokeStyle = COLORS.provinceBorder;
-    ctx.lineWidth = 0.8 * px;
-    ctx.stroke(cache.provinceBorderPath);
-
-    ctx.strokeStyle = COLORS.nationBorderDark;
-    ctx.lineWidth = 3.4 * px;
-    ctx.stroke(cache.nationBorderPath);
-    ctx.strokeStyle = COLORS.nationBorderLight;
-    ctx.lineWidth = 1 * px;
-    ctx.setLineDash([5 * px, 3 * px]);
-    ctx.stroke(cache.nationBorderPath);
-    ctx.setLineDash([]);
-
-    ctx.strokeStyle = COLORS.coast;
-    ctx.lineWidth = 1.3 * px;
-    ctx.stroke(cache.coastPath);
-
-    // Highlight outline: player's nation in game, previewed nation in setup.
-    const outlined = state.phase === 'playing' ? state.playerNationId : focus;
-    if (outlined >= 0) {
-      ctx.strokeStyle = COLORS.playerOutline;
-      ctx.lineWidth = 1.8 * px;
-      ctx.stroke(cache.nationOutlines[outlined]);
-    }
-
     // Hover & selection.
     const hov = state.hoveredProvinceId, sel = state.selectedProvinceId;
     if (hov >= 0 && hov !== sel) {
       ctx.fillStyle = COLORS.hoverFill;
-      ctx.fill(paths[hov]);
+      ctx.fill(paths[hov], 'evenodd');
       ctx.strokeStyle = COLORS.hoverStroke;
       ctx.lineWidth = 1.5 * px;
       ctx.stroke(paths[hov]);
     }
     if (sel >= 0) {
       ctx.fillStyle = COLORS.selectFill;
-      ctx.fill(paths[sel]);
+      ctx.fill(paths[sel], 'evenodd');
       ctx.strokeStyle = COLORS.selectGlow;
       ctx.lineWidth = 7 * px;
       ctx.stroke(paths[sel]);
@@ -407,20 +461,170 @@ export class Renderer {
 
     // Screen-space overlay: icons and labels stay a constant pixel size.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.drawOverlay();
+    this.drawOverlay(state.map.provinceScale * z);
 
     this.lastFrameMs = performance.now() - t0;
     return true;
   }
 
-  /** Grid lines over the visible part of the ocean. */
-  drawGrid(px) {
-    const { ctx, camera: cam } = this;
+  /**
+   * 'exact'  — same zoom and the view is fully inside the layer (pure pan);
+   * 'scaled' — the camera is moving (drag, pinch, zoom animation): reuse the
+   *            layer stretched/shifted and redraw crisply once it stops;
+   * null     — redraw the layer now.
+   */
+  layerUsable() {
+    const L = this.layerFrame;
+    if (!this.layerValid || !L) return null;
+    const cam = this.camera;
+    const ratio = cam.zoom / L.zoom;
+    const v = this.viewRect(0);
+    const hw = L.w / 2 / L.zoom, hh = L.h / 2 / L.zoom;
+    const ix = Math.max(0, Math.min(v.x1, L.x + hw) - Math.max(v.x0, L.x - hw));
+    const iy = Math.max(0, Math.min(v.y1, L.y + hh) - Math.max(v.y0, L.y - hh));
+    const coverage = (ix * iy) / ((v.x1 - v.x0) * (v.y1 - v.y0));
+    if (Math.abs(ratio - 1) < 1e-9 && coverage > 0.9999) return 'exact';
+    // "Moving" includes short pauses mid-gesture: only redraw after 150 ms of stillness.
+    const p = this.prevCam;
+    const now = performance.now();
+    if (!p || p.x !== cam.x || p.y !== cam.y || p.zoom !== cam.zoom) this.lastMoveAt = now;
+    const moving = now - (this.lastMoveAt ?? 0) < 150;
+    return moving && ratio > 0.33 && ratio < 3 && coverage > 0.55 ? 'scaled' : null;
+  }
+
+  rebuildLayer() {
+    const cam = this.camera;
+    const PAD = 0.3;
+    const w = Math.ceil(cam.viewW * (1 + 2 * PAD)), h = Math.ceil(cam.viewH * (1 + 2 * PAD));
+    // iOS caps canvas area at ~16.7 MP; keep well under it.
+    const ldpr = Math.min(this.dpr, Math.sqrt(14e6 / (w * h)));
+    if (!this.layer) {
+      this.layer = document.createElement('canvas');
+      this.layerCtx = this.layer.getContext('2d', { alpha: false });
+    }
+    const pw = Math.round(w * ldpr), ph = Math.round(h * ldpr);
+    if (this.layer.width !== pw || this.layer.height !== ph) {
+      this.layer.width = pw;
+      this.layer.height = ph;
+    }
+    this.layerFrame = { x: cam.x, y: cam.y, zoom: cam.zoom, w, h, dpr: ldpr };
+    this.drawStatic(this.layerCtx, this.layerFrame);
+    this.layerValid = true;
+    this.layerBuilds = (this.layerBuilds ?? 0) + 1;
+  }
+
+  /** Everything that doesn't change while the camera pans. */
+  drawStatic(ctx, F) {
+    const { cache, state } = this;
+    const map = state.map;
+    const z = F.zoom;
+    const px = 1 / z;
+    const view = { x0: F.x - F.w / 2 / z, y0: F.y - F.h / 2 / z, x1: F.x + F.w / 2 / z, y1: F.y + F.h / 2 / z };
+    const provincePx = map.provinceScale * z;
+    const detail = provincePx >= DETAIL_PX;
+
+    ctx.setTransform(F.dpr, 0, 0, F.dpr, 0, 0);
+    ctx.fillStyle = COLORS.void;
+    ctx.fillRect(0, 0, F.w, F.h);
+    const ox = F.w / 2 - F.x * z, oy = F.h / 2 - F.y * z;
+    ctx.setTransform(F.dpr * z, 0, 0, F.dpr * z, F.dpr * ox, F.dpr * oy);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // Ocean, grid/graticule, shallow water, coastal glow.
+    ctx.fillStyle = COLORS.ocean;
+    ctx.fillRect(0, 0, map.width, map.height);
+    this.drawGrid(ctx, px, view);
+    ctx.fillStyle = COLORS.shallow;
+    ctx.fill(cache.shallowPath, 'evenodd');
+    ctx.strokeStyle = COLORS.coastGlow;
+    ctx.lineWidth = 12 * px;
+    cache.coast.stroke(ctx, view);
+
+    // Land.
+    const paths = cache.provincePaths;
+    if (detail) {
+      for (let i = 0; i < paths.length; i++) {
+        if (!intersects(map.provinces[i].bbox, view)) continue;
+        ctx.fillStyle = cache.fills[i];
+        ctx.fill(paths[i], 'evenodd');
+      }
+      const terrainAlpha = clamp((provincePx - 34) / 30, 0, 1) * 0.55;
+      if (terrainAlpha > 0) {
+        ctx.globalAlpha = terrainAlpha;
+        for (let i = 0; i < paths.length; i++) {
+          const p = map.provinces[i];
+          const pat = this.patterns[p.terrain];
+          if (!pat || !intersects(p.bbox, view)) continue;
+          ctx.fillStyle = pat;
+          ctx.fill(paths[i], 'evenodd');
+        }
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      cache.nationAreas.forEach((path, i) => { ctx.fillStyle = cache.nationFills[i]; ctx.fill(path, 'evenodd'); });
+      ctx.fillStyle = COLORS.unclaimed;
+      ctx.fill(cache.unclaimedArea, 'evenodd');
+    }
+
+    // Start screen: dim every nation except the one being previewed.
+    const focus = state.phase === 'setup' ? state.focusedNationId : -1;
+    if (focus >= 0) {
+      ctx.fillStyle = COLORS.dimOthers;
+      cache.nationAreas.forEach((path, i) => { if (i !== focus) ctx.fill(path, 'evenodd'); });
+      ctx.fill(cache.unclaimedArea, 'evenodd');
+    }
+
+    // Borders: province (thin, fades in) → nation (thick, two-tone) → coastline.
+    const provBorderAlpha = clamp((provincePx - DETAIL_PX) / 20, 0, 1);
+    if (provBorderAlpha > 0) {
+      ctx.globalAlpha = provBorderAlpha;
+      ctx.strokeStyle = COLORS.provinceBorder;
+      ctx.lineWidth = 0.8 * px;
+      cache.provinceBorders.stroke(ctx, view);
+      ctx.globalAlpha = 1;
+    }
+    const thick = clamp(provincePx / 12, 1.6, 3.4);
+    ctx.strokeStyle = COLORS.nationBorderDark;
+    ctx.lineWidth = thick * px;
+    cache.nationBorders.stroke(ctx, view);
+    if (detail) {
+      ctx.strokeStyle = COLORS.nationBorderLight;
+      ctx.lineWidth = 1 * px;
+      ctx.setLineDash([5 * px, 3 * px]);
+      cache.nationBorders.stroke(ctx, view);
+      ctx.setLineDash([]);
+    }
+    ctx.strokeStyle = COLORS.coast;
+    ctx.lineWidth = 1.1 * px;
+    cache.coast.stroke(ctx, view);
+
+    // Highlight outline: player's nation in game, previewed nation in setup.
+    const outlined = state.phase === 'playing' ? state.playerNationId : focus;
+    if (outlined >= 0) {
+      ctx.strokeStyle = COLORS.playerOutline;
+      ctx.lineWidth = 1.8 * px;
+      ctx.stroke(cache.nationOutlines[outlined]);
+    }
+  }
+
+  /** Lat/lon graticule on real maps, tactical grid on generated ones. */
+  drawGrid(ctx, px, view) {
     const map = this.state.map;
+    ctx.lineWidth = px;
+    if (map.graticule) {
+      if (!this.cache.graticule) {
+        const path = new Path2D();
+        for (const [a, b] of map.graticule) { path.moveTo(a.x, a.y); path.lineTo(b.x, b.y); }
+        this.cache.graticule = path;
+      }
+      ctx.strokeStyle = COLORS.gridMajor;
+      ctx.stroke(this.cache.graticule);
+      return;
+    }
     const step = map.gridSize;
-    const tl = cam.screenToWorld(0, 0), br = cam.screenToWorld(cam.viewW, cam.viewH);
-    const x0 = Math.max(0, tl.x), x1 = Math.min(map.width, br.x);
-    const y0 = Math.max(0, tl.y), y1 = Math.min(map.height, br.y);
+    const x0 = Math.max(0, view.x0), x1 = Math.min(map.width, view.x1);
+    const y0 = Math.max(0, view.y0), y1 = Math.min(map.height, view.y1);
     const minor = new Path2D(), major = new Path2D();
     for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) {
       const path = x % (step * 5) === 0 ? major : minor;
@@ -430,84 +634,111 @@ export class Renderer {
       const path = y % (step * 5) === 0 ? major : minor;
       path.moveTo(x0, y); path.lineTo(x1, y);
     }
-    ctx.lineWidth = px;
     ctx.strokeStyle = COLORS.grid;
     ctx.stroke(minor);
     ctx.strokeStyle = COLORS.gridMajor;
     ctx.stroke(major);
   }
 
-  drawOverlay() {
+  drawOverlay(provincePx) {
     const { ctx, camera: cam, cache, state } = this;
     const map = state.map;
-    const zr = cam.zoom / cam.refZoom; // 1 ≈ overview
-    const W = cam.viewW, H = cam.viewH, M = 60;
+    const W = cam.viewW, H = cam.viewH, M = 40;
     const onScreen = (s) => s.x > -M && s.y > -M && s.x < W + M && s.y < H + M;
+    const space = new LabelSpace();
+    const z = cam.zoom;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
 
-    // Nation names fade out as you zoom in.
-    const nationAlpha = clamp((2.2 - zr) / 0.8, 0, 1);
+    // 1. City icons (claim their space first so labels avoid them).
+    const iconScale = clamp(0.8 + (provincePx - 30) / 200, 0.8, 1.3);
+    const shownCities = [];
+    for (const p of cache.cities) {
+      const ps = Math.sqrt(p.area) * z; // this province's size on screen
+      const nation = map.nations[p.owner];
+      const major = p.isCapital && nation?.major;
+      const visible = major || (p.isCapital ? ps >= 12 : ps >= 18);
+      if (!visible) continue;
+      const s = cam.worldToScreen(p.center.x, p.center.y);
+      if (!onScreen(s)) continue;
+      const r = p.isCapital ? 6 * iconScale : 3.6 * iconScale;
+      // Major powers' capitals always show; everything else yields to what's already placed.
+      if (!space.claim(s.x, s.y, r * 2 + 2, r * 2 + 2) && !major) continue;
+      if (p.isCapital) this.drawCapitalIcon(s.x, s.y, r);
+      else this.drawCityIcon(s.x, s.y, r);
+      shownCities.push({ p, s, ps, r });
+    }
+
+    // 2. Nation names, largest first, only where they fit; fade out when zoomed far in.
+    const nationAlpha = clamp((120 - provincePx) / 50, 0, 1);
     if (nationAlpha > 0) {
-      for (const n of map.nations) {
-        const a = cache.nationLabels[n.id];
+      ctx.globalAlpha = nationAlpha * 0.88;
+      for (const a of cache.labelOrder) {
         const s = cam.worldToScreen(a.x, a.y);
         if (!onScreen(s)) continue;
-        const size = clamp(Math.sqrt(a.area) * cam.zoom * 0.075, 11, 30);
-        const text = n.shortName.toUpperCase();
+        const extent = Math.sqrt(a.area) * z;
+        const size = clamp(extent * 0.14, 9, 28);
         ctx.font = `700 ${size.toFixed(1)}px ${FONT_UI}`;
-        if (this.hasLetterSpacing) ctx.letterSpacing = `${(size * 0.3).toFixed(1)}px`;
-        // If the label would cover the capital star, drop it just below the icon.
-        const cap = map.provinces[n.capitalId].center;
-        const cs = cam.worldToScreen(cap.x, cap.y);
-        if (Math.abs(cs.x - s.x) < ctx.measureText(text).width / 2 + 10 && Math.abs(cs.y - s.y) < size / 2 + 12) {
-          s.y = cs.y + 14 + size / 2;
-        }
-        ctx.globalAlpha = nationAlpha * 0.85;
-        this.haloText(text, s.x, s.y, 4);
+        const spacing = size * 0.22;
+        if (this.hasLetterSpacing) ctx.letterSpacing = `${spacing.toFixed(1)}px`;
+        const w = ctx.measureText(a.text).width;
+        if (w > extent * 1.7 && !(a.nation.major && extent > 18)) continue;
+        // Try the anchor, then just above/below it (city icons often sit on the anchor).
+        const dy = [0, -1.15, 1.15, -2.3, 2.3].map((k) => k * size).find((d) => space.claim(s.x, s.y + d, w + 4, size + 2));
+        if (dy === undefined) continue;
+        this.haloText(a.text, s.x, s.y + dy, 3.5);
+      }
+      // Unclaimed regions (peoples, cultures) in italics.
+      for (const a of cache.regionLabels) {
+        const extent = Math.sqrt(a.area) * z;
+        if (extent < 60) continue;
+        const s = cam.worldToScreen(a.x, a.y);
+        if (!onScreen(s)) continue;
+        const size = clamp(extent * 0.07, 9, 15);
+        ctx.font = `italic 500 ${size.toFixed(1)}px ${FONT_UI}`;
+        if (this.hasLetterSpacing) ctx.letterSpacing = '0.5px';
+        const w = ctx.measureText(a.text).width;
+        if (w > extent * 1.6 || !space.claim(s.x, s.y, w + 4, size + 2)) continue;
+        this.haloText(a.text, s.x, s.y, 3, COLORS.labelDim);
       }
       if (this.hasLetterSpacing) ctx.letterSpacing = '0px';
       ctx.globalAlpha = 1;
     }
 
-    // City icons.
-    const iconScale = clamp(0.85 + (zr - 1) * 0.12, 0.85, 1.35);
-    const cityLabelAlpha = clamp((zr - 1.5) / 0.5, 0, 1);
+    // 3. City names when their province is big enough on screen.
     ctx.font = `600 ${Math.round(12 * iconScale)}px ${FONT_UI}`;
-    for (const p of cache.cities) {
-      const s = cam.worldToScreen(p.center.x, p.center.y);
-      if (!onScreen(s)) continue;
-      if (p.isCapital) this.drawCapitalIcon(s.x, s.y, 6.5 * iconScale);
-      else this.drawCityIcon(s.x, s.y, 4 * iconScale);
-      if (cityLabelAlpha > 0) {
-        ctx.globalAlpha = cityLabelAlpha;
-        this.haloText(p.name, s.x, s.y + 13 * iconScale, 3);
-        ctx.globalAlpha = 1;
-      }
+    for (const { p, s, ps, r } of shownCities) {
+      if (ps < (p.isCapital ? 34 : 48)) continue;
+      const y = s.y + r + 9;
+      const w = ctx.measureText(p.name).width;
+      if (!space.claim(s.x, y, w + 4, 14)) continue;
+      this.haloText(p.name, s.x, y, 3);
     }
 
-    // Province names when zoomed far in.
-    const provAlpha = clamp((zr - 2.8) / 0.6, 0, 1);
-    if (provAlpha > 0) {
+    // 4. Province names when zoomed far in.
+    if (provincePx > 95) {
       ctx.font = `500 11px ${FONT_UI}`;
-      ctx.globalAlpha = provAlpha * 0.8;
+      ctx.globalAlpha = clamp((provincePx - 95) / 40, 0, 1) * 0.8;
+      const view = this.viewRect(0);
       for (const p of map.provinces) {
-        if (p.isCity) continue;
+        if (p.isCity || Math.sqrt(p.area) * z < 110 || !intersects(p.bbox, view)) continue;
         const s = cam.worldToScreen(p.center.x, p.center.y);
-        if (onScreen(s)) this.haloText(p.name.toUpperCase(), s.x, s.y, 3);
+        const text = p.name.toUpperCase();
+        if (!space.claim(s.x, s.y, ctx.measureText(text).width + 4, 13)) continue;
+        this.haloText(text, s.x, s.y, 3);
       }
       ctx.globalAlpha = 1;
     }
   }
 
-  haloText(text, x, y, halo) {
+  haloText(text, x, y, halo, color = COLORS.label) {
     const ctx = this.ctx;
     ctx.strokeStyle = COLORS.labelHalo;
     ctx.lineWidth = halo;
     ctx.strokeText(text, x, y);
-    ctx.fillStyle = COLORS.label;
+    ctx.fillStyle = color;
     ctx.fillText(text, x, y);
   }
 

@@ -13,6 +13,8 @@
  */
 
 import { generateMap, randomSeed, pickProvince } from './map.js';
+import { buildWorldMap } from './world.js';
+import { ERAS, DEFAULT_ERA, getEra, loadEraData } from './eras.js';
 import { GameState } from './state.js';
 import { Renderer } from './render.js';
 import { Camera, InputController } from './camera.js';
@@ -63,6 +65,28 @@ function focusOn(x, y, zoom, duration) {
   camera.flyTo(f.x, f.y, f.zoom, duration);
 }
 
+/** Zoom at which a typical province is `px` screen pixels across. */
+const detailZoom = (px) => px / state.map.provinceScale;
+
+/** Camera frame that fits a nation's territory into the visible area. */
+function nationFrame(id) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of state.provincesOf(id)) {
+    x0 = Math.min(x0, p.bbox.x0); y0 = Math.min(y0, p.bbox.y0);
+    x1 = Math.max(x1, p.bbox.x1); y1 = Math.max(y1, p.bbox.y1);
+  }
+  if (!isFinite(x0)) return null;
+  // Far-flung empires (colonies on several continents): frame the capital's region instead.
+  const cap = state.getProvince(state.getNation(id).capitalId);
+  const i = hudInsets();
+  const vw = camera.viewW - i.left - i.right, vh = camera.viewH - i.top - i.bottom;
+  let zoom = Math.min(vw / (x1 - x0 + 40), vh / (y1 - y0 + 40));
+  let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  if (zoom < camera.refZoom * 1.2 && cap) { zoom = camera.refZoom * 1.4; cx = cap.center.x; cy = cap.center.y; }
+  zoom = Math.min(zoom, detailZoom(120));
+  return framed(cx, cy, zoom);
+}
+
 /** Whole map, fitted into the area not covered by HUD panels. */
 function overviewFrame() {
   const map = state.map;
@@ -73,12 +97,10 @@ function overviewFrame() {
 
 // --- Actions (the only place UI intent turns into camera/state side effects) ---
 
-function loadMap(seed) {
-  const s = (seed ?? randomSeed()).toUpperCase();
-  const t0 = performance.now();
-  const map = generateMap(s);
-  console.info(`[map] seed ${s}: ${map.provinces.length} provinces, ${map.seaZones.length} sea zones in ${(performance.now() - t0).toFixed(0)} ms`);
-  camera.setWorld(map.width, map.height);
+/** Install a freshly built map and frame it. */
+function installMap(map) {
+  // Real-world maps need deeper zoom (Europe's provinces are small).
+  camera.setWorld(map.width, map.height, map.kind === 'world' ? 16 : 6);
   state.loadMap(map);
   const f = overviewFrame();
   camera.fit();
@@ -86,20 +108,53 @@ function loadMap(seed) {
   camera.y = f.y;
   camera.zoom = camera.targetZoom = f.zoom;
   renderer.requestRender();
-  // Reflect the seed in the URL so a reload/share reproduces the map.
+  // Reflect the scenario in the URL so a reload/share reproduces it.
   // Sandboxed embeds can refuse this, which is harmless.
   try {
     const url = new URL(window.location.href);
-    url.searchParams.set('seed', s);
+    url.searchParams.set('era', map.era.id);
+    if (map.era.fictional) url.searchParams.set('seed', map.seed); else url.searchParams.delete('seed');
     history.replaceState(null, '', url);
   } catch { /* ignore */ }
+  try { localStorage.setItem('im:era', map.era.id); } catch { /* ignore */ }
+}
+
+/** Procedural map for the "Fictional World" era. */
+function loadMap(seed) {
+  const s = (seed ?? randomSeed()).toUpperCase();
+  const t0 = performance.now();
+  const map = generateMap(s);
+  map.era = getEra('fictional');
+  console.info(`[map] seed ${s}: ${map.provinces.length} provinces in ${(performance.now() - t0).toFixed(0)} ms`);
+  installMap(map);
+}
+
+let eraRequest = 0;
+/** Load a real-world era (only that era's data is parsed). */
+async function loadEra(id, seed = null) {
+  const era = getEra(id);
+  if (era.fictional) { loadMap(seed); return; }
+  const request = ++eraRequest;
+  ui.setLoading(era.id);
+  try {
+    const t0 = performance.now();
+    const data = await loadEraData(era.id);
+    if (request !== eraRequest) return; // a newer choice superseded this one
+    const map = buildWorldMap(data, era);
+    console.info(`[era] ${era.id}: ${map.provinces.length} provinces, ${map.nations.length} nations in ${(performance.now() - t0).toFixed(0)} ms`);
+    installMap(map);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('map-stats').innerHTML = `<div class="loading-line">Could not load ${era.label}: ${err.message}</div>`;
+  }
 }
 
 const ui = new UI(state, {
+  selectEra: (id) => loadEra(id),
   newMap: loadMap,
   previewNation(id) {
-    const a = renderer.nationAnchor(id);
-    if (a) focusOn(a.x, a.y, camera.refZoom * 1.5, 0.8);
+    const f = nationFrame(id);
+    if (f) camera.flyTo(f.x, f.y, f.zoom, 0.8);
   },
   deploy(id) {
     state.setPlayerNation(id);
@@ -107,13 +162,13 @@ const ui = new UI(state, {
     state.setPhase('playing');
     const cap = state.getProvince(state.getNation(id).capitalId);
     state.setSelected(cap.id);
-    focusOn(cap.center.x, cap.center.y, camera.refZoom * 2.4, 1.2);
+    focusOn(cap.center.x, cap.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.2);
   },
   focusProvince(id) {
     const p = state.getProvince(id);
     if (!p) return;
     state.setSelected(id);
-    focusOn(p.center.x, p.center.y, Math.max(camera.zoom, camera.refZoom * 2.4), 0.6);
+    focusOn(p.center.x, p.center.y, Math.max(camera.zoom, detailZoom(80)), 0.6);
   },
   returnToMenu() {
     state.setSelected(-1);
@@ -140,7 +195,8 @@ const input = new InputController(canvas, camera, {
     const w = camera.screenToWorld(sx, sy);
     const id = pickProvince(state.map, w.x, w.y);
     if (state.phase === 'setup') {
-      if (id >= 0) ui.choosePendingNation(state.getProvince(id).owner);
+      const owner = state.getProvince(id)?.owner ?? -1;
+      if (owner >= 0) ui.choosePendingNation(owner);
     } else {
       state.setSelected(id);
     }
@@ -157,9 +213,13 @@ renderer.resize();
 
 // --- Boot ---
 
-let initialSeed = null;
-try { initialSeed = new URLSearchParams(window.location.search).get('seed'); } catch { /* ignore */ }
-loadMap(initialSeed);
+let params = new URLSearchParams();
+try { params = new URLSearchParams(window.location.search); } catch { /* ignore */ }
+let savedEra = null;
+try { savedEra = localStorage.getItem('im:era'); } catch { /* ignore */ }
+const initialEra = [params.get('era'), params.get('seed') ? 'fictional' : null, savedEra, DEFAULT_ERA]
+  .find((id) => id && ERAS.some((e) => e.id === id));
+loadEra(initialEra, params.get('seed'));
 
 // --- Main loop ---
 
@@ -181,4 +241,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra };

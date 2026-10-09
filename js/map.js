@@ -635,7 +635,7 @@ export function generateMap(seed, overrides = {}) {
     name: '',
     center: c.center,          // centroid: labels, icons, unit anchors
     site: c.site,              // Voronoi generator
-    polygon: c.polygon,
+    rings: [c.polygon],         // list of rings (real-world provinces can have several)
     area: c.area,
     neighbors: c.neighbors.filter((n) => provinceOfCell[n] >= 0).map((n) => provinceOfCell[n]),
     seaNeighbors: c.neighbors.filter((n) => seaOfCell[n] >= 0).map((n) => seaOfCell[n]),
@@ -681,6 +681,7 @@ export function generateMap(seed, overrides = {}) {
       color: colors[id % colors.length],
       flag: { pattern: rng.pick(FLAG_PATTERNS), colors: [colors[id % colors.length], tints[0], tints[1]] },
       capitalId: cap.id,
+      major: true,
     };
   });
 
@@ -717,14 +718,33 @@ export function generateMap(seed, overrides = {}) {
   };
 
   // Province-local scratch fields not needed after generation.
-  for (const p of provinces) delete p.roughness;
+  for (const p of provinces) {
+    delete p.roughness;
+    const xs = p.rings[0].map((v) => v.x), ys = p.rings[0].map((v) => v.y);
+    p.bbox = { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+    p.region = null;
+  }
+  const sizes = provinces.map((p) => Math.sqrt(p.area)).sort((a, b) => a - b);
 
-  return { seed: String(seed), width: W, height: H, gridSize: cfg.gridSize, provinces, seaZones, nations, borders, pick };
+  return {
+    kind: 'generated',
+    seed: String(seed),
+    width: W,
+    height: H,
+    gridSize: cfg.gridSize,
+    provinces,
+    seaZones,
+    nations,
+    borders,
+    pick,
+    provinceScale: sizes[Math.floor(sizes.length / 2)],
+  };
 }
 
 /** Province under world point (x, y), or -1 for sea / off-map. */
 export function pickProvince(map, x, y) {
   if (!map || x < 0 || y < 0 || x > map.width || y > map.height) return -1;
+  if (map.pickAt) return map.pickAt(x, y); // real-world maps: exact point-in-polygon
   const { xs, ys, province } = map.pick;
   let best = -1, bd = Infinity;
   for (let i = 0; i < xs.length; i++) {
@@ -737,6 +757,7 @@ export function pickProvince(map, x, y) {
 
 /** Tactical grid reference for a world point, e.g. "K-07". */
 export function gridRef(map, x, y) {
+  if (map.formatCoord) return map.formatCoord(x, y);
   const g = map.gridSize;
   const col = String.fromCharCode(65 + Math.max(0, Math.min(25, Math.floor(x / g))));
   const row = String(Math.max(0, Math.floor(y / g)) + 1).padStart(2, '0');

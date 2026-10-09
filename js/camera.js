@@ -24,6 +24,7 @@ export class Camera {
     this.refZoom = 1;            // aspect-independent "overview" zoom; UI zoom levels are relative to it
     this.minZoom = 0.5;
     this.maxZoom = 8;
+    this.maxZoomRel = 6;         // max zoom as a multiple of refZoom (per map)
     this.velX = 0;               // inertia, screen px / s
     this.velY = 0;
     this.flight = null;          // active flyTo animation
@@ -35,9 +36,10 @@ export class Camera {
     this.updateLimits();
   }
 
-  setWorld(w, h) {
+  setWorld(w, h, maxZoomRel = 6) {
     this.worldW = w;
     this.worldH = h;
+    this.maxZoomRel = maxZoomRel;
     this.updateLimits();
   }
 
@@ -47,7 +49,7 @@ export class Camera {
     // levels for labels/fly-to use the geometric-mean scale instead.
     this.refZoom = Math.max(this.fitZoom, Math.sqrt((this.viewW * this.viewH) / (this.worldW * this.worldH)));
     this.minZoom = this.fitZoom * 0.6;
-    this.maxZoom = this.refZoom * 6;
+    this.maxZoom = this.refZoom * this.maxZoomRel;
     this.zoom = clamp(this.zoom, this.minZoom, this.maxZoom);
     this.targetZoom = clamp(this.targetZoom, this.minZoom, this.maxZoom);
     this.clampPosition();
