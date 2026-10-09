@@ -184,3 +184,64 @@ export class AuthService {
     this.channels.clear();
   }
 }
+
+/**
+ * Demo sign-in for builds without Supabase (the claude.ai preview and local
+ * development). It fakes an approved owner account in this browser only, so
+ * the whole flow (menu, admin panel) can be tried. It has no backend and no
+ * powers: builds with Supabase settings never use it or show its button.
+ */
+export class DemoAuthService {
+  constructor() {
+    this.demo = true;
+    this.session = null;
+    this.listeners = new Set();
+    this.rows = [
+      { user_id: 'demo-owner', provider: 'demo', display_name: 'Demo Commander', email: 'demo@iron-meridian.test', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 3).toISOString() },
+      { user_id: 'demo-1', provider: 'google', display_name: 'Ada Lovelace', email: 'ada@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 5).toISOString() },
+      { user_id: 'demo-2', provider: 'discord', display_name: 'Basil Hart', email: 'basil@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 2).toISOString() },
+      { user_id: 'demo-3', provider: 'azure', display_name: 'Chen Wei', email: 'chen@example.com', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 2).toISOString() },
+      { user_id: 'demo-4', provider: 'x', display_name: 'Dana Ruiz', email: 'dana@example.com', status: 'denied', requested_at: new Date(Date.now() - 864e5 * 4).toISOString() },
+    ];
+  }
+
+  async init() {
+    try { if (localStorage.getItem('im:demo-session') === '1') this.session = this.fakeSession(); } catch { /* ignore */ }
+    return this.session;
+  }
+
+  fakeSession() {
+    return { user: { id: 'demo-owner', email: 'demo@iron-meridian.test', app_metadata: { provider: 'demo' }, user_metadata: { full_name: 'Demo Commander' } } };
+  }
+
+  onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  get user() { return this.session?.user ?? null; }
+  get provider() { return 'demo'; }
+  get displayName() { return 'Demo Commander'; }
+
+  async signInDemo() {
+    this.session = this.fakeSession();
+    try { localStorage.setItem('im:demo-session', '1'); } catch { /* ignore */ }
+  }
+
+  async signInWithProvider() { throw new Error('Real sign-in is off in this preview. Use Demo sign-in.'); }
+  async sendMagicLink() { throw new Error('Real sign-in is off in this preview. Use Demo sign-in.'); }
+
+  async signOut() {
+    this.session = null;
+    try { localStorage.removeItem('im:demo-session'); } catch { /* ignore */ }
+  }
+
+  async isOwner() { return !!this.session; }
+  async myBetaRow() { return this.rows[0]; }
+  async requestAccess() { return this.rows[0]; }
+  watchMyRow() { return () => {}; }
+  async listTesters() { return this.rows.map((r) => ({ ...r })); }
+  async setStatus(userId, status) {
+    const r = this.rows.find((x) => x.user_id === userId);
+    r.status = status;
+    return { ...r };
+  }
+  watchAll() { return () => {}; }
+  unwatchAll() {}
+}

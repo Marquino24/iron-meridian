@@ -36,7 +36,9 @@ const RAW = path.join(ROOT, 'data/raw');
 const OUT = path.join(ROOT, 'data/eras');
 
 const CFG = {
-  targetProvinces: 1000,  // land provinces worldwide (cities included)
+  targetProvinces: 3600,  // land provinces worldwide, historical eras (cities included)
+  targetModern: 2300,     // modern era: admin-1 regions, merged or split toward this
+  admin1Simplify: '5%',
   sizeExponent: 0.68,     // n ∝ area^k: sub-linear so mid-size countries still get detail
   simplify: '12%',
   quantum: 0.2,           // coordinate precision in world units (~2 km)
@@ -303,6 +305,103 @@ async function simplifyAndProject(src) {
 // Cities and capitals
 // ---------------------------------------------------------------------------
 
+/**
+ * Modern era: Natural Earth admin-1 regions (states, provinces) with real
+ * names. Countries that the dataset splits very finely (UK local
+ * authorities, Slovenian municipalities…) are grouped by the dataset's own
+ * `region` field when that is closer to the country's province budget.
+ * Returns nation shapes (dissolved from the same simplified regions, so
+ * borders line up exactly) and the region units.
+ */
+async function loadAdmin1(era, admin0) {
+  const src = ensureRaw(era.admin1.file, era.admin1.url);
+  const sovOf = new Map();
+  for (const f of admin0.features) sovOf.set(f.properties.ADM0_A3, f.properties.SOVEREIGNT);
+  const sovBySov3 = new Map();
+  for (const f of admin0.features) sovBySov3.set(f.properties.SOV_A3, f.properties.SOVEREIGNT);
+
+  // Projected area of every raw unit → per-country province budget.
+  const projArea = (g) => {
+    if (!g) return 0;
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+    let a = 0;
+    for (const poly of polys) poly.forEach((ring, i) => {
+      const r = ring.map(([lon, lat]) => { const p = project(lon, Math.max(LAT_MIN, Math.min(LAT_MAX, lat))); return [p.x, p.y]; });
+      a += (i === 0 ? 1 : -1) * Math.abs(ringArea(r));
+    });
+    return Math.max(0, a);
+  };
+  const units = [];
+  for (const f of src.features) {
+    const p = f.properties;
+    const sov = sovOf.get(p.adm0_a3) ?? sovBySov3.get(p.sov_a3) ?? p.admin;
+    if (!sov || sov === 'Antarctica') continue;
+    const name = (p.name_en || p.name || p.gn_name || p.admin || '').trim();
+    units.push({ f, sov, name, region: (p.region || '').trim(), area: projArea(f.geometry) });
+  }
+  const bySov = new Map();
+  for (const u of units) { if (!bySov.has(u.sov)) bySov.set(u.sov, []); bySov.get(u.sov).push(u); }
+  const countryArea = new Map([...bySov].map(([k, us]) => [k, us.reduce((s, u) => s + u.area, 0)]));
+  const budget = budgetFor(countryArea, CFG.targetModern);
+
+  let regionGrouped = 0;
+  for (const [sov, us] of bySov) {
+    const n = budget.get(sov);
+    const regions = new Set(us.map((u) => u.region).filter(Boolean));
+    const useRegion = us.length > n * 1.5 && regions.size >= 2 && us.every((u) => u.region)
+      && Math.abs(Math.log(regions.size / n)) < Math.abs(Math.log(us.length / n));
+    if (useRegion) regionGrouped++;
+    us.forEach((u, i) => {
+      u.key = useRegion ? `${sov}|${u.region}` : `${sov}|${u.f.properties.ne_id ?? i}|${u.name}`;
+      u.label = useRegion ? u.region : u.name;
+    });
+  }
+  const tagged = {
+    type: 'FeatureCollection',
+    features: units.map((u) => ({ type: 'Feature', geometry: u.f.geometry, properties: { U: u.key, G: u.sov, N: u.label } })),
+  };
+  const cmd = `-i in.json name=units -clean -dissolve2 U copy-fields=G,N -simplify ${CFG.admin1Simplify} keep-shapes -clip bbox=-180,${LAT_MIN},180,${LAT_MAX} -clean `
+    + `-dissolve2 G target=units + name=nations -o target=units,nations format=geojson precision=0.0001`;
+  const out = await mapshaper.applyCommands(cmd, { 'in.json': tagged });
+  const projectMp = (g) => {
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+    const projected = polys.map((poly) => poly.map((ring) => ring.map(([lon, lat]) => { const p = project(lon, lat); return [p.x, p.y]; })));
+    return openMultiPolygon(polygonClipping.union(projected));
+  };
+  const nations = new Map();
+  for (const f of JSON.parse(out['nations.json']).features) {
+    if (!f.geometry) continue;
+    const mp = projectMp(f.geometry);
+    if (mp.length) nations.set(f.properties.G, mp);
+  }
+  const regionUnits = [];
+  for (const f of JSON.parse(out['units.json']).features) {
+    if (!f.geometry) continue;
+    const mp = projectMp(f.geometry);
+    if (!mp.length) continue;
+    regionUnits.push({ sov: f.properties.G, name: f.properties.N, mp, rings: mp.flat(), area: mp.reduce((s, poly) => s + polyArea(poly), 0) });
+  }
+  console.log(`     admin-1: ${units.length} source regions → ${regionUnits.length} units (${regionGrouped} countries grouped by region)`);
+  return { shapes: nations, units: regionUnits, budget };
+}
+
+/** Province budget per country: n ∝ area^k, scaled so the total is near `target`. */
+function budgetFor(areas, target, weightOf = () => 1) {
+  const w = (a, k) => Math.pow(Math.max(a, 1), CFG.sizeExponent) * k;
+  let lo = 0, hi = 50;
+  const count = (m) => [...areas].reduce((s, [key, a]) => s + Math.max(1, Math.round(m * w(a, weightOf(key)))), 0);
+  for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2; if (count(mid) > target) hi = mid; else lo = mid; }
+  return new Map([...areas].map(([key, a]) => [key, Math.max(1, Math.round(lo * w(a, weightOf(key))))]));
+}
+
+/** "North", "South-East"… for the part of a split region relative to its centre. */
+const COMPASS = ['East', 'North-East', 'North', 'North-West', 'West', 'South-West', 'South', 'South-East'];
+function compassName(dx, dy, spread) {
+  if (Math.hypot(dx, dy) < spread * 0.35) return 'Central';
+  const a = Math.atan2(-dy, dx); // screen y grows downward
+  return COMPASS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+}
+
 function loadPlaces() {
   const gj = ensureRaw(NE_PLACES.file, NE_PLACES.url);
   return gj.features.map((f) => {
@@ -331,8 +430,10 @@ async function buildEra(era, places) {
   const t0 = Date.now();
   const rng = createRng(`iron-meridian:${era.id}`);
   const src = ensureRaw(era.file, era.url);
+  // Admin-1 needs admin-0's original properties, so it runs before tagging.
+  const admin1 = era.admin1 ? await loadAdmin1(era, src) : null;
   const groups = tagFeatures(era, src);
-  const shapes = await simplifyAndProject(src);
+  const shapes = admin1 ? admin1.shapes : await simplifyAndProject(src);
 
   // --- Countries (nations + unclaimed regions) with geometry -----------------
   const countries = [];
@@ -469,10 +570,13 @@ async function buildEra(era, places) {
     if (total > CFG.targetProvinces) hi = mid; else lo = mid;
   }
   for (const c of countries) c.nProvinces = countFor(c, lo);
+  if (admin1) for (const c of countries) c.nProvinces = admin1.budget.get(c.key) ?? 1;
 
   // --- Seeds and clipped Voronoi cells ----------------------------------------------
   const provinces = [];
+  if (admin1) buildAdmin1Provinces(rng, countries, admin1.units, provinces, stats);
   for (const [ci, c] of countries.entries()) {
+    if (admin1) break;
     const seeds = c.cities.map((city) => ({ x: city.x, y: city.y, city }));
     const cellArea = c.area / c.nProvinces;
     // Pieces (islands) big enough to deserve their own province.
@@ -616,7 +720,7 @@ async function buildEra(era, places) {
     const { lon, lat } = unproject(p.seed.x, p.seed.y);
     const r = (hashSeed(`${era.id}:${p.id}`) % 1000) / 1000;
     p.terrain = p.city && !p.city.generated && (p.city.capital || r < 0.6) ? 'urban' : terrainAt(lon, lat, r);
-    p.name = p.city?.name ?? names();
+    p.name = p.regionName ?? p.city?.name ?? names();
   }
 
   // --- Nations: order by size, colours (neighbours differ), flags ------------------------------------
@@ -706,7 +810,11 @@ async function buildEra(era, places) {
       r: p.rings.map(encRing),
       e: p.edges,
     };
-    if (p.city) o.c = p.city.capital ? 2 : 1;
+    if (p.city) {
+      o.c = p.city.capital ? 2 : 1;
+      if (p.city.name && p.city.name !== p.name) o.cn = p.city.name;
+      if (p.city.x !== undefined && (Math.abs(p.city.x - p.seed.x) > Q || Math.abs(p.city.y - p.seed.y) > Q)) o.cp = [Math.round(p.city.x / Q), Math.round(p.city.y / Q)];
+    }
     if (owner < 0 && countries[p.country].key !== '~Unknown') o.g = countries[p.country].key.slice(1);
     return o;
   });
@@ -739,9 +847,87 @@ async function buildEra(era, places) {
     `${provOut.filter((p) => p.c).length} cities, ${seas.length} sea zones, ${(json.length / 1024).toFixed(0)} KB, ${((Date.now() - t0) / 1000).toFixed(1)} s`,
   );
   console.log(`     capitals: ${stats.capitalsCurated} curated, ${stats.capitalsFromNE} Natural Earth, ${stats.capitalsGenerated} generated`);
+  if (stats.splitRegions !== undefined) console.log(`     regions split: ${stats.splitRegions}, cities sharing a region (not shown): ${stats.citiesDropped}`);
   if (stats.unplaced.length) console.log(`     not placed: ${stats.unplaced.join('; ')}`);
   if (missingMajors.length) console.log(`     WARNING missing majors: ${missingMajors.join(', ')}`);
   return { id: era.id, provinces: land, nations: nations.length, kb: json.length / 1024 };
+}
+
+/** Point well inside a (multi)polygon: grid search maximising distance to the outline. */
+function interiorCenter(mp) {
+  const big = mp.slice().sort((a, b) => polyArea(b) - polyArea(a))[0];
+  const [x0, y0, x1, y1] = bboxOf(big);
+  let best = null, bd = -1;
+  const n = 14;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const x = x0 + ((i + 0.5) / n) * (x1 - x0), y = y0 + ((j + 0.5) / n) * (y1 - y0);
+    if (!pointInRings(x, y, big)) continue;
+    let d = Infinity;
+    for (const r of big) for (let k = 0; k < r.length; k++) d = Math.min(d, distToSegment(x, y, r[k], r[(k + 1) % r.length]));
+    if (d > bd) { bd = d; best = { x, y }; }
+  }
+  return best ?? { x: big[0][0][0], y: big[0][0][1] };
+}
+
+/**
+ * Modern era: one province per admin-1 region, except regions much larger
+ * than their country's typical province, which are split into seeded parts
+ * ("Krasnoyarsk North"). Each region keeps its most important city.
+ */
+function buildAdmin1Provinces(rng, countries, units, provinces, stats) {
+  const byKey = new Map(countries.map((c, i) => [c.key, i]));
+  stats.splitRegions = 0;
+  stats.citiesDropped = 0;
+  for (const u of units) {
+    const ci = byKey.get(u.sov);
+    if (ci === undefined) continue;
+    const c = countries[ci];
+    const cell = c.area / Math.max(1, c.nProvinces);
+    const k = u.area > cell * 2.4 ? Math.min(40, Math.round(u.area / cell)) : 1;
+    const inUnit = c.cities.filter((city) => pointInRings(city.x, city.y, u.rings)).sort((a, b) => a.priority - b.priority);
+
+    if (k === 1) {
+      if (inUnit.length > 1) stats.citiesDropped += inUnit.length - 1;
+      provinces.push({ country: ci, seed: interiorCenter(u.mp), city: inUnit[0] ?? null, mp: u.mp, rings: u.rings, area: u.area, regionName: u.name });
+      continue;
+    }
+
+    // Split: cities first (so each keeps its own part), then well-spread extra seeds.
+    stats.splitRegions++;
+    const seeds = inUnit.slice(0, k).map((city) => ({ x: city.x, y: city.y, city }));
+    const pieces = u.mp.map((poly) => ({ poly, area: polyArea(poly), bbox: bboxOf(poly) })).sort((a, b) => b.area - a.area);
+    const total = pieces.reduce((s2, p) => s2 + p.area, 0);
+    for (const piece of pieces) {
+      const want = Math.round(((k - inUnit.slice(0, k).length) * piece.area) / total);
+      for (let i = 0; i < want; i++) { const pt = bestCandidate(rng, piece, seeds, 12); if (pt) seeds.push(pt); }
+    }
+    if (seeds.length < 2) {
+      provinces.push({ country: ci, seed: interiorCenter(u.mp), city: inUnit[0] ?? null, mp: u.mp, rings: u.rings, area: u.area, regionName: u.name });
+      continue;
+    }
+    const [x0, y0, x1, y1] = bboxOf(u.rings);
+    const vor = Delaunay.from(seeds.map((p) => [p.x, p.y])).voronoi([x0 - 1, y0 - 1, x1 + 1, y1 + 1]);
+    const clipGeom = u.mp.map((poly) => poly.map(closeRing));
+    const center = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+    const spread = Math.max(x1 - x0, y1 - y0) / 2;
+    const parts = [];
+    seeds.forEach((sd, i) => {
+      const cellPoly = vor.cellPolygon(i);
+      if (!cellPoly) return;
+      const mp = openMultiPolygon(polygonClipping.intersection([cellPoly], clipGeom));
+      if (!mp.length) return;
+      parts.push({ sd, mp, dir: compassName(sd.x - center.x, sd.y - center.y, spread) });
+    });
+    // Unique names within the region: "Krasnoyarsk North", "Krasnoyarsk North 2"…
+    const used = new Map();
+    for (const part of parts) {
+      const n = (used.get(part.dir) ?? 0) + 1;
+      used.set(part.dir, n);
+      const name = `${u.name} ${part.dir}${n > 1 ? ` ${n}` : ''}`;
+      const seed = part.sd.city ? { x: part.sd.x, y: part.sd.y } : interiorCenter(part.mp);
+      provinces.push({ country: ci, seed, city: part.sd.city ?? null, mp: part.mp, rings: part.mp.flat(), area: part.mp.reduce((a, poly) => a + polyArea(poly), 0), regionName: name });
+    }
+  }
 }
 
 function xy(lon, lat) {

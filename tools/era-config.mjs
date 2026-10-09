@@ -19,7 +19,7 @@ export const SOURCES = {
     license: 'GPL-3.0',
   },
   ne: {
-    name: 'Natural Earth 1:50m Admin-0 countries + populated places',
+    name: 'Natural Earth 1:10m admin-1 regions, 1:50m countries + populated places',
     url: 'https://www.naturalearthdata.com',
     license: 'Public domain',
   },
@@ -280,6 +280,7 @@ export const ERAS = [
   },
   {
     id: 'modern', source: 'ne', dataYear: 2024, file: 'ne_50m_admin_0_countries.geojson', url: `${NE}/ne_50m_admin_0_countries.geojson`,
+    admin1: { file: 'ne_10m_admin_1_states_provinces.geojson', url: `${NE}/ne_10m_admin_1_states_provinces.geojson` },
     aliases: {},
     majors: ['United States of America', 'China', 'Russia', 'India', 'United Kingdom', 'France', 'Germany', 'Japan'],
     names: {},

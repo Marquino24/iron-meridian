@@ -6,7 +6,7 @@
   <title>Iron Meridian</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1l7 7-7 7-7-7z' fill='%23ffb547'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -42,6 +42,12 @@
 
     <aside id="province-panel" class="panel" aria-hidden="true"></aside>
 
+    <div id="style-toggle" class="style-toggle" role="radiogroup" aria-label="Map style">
+      <button type="button" role="radio" data-style="political">Political</button>
+      <button type="button" role="radio" data-style="satellite">Satellite</button>
+      <button type="button" role="radio" data-style="terrain">Terrain</button>
+    </div>
+
     <footer id="statusbar">
       <span><i>GRID</i> <b id="status-grid">—</b></span>
       <span class="grow"><i>TARGET</i> <b id="status-province">—</b></span>
@@ -51,14 +57,48 @@
     </footer>
   </div>
 
-  <section id="start-screen" class="start">
-    <div class="start-card">
-      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.2</div>
-      <h1>IRON<span>MERIDIAN</span></h1>
-      <p class="tagline">Choose an era, then a nation to command. Click a name or any territory on the map.</p>
+  <!-- Main menu: game-launcher style over the slowly panning map. -->
+  <section id="main-menu" class="screen menu" hidden aria-label="Main menu">
+    <div class="menu-panel screen-left">
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.2.6</div>
+      <h1 class="menu-title">IRON<span>MERIDIAN</span></h1>
+      <nav class="menu-list" aria-label="Main menu">
+        <button type="button" class="menu-item resume" data-menu="resume" hidden><span>Resume game</span><small id="resume-detail"></small></button>
+        <button type="button" class="menu-item primary" data-menu="single"><span>Single Player</span><small>Seven eras, any nation</small></button>
+        <button type="button" class="menu-item" data-menu="multi" disabled><span>Multiplayer</span><em>Coming soon</em></button>
+        <button type="button" class="menu-item" data-menu="sandbox" disabled><span>Sandbox</span><em>Coming soon</em></button>
+        <button type="button" class="menu-item" data-menu="settings"><span>Settings</span></button>
+        <button type="button" class="menu-item admin-item" data-open-admin hidden><span>Admin</span><small>Beta testers</small></button>
+        <button type="button" class="menu-item quiet" data-menu="signout" hidden><span>Sign out</span></button>
+      </nav>
+      <div id="account" class="account" hidden>
+        <span id="account-provider" class="account-provider"></span>
+        <span>Signed in as <b id="account-name"></b></span>
+      </div>
+    </div>
+  </section>
 
-      <div class="section-title">ERA</div>
-      <div id="era-grid" class="era-grid" role="group" aria-label="Era"></div>
+  <!-- Era select -->
+  <section id="era-screen" class="screen side" hidden aria-label="Select era">
+    <div class="side-panel screen-left">
+      <div class="screen-head">
+        <button type="button" class="back-btn" data-back>‹ Back</button>
+        <div class="eyebrow">SINGLE PLAYER · STEP 1 OF 2</div>
+      </div>
+      <h2 class="screen-title">Choose an era</h2>
+      <div id="era-grid" class="era-list" role="list" aria-label="Eras"></div>
+    </div>
+  </section>
+
+  <!-- Nation select (start screen) -->
+  <section id="start-screen" class="screen side start" hidden aria-label="Select nation">
+    <div class="start-card side-panel screen-left">
+      <div class="screen-head">
+        <button type="button" class="back-btn" data-back>‹ Eras</button>
+        <div class="eyebrow">SINGLE PLAYER · STEP 2 OF 2</div>
+      </div>
+      <h2 class="screen-title" id="nation-screen-title">Choose a nation</h2>
+      <p class="tagline">Click a name or any territory on the map.</p>
 
       <div id="seed-row" class="seed-row" hidden>
         <label for="seed-input">MAP SEED</label>
@@ -82,23 +122,65 @@
       <button id="btn-deploy" type="button" class="btn primary" disabled>SELECT A NATION</button>
       <p class="hint">DRAG to pan · SCROLL / PINCH to zoom · WASD / ARROWS · ESC deselect · SPACE pause</p>
       <p id="data-source" class="data-source"></p>
-      <div id="account" class="account" hidden>
-        <span id="account-provider" class="account-provider"></span>
-        <span>Signed in as <b id="account-name"></b></span>
-        <button type="button" class="link-btn" data-sign-out>Sign out</button>
-      </div>
     </div>
   </section>
 
-  <!-- Sign-in and beta gate (only when Supabase is configured in js/config.js). -->
+  <!-- Settings -->
+  <section id="settings-screen" class="screen side" hidden aria-label="Settings">
+    <div class="side-panel screen-left">
+      <div class="screen-head">
+        <button type="button" class="back-btn" data-back>‹ Back</button>
+        <div class="eyebrow">SETTINGS</div>
+      </div>
+      <h2 class="screen-title">Settings</h2>
+      <form id="settings-form" class="settings" novalidate>
+        <fieldset>
+          <legend>Default map style</legend>
+          <div class="seg" role="radiogroup">
+            <label><input type="radio" name="mapStyle" value="political" id="set-style-political"><span>Political</span></label>
+            <label><input type="radio" name="mapStyle" value="satellite" id="set-style-satellite"><span>Satellite</span></label>
+            <label><input type="radio" name="mapStyle" value="terrain" id="set-style-terrain"><span>Terrain</span></label>
+          </div>
+          <p class="setting-note">Roman and Medieval eras draw the political map as an old parchment map.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Graphics quality</legend>
+          <div class="seg" role="radiogroup">
+            <label><input type="radio" name="quality" value="low" id="set-q-low"><span>Low</span></label>
+            <label><input type="radio" name="quality" value="medium" id="set-q-medium"><span>Medium</span></label>
+            <label><input type="radio" name="quality" value="high" id="set-q-high"><span>High</span></label>
+          </div>
+          <p class="setting-note" id="quality-note"></p>
+        </fieldset>
+        <fieldset>
+          <legend>UI scale</legend>
+          <div class="range-row">
+            <input type="range" id="set-ui-scale" name="uiScale" min="80" max="130" step="5">
+            <output id="ui-scale-out" for="set-ui-scale"></output>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Sound volume</legend>
+          <div class="range-row">
+            <input type="range" id="set-volume" name="volume" min="0" max="100" step="5">
+            <output id="volume-out" for="set-volume"></output>
+          </div>
+          <p class="setting-note">There's no sound yet; this setting is saved for when there is.</p>
+        </fieldset>
+        <button type="button" class="link-btn" id="settings-reset">Reset to defaults</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Sign-in and beta gate. Without Supabase settings (dev preview) it offers a demo sign-in. -->
   <section id="launcher" class="launcher" hidden aria-label="Sign in">
     <div class="launcher-hero">
-      <div class="eyebrow">CLOSED BETA · BUILD 0.2.5</div>
+      <div class="eyebrow">CLOSED BETA · BUILD 0.2.6</div>
       <h1 class="launcher-title">IRON<span>MERIDIAN</span></h1>
       <p class="launcher-sub">Real-time grand strategy across two thousand years of real borders.</p>
       <ul class="launcher-facts">
         <li><b>7</b><span>eras</span></li>
-        <li><b>1,000+</b><span>provinces</span></li>
+        <li><b>4,000+</b><span>provinces</span></li>
         <li><b>200</b><span>nations</span></li>
       </ul>
     </div>

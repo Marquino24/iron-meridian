@@ -108,13 +108,14 @@ export class UI {
   bindStartScreen() {
     const { eraGrid, seedInput, seedLoad, newMap, deploy, nationList, search, filterTabs } = this.el;
     eraGrid.innerHTML = ERAS.map((e) => `
-      <button type="button" class="era-card" data-era="${e.id}" aria-pressed="false">
+      <button type="button" class="era-card" data-era="${e.id}" role="listitem">
         <span class="era-year">${escapeHtml(e.year)}</span>
         <span class="era-name">${escapeHtml(e.label)}</span>
+        <span class="era-blurb">${escapeHtml(e.blurb ?? '')}</span>
       </button>`).join('');
     eraGrid.addEventListener('click', (e) => {
       const b = e.target.closest('[data-era]');
-      if (b && b.dataset.era !== this.state.era?.id) this.actions.selectEra(b.dataset.era);
+      if (b) this.actions.selectEra(b.dataset.era);
     });
 
     newMap.addEventListener('click', () => this.actions.newMap(null));
@@ -168,11 +169,10 @@ export class UI {
     el.search.value = '';
 
     for (const b of el.eraGrid.children) {
-      const on = b.dataset.era === era.id;
-      b.classList.toggle('selected', on);
+      b.classList.toggle('selected', b.dataset.era === era.id);
       b.classList.remove('loading');
-      b.setAttribute('aria-pressed', String(on));
     }
+    document.getElementById('nation-screen-title').textContent = era.fictional ? 'Choose a nation' : `${era.label}, ${era.year === 'Present' ? 'today' : era.year}`;
     el.seedRow.hidden = !era.fictional;
     el.seedInput.value = map.seed;
     el.statusSeed.textContent = era.fictional ? map.seed : `${era.label.toUpperCase()} ${era.year}`;
@@ -271,7 +271,6 @@ export class UI {
 
   onPhase(phase) {
     const playing = phase === 'playing';
-    this.el.start.classList.toggle('hidden', playing);
     this.el.hud.classList.toggle('setup', !playing);
     this.renderProvincePanel();
     if (playing) this.renderPlayer();
@@ -371,7 +370,7 @@ export class UI {
         <dt>TERRAIN</dt>
         <dd><span class="terrain-chip t-${terrain.id}"></span>${terrain.label.toUpperCase()}</dd>
         <dt>CITY</dt>
-        <dd>${p.isCapital ? 'YES — NATIONAL CAPITAL' : p.isCity ? 'YES' : 'NO'}</dd>
+        <dd>${p.isCity ? `${p.cityName && p.cityName !== p.name ? escapeHtml(p.cityName) : 'YES'}${p.isCapital ? ' — NATIONAL CAPITAL' : ''}` : 'NO'}</dd>
         <dt>NEIGHBORS</dt>
         <dd>${p.neighbors.length} LAND${p.seaNeighbors.length ? ` · ${p.seaNeighbors.length} SEA` : ''}</dd>
         <dt>AREA</dt>

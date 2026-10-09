@@ -43,6 +43,45 @@ const COLORS = {
 };
 
 const FONT_UI = '"Rajdhani", "Segoe UI", system-ui, sans-serif';
+const FONT_OLD = '"IM Fell English", "Iowan Old Style", Georgia, serif';
+
+/**
+ * Map looks. `political` is the default; Roman and Medieval eras draw their
+ * political map as `parchment`. `satellite` and `terrain` lay imagery under
+ * the borders.
+ */
+const LOOKS = {
+  political: {
+    ocean: COLORS.ocean, landAlpha: 1, patterns: true, glow: true, shallow: true, grid: true,
+    provinceBorder: COLORS.provinceBorder, nationDark: COLORS.nationBorderDark, nationLight: COLORS.nationBorderLight, nationDash: true,
+    coast: COLORS.coast, label: COLORS.label, labelDim: COLORS.labelDim, halo: COLORS.labelHalo, font: FONT_UI, nationWeight: 700, upper: true,
+  },
+  parchment: {
+    ocean: '#b9c3ab', landAlpha: 1, patterns: true, glow: false, shallow: false, grid: true, gridColor: 'rgba(90,70,40,0.18)', paper: true,
+    provinceBorder: 'rgba(92,62,32,0.32)', nationDark: 'rgba(74,44,22,0.85)', nationLight: 'rgba(168,52,40,0.55)', nationDash: true,
+    coast: 'rgba(70,46,24,0.9)', coastHalo: 'rgba(80,96,80,0.35)', label: '#3b2414', labelDim: 'rgba(70,44,22,0.75)', halo: 'rgba(240,229,198,0.9)',
+    font: FONT_OLD, nationWeight: 400, italic: true, upper: true,
+  },
+  satellite: {
+    image: 'satellite', overlayAlpha: 0.3, patterns: false, glow: false, shallow: false, grid: true, gridColor: 'rgba(255,255,255,0.06)',
+    provinceBorder: 'rgba(255,255,255,0.2)', nationDark: 'rgba(0,0,0,0.55)', nationLight: 'rgba(255,255,255,0.85)', nationDash: false,
+    coast: 'rgba(255,255,255,0.28)', label: '#ffffff', labelDim: 'rgba(235,240,240,0.8)', halo: 'rgba(0,0,0,0.75)', font: FONT_UI, nationWeight: 700, upper: true,
+  },
+  terrain: {
+    image: 'terrain', overlayAlpha: 0.1, patterns: false, glow: false, shallow: false, grid: false,
+    provinceBorder: 'rgba(70,55,40,0.22)', nationDark: 'rgba(72,44,72,0.85)', nationLight: null, nationDash: false, thinNation: true,
+    coast: null, label: '#2a2622', labelDim: 'rgba(50,46,40,0.75)', halo: 'rgba(255,255,255,0.8)', font: FONT_UI, nationWeight: 700, upper: true,
+  },
+};
+
+/** Device-pixel caps and effects per graphics quality. */
+const QUALITY = {
+  low: { dpr: 1, pad: 0.2, effects: false },
+  medium: { dpr: 1.5, pad: 0.3, effects: true },
+  high: { dpr: 2, pad: 0.3, effects: true },
+};
+
+const PARCHMENT = [233, 220, 184];
 
 /** On-screen province size (px) at which per-province detail switches on. */
 const DETAIL_PX = 26;
@@ -139,6 +178,37 @@ class LabelSpace {
 }
 
 /** Terrain symbol tiles, drawn at 2× (64px); scaled per map in buildGeometry(). */
+function parchmentFill(province, nation) {
+  const base = nation ? mix(hexToRgb(nation.color), PARCHMENT, 0.58) : PARCHMENT;
+  const shade = province ? TERRAIN_SHADE[province.terrain] : TERRAIN_SHADE.plains;
+  const jitter = province ? 0.97 + hash01(province.id) * 0.06 : 1;
+  return rgb(base.map((v) => v * (0.94 + (shade.k - 0.9) * 0.4) * jitter));
+}
+
+/** Paper grain for the old-map look (generated, no image file). */
+function createPaperPattern(ctx) {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  let seed = 1234567;
+  const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let i = 0; i < S * S; i++) {
+    const n = 225 + rand() * 30;
+    img.data[i * 4] = n; img.data[i * 4 + 1] = n - 6; img.data[i * 4 + 2] = n - 22; img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  g.strokeStyle = 'rgba(120,90,50,0.08)';
+  for (let i = 0; i < 70; i++) {
+    g.beginPath();
+    const x = rand() * S, y = rand() * S, l = 10 + rand() * 40, a = rand() * Math.PI;
+    g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+    g.stroke();
+  }
+  return ctx.createPattern(c, 'repeat');
+}
+
 function createTerrainPatterns(ctx) {
   const S = 32, R = 2;
   const make = (draw) => {
@@ -253,6 +323,10 @@ export class Renderer {
     this.dirty = true;
     this.cache = null;
     this.patterns = createTerrainPatterns(this.ctx);
+    this.paper = createPaperPattern(this.ctx);
+    this.style = 'political';      // political | satellite | terrain
+    this.quality = 'high';         // low | medium | high
+    this.images = {};              // style imagery, filled by setImage()
     this.hasLetterSpacing = 'letterSpacing' in this.ctx;
     this.lastFrameMs = 0;
 
@@ -267,10 +341,34 @@ export class Renderer {
 
   requestRender() { this.dirty = true; }
 
-  /** Match the backing store to CSS size × devicePixelRatio. */
+  setStyle(style) {
+    if (!LOOKS[style] || style === 'parchment') return;
+    this.style = style;
+    this.invalidateLayer();
+  }
+
+  setQuality(quality) {
+    if (!QUALITY[quality]) return;
+    this.quality = quality;
+    this.resize();
+  }
+
+  /** Provide a loaded imagery image (satellite/terrain). */
+  setImage(name, img) {
+    this.images[name] = img;
+    this.invalidateLayer();
+  }
+
+  /** The effective look: the chosen style, with parchment for old eras' political map. */
+  look() {
+    if (this.style === 'political') return this.state.map?.era?.oldMap ? LOOKS.parchment : LOOKS.political;
+    return LOOKS[this.style];
+  }
+
+  /** Match the backing store to CSS size × devicePixelRatio (capped by quality). */
   resize() {
     const rect = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = Math.min(window.devicePixelRatio || 1, QUALITY[this.quality].dpr);
     this.canvas.width = Math.max(1, Math.round(rect.width * this.dpr));
     this.canvas.height = Math.max(1, Math.round(rect.height * this.dpr));
     this.camera.setViewport(rect.width, rect.height);
@@ -308,6 +406,8 @@ export class Renderer {
     const c = this.cache;
     c.fills = provinces.map((p) => provinceFill(p, nations[p.owner]));
     c.nationFills = nations.map((n) => rgb(baseColor(n)));
+    c.fillsOld = provinces.map((p) => parchmentFill(p, nations[p.owner]));
+    c.nationFillsOld = nations.map((n) => parchmentFill(null, n));
 
     c.provinceBorders = new ChunkedPath(map.width, map.height);
     c.nationBorders = new ChunkedPath(map.width, map.height);
@@ -494,7 +594,7 @@ export class Renderer {
 
   rebuildLayer() {
     const cam = this.camera;
-    const PAD = 0.3;
+    const PAD = QUALITY[this.quality].pad;
     const w = Math.ceil(cam.viewW * (1 + 2 * PAD)), h = Math.ceil(cam.viewH * (1 + 2 * PAD));
     // iOS caps canvas area at ~16.7 MP; keep well under it.
     const ldpr = Math.min(this.dpr, Math.sqrt(14e6 / (w * h)));
@@ -517,11 +617,16 @@ export class Renderer {
   drawStatic(ctx, F) {
     const { cache, state } = this;
     const map = state.map;
+    const L = this.look();
+    const fx = QUALITY[this.quality].effects;
     const z = F.zoom;
     const px = 1 / z;
     const view = { x0: F.x - F.w / 2 / z, y0: F.y - F.h / 2 / z, x1: F.x + F.w / 2 / z, y1: F.y + F.h / 2 / z };
     const provincePx = map.provinceScale * z;
     const detail = provincePx >= DETAIL_PX;
+    const paths = cache.provincePaths;
+    const old = L === LOOKS.parchment;
+    const image = L.image ? this.images[L.image] : null;
 
     ctx.setTransform(F.dpr, 0, 0, F.dpr, 0, 0);
     ctx.fillStyle = COLORS.void;
@@ -531,25 +636,63 @@ export class Renderer {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Ocean, grid/graticule, shallow water, coastal glow.
-    ctx.fillStyle = COLORS.ocean;
-    ctx.fillRect(0, 0, map.width, map.height);
-    this.drawGrid(ctx, px, view);
-    ctx.fillStyle = COLORS.shallow;
-    ctx.fill(cache.shallowPath, 'evenodd');
-    ctx.strokeStyle = COLORS.coastGlow;
-    ctx.lineWidth = 12 * px;
-    cache.coast.stroke(ctx, view);
+    // 1. Base: imagery, or ocean + grid.
+    if (image) {
+      this.drawImagery(ctx, image, view, map);
+    } else {
+      ctx.fillStyle = L.ocean ?? COLORS.ocean;
+      ctx.fillRect(0, 0, map.width, map.height);
+    }
+    if (L.grid) this.drawGrid(ctx, px, view, L.gridColor);
+    if (!image && L.shallow && fx) {
+      ctx.fillStyle = COLORS.shallow;
+      ctx.fill(cache.shallowPath, 'evenodd');
+    }
+    if (L.glow && fx) {
+      ctx.strokeStyle = COLORS.coastGlow;
+      ctx.lineWidth = 12 * px;
+      cache.coast.stroke(ctx, view);
+    }
+    if (L.coastHalo && fx) {
+      ctx.strokeStyle = L.coastHalo;
+      ctx.lineWidth = 7 * px;
+      cache.coast.stroke(ctx, view);
+    }
 
-    // Land.
-    const paths = cache.provincePaths;
-    if (detail) {
-      for (let i = 0; i < paths.length; i++) {
-        if (!intersects(map.provinces[i].bbox, view)) continue;
-        ctx.fillStyle = cache.fills[i];
-        ctx.fill(paths[i], 'evenodd');
+    // 2. Land: solid fills (political / parchment) or a tint over imagery.
+    if (image || L.image) {
+      if (!image) { ctx.fillStyle = COLORS.ocean; ctx.fillRect(0, 0, map.width, map.height); } // imagery still loading
+      ctx.globalAlpha = image ? L.overlayAlpha : 0.9;
+      if (detail) {
+        for (let i = 0; i < paths.length; i++) {
+          const p = map.provinces[i];
+          if (p.owner < 0 || !intersects(p.bbox, view)) continue;
+          ctx.fillStyle = cache.nationFills[p.owner];
+          ctx.fill(paths[i], 'evenodd');
+        }
+      } else {
+        cache.nationAreas.forEach((path, i) => { ctx.fillStyle = cache.nationFills[i]; ctx.fill(path, 'evenodd'); });
       }
-      const terrainAlpha = clamp((provincePx - 34) / 30, 0, 1) * 0.55;
+      ctx.globalAlpha = 1;
+    } else {
+      const fills = old ? cache.fillsOld : cache.fills;
+      if (detail) {
+        for (let i = 0; i < paths.length; i++) {
+          if (!intersects(map.provinces[i].bbox, view)) continue;
+          ctx.fillStyle = fills[i];
+          ctx.fill(paths[i], 'evenodd');
+        }
+      } else {
+        const nf = old ? cache.nationFillsOld : cache.nationFills;
+        cache.nationAreas.forEach((path, i) => { ctx.fillStyle = nf[i]; ctx.fill(path, 'evenodd'); });
+        ctx.fillStyle = old ? rgb(PARCHMENT) : COLORS.unclaimed;
+        ctx.fill(cache.unclaimedArea, 'evenodd');
+      }
+      if (detail && old) {
+        ctx.fillStyle = rgb(PARCHMENT);
+        ctx.fill(cache.unclaimedArea, 'evenodd');
+      }
+      const terrainAlpha = L.patterns && fx ? clamp((provincePx - 34) / 30, 0, 1) * (old ? 0.4 : 0.55) : 0;
       if (terrainAlpha > 0) {
         ctx.globalAlpha = terrainAlpha;
         for (let i = 0; i < paths.length; i++) {
@@ -561,10 +704,17 @@ export class Renderer {
         }
         ctx.globalAlpha = 1;
       }
-    } else {
-      cache.nationAreas.forEach((path, i) => { ctx.fillStyle = cache.nationFills[i]; ctx.fill(path, 'evenodd'); });
-      ctx.fillStyle = COLORS.unclaimed;
-      ctx.fill(cache.unclaimedArea, 'evenodd');
+    }
+
+    // Old-map paper grain over everything.
+    if (L.paper && fx) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.55;
+      ctx.setTransform(F.dpr, 0, 0, F.dpr, 0, 0);
+      ctx.fillStyle = this.paper;
+      ctx.fillRect(0, 0, F.w, F.h);
+      ctx.restore();
     }
 
     // Start screen: dim every nation except the one being previewed.
@@ -575,29 +725,31 @@ export class Renderer {
       ctx.fill(cache.unclaimedArea, 'evenodd');
     }
 
-    // Borders: province (thin, fades in) → nation (thick, two-tone) → coastline.
-    const provBorderAlpha = clamp((provincePx - DETAIL_PX) / 20, 0, 1);
+    // 3. Borders: province (fade in with zoom) → nation → coastline.
+    const provBorderAlpha = clamp((provincePx - DETAIL_PX) / 24, 0, 1);
     if (provBorderAlpha > 0) {
       ctx.globalAlpha = provBorderAlpha;
-      ctx.strokeStyle = COLORS.provinceBorder;
-      ctx.lineWidth = 0.8 * px;
+      ctx.strokeStyle = L.provinceBorder;
+      ctx.lineWidth = 0.75 * px;
       cache.provinceBorders.stroke(ctx, view);
       ctx.globalAlpha = 1;
     }
-    const thick = clamp(provincePx / 12, 1.6, 3.4);
-    ctx.strokeStyle = COLORS.nationBorderDark;
+    const thick = L.thinNation ? 1.3 : clamp(provincePx / 12, 1.6, 3.2);
+    ctx.strokeStyle = L.nationDark;
     ctx.lineWidth = thick * px;
     cache.nationBorders.stroke(ctx, view);
-    if (detail) {
-      ctx.strokeStyle = COLORS.nationBorderLight;
-      ctx.lineWidth = 1 * px;
-      ctx.setLineDash([5 * px, 3 * px]);
+    if (L.nationLight && (detail || !L.nationDash)) {
+      ctx.strokeStyle = L.nationLight;
+      ctx.lineWidth = (L.nationDash ? 1 : 0.9) * px;
+      if (L.nationDash) ctx.setLineDash([5 * px, 3 * px]);
       cache.nationBorders.stroke(ctx, view);
       ctx.setLineDash([]);
     }
-    ctx.strokeStyle = COLORS.coast;
-    ctx.lineWidth = 1.1 * px;
-    cache.coast.stroke(ctx, view);
+    if (L.coast) {
+      ctx.strokeStyle = L.coast;
+      ctx.lineWidth = (old ? 1.2 : 1.1) * px;
+      cache.coast.stroke(ctx, view);
+    }
 
     // Highlight outline: player's nation in game, previewed nation in setup.
     const outlined = state.phase === 'playing' ? state.playerNationId : focus;
@@ -608,8 +760,21 @@ export class Renderer {
     }
   }
 
+  /** Draw the visible part of a world image (it covers the map exactly). */
+  drawImagery(ctx, img, view, map) {
+    const x0 = Math.max(0, view.x0), y0 = Math.max(0, view.y0);
+    const x1 = Math.min(map.width, view.x1), y1 = Math.min(map.height, view.y1);
+    ctx.fillStyle = '#0b1622';
+    ctx.fillRect(0, 0, map.width, map.height);
+    if (x1 <= x0 || y1 <= y0) return;
+    const kx = img.width / map.width, ky = img.height / map.height;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = this.quality === 'low' ? 'low' : 'high';
+    ctx.drawImage(img, x0 * kx, y0 * ky, (x1 - x0) * kx, (y1 - y0) * ky, x0, y0, x1 - x0, y1 - y0);
+  }
+
   /** Lat/lon graticule on real maps, tactical grid on generated ones. */
-  drawGrid(ctx, px, view) {
+  drawGrid(ctx, px, view, color) {
     const map = this.state.map;
     ctx.lineWidth = px;
     if (map.graticule) {
@@ -618,7 +783,7 @@ export class Renderer {
         for (const [a, b] of map.graticule) { path.moveTo(a.x, a.y); path.lineTo(b.x, b.y); }
         this.cache.graticule = path;
       }
-      ctx.strokeStyle = COLORS.gridMajor;
+      ctx.strokeStyle = color ?? COLORS.gridMajor;
       ctx.stroke(this.cache.graticule);
       return;
     }
@@ -640,102 +805,104 @@ export class Renderer {
     ctx.stroke(major);
   }
 
+  /**
+   * Screen-space labels and icons, placed by priority without overlaps:
+   * nation names → cities (icon, then name) → province names.
+   */
   drawOverlay(provincePx) {
     const { ctx, camera: cam, cache, state } = this;
     const map = state.map;
+    const L = this.look();
+    this.theme = L;
     const W = cam.viewW, H = cam.viewH, M = 40;
     const onScreen = (s) => s.x > -M && s.y > -M && s.x < W + M && s.y < H + M;
     const space = new LabelSpace();
     const z = cam.zoom;
+    const italic = L.italic ? 'italic ' : '';
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
 
-    // 1. City icons (claim their space first so labels avoid them).
-    const iconScale = clamp(0.8 + (provincePx - 30) / 200, 0.8, 1.3);
-    const shownCities = [];
-    for (const p of cache.cities) {
-      const ps = Math.sqrt(p.area) * z; // this province's size on screen
-      const nation = map.nations[p.owner];
-      const major = p.isCapital && nation?.major;
-      const visible = major || (p.isCapital ? ps >= 12 : ps >= 18);
-      if (!visible) continue;
-      const s = cam.worldToScreen(p.center.x, p.center.y);
-      if (!onScreen(s)) continue;
-      const r = p.isCapital ? 6 * iconScale : 3.6 * iconScale;
-      // Major powers' capitals always show; everything else yields to what's already placed.
-      if (!space.claim(s.x, s.y, r * 2 + 2, r * 2 + 2) && !major) continue;
-      if (p.isCapital) this.drawCapitalIcon(s.x, s.y, r);
-      else this.drawCityIcon(s.x, s.y, r);
-      shownCities.push({ p, s, ps, r });
-    }
-
-    // 2. Nation names, largest first, only where they fit; fade out when zoomed far in.
-    const nationAlpha = clamp((120 - provincePx) / 50, 0, 1);
+    // 1. Nation names, largest first, only where they fit; fade out when zoomed far in.
+    const nationAlpha = clamp((130 - provincePx) / 50, 0, 1);
     if (nationAlpha > 0) {
-      ctx.globalAlpha = nationAlpha * 0.88;
+      ctx.globalAlpha = nationAlpha * 0.9;
       for (const a of cache.labelOrder) {
         const s = cam.worldToScreen(a.x, a.y);
         if (!onScreen(s)) continue;
         const extent = Math.sqrt(a.area) * z;
         const size = clamp(extent * 0.14, 9, 28);
-        ctx.font = `700 ${size.toFixed(1)}px ${FONT_UI}`;
-        const spacing = size * 0.22;
-        if (this.hasLetterSpacing) ctx.letterSpacing = `${spacing.toFixed(1)}px`;
-        const w = ctx.measureText(a.text).width;
+        ctx.font = `${italic}${L.nationWeight} ${size.toFixed(1)}px ${L.font}`;
+        if (this.hasLetterSpacing) ctx.letterSpacing = `${(size * 0.22).toFixed(1)}px`;
+        const text = L.upper ? a.text : a.nation.shortName;
+        const w = ctx.measureText(text).width;
         if (w > extent * 1.7 && !(a.nation.major && extent > 18)) continue;
-        // Try the anchor, then just above/below it (city icons often sit on the anchor).
-        const dy = [0, -1.15, 1.15, -2.3, 2.3].map((k) => k * size).find((d) => space.claim(s.x, s.y + d, w + 4, size + 2));
+        const dy = [0, -1.15, 1.15].map((k) => k * size).find((d) => space.claim(s.x, s.y + d, w + 4, size + 2));
         if (dy === undefined) continue;
-        this.haloText(a.text, s.x, s.y + dy, 3.5);
+        this.haloText(text, s.x, s.y + dy, 3.5);
       }
-      // Unclaimed regions (peoples, cultures) in italics.
+      // Unclaimed regions (peoples, cultures), quieter.
       for (const a of cache.regionLabels) {
         const extent = Math.sqrt(a.area) * z;
         if (extent < 60) continue;
         const s = cam.worldToScreen(a.x, a.y);
         if (!onScreen(s)) continue;
         const size = clamp(extent * 0.07, 9, 15);
-        ctx.font = `italic 500 ${size.toFixed(1)}px ${FONT_UI}`;
+        ctx.font = `italic 500 ${size.toFixed(1)}px ${L.font}`;
         if (this.hasLetterSpacing) ctx.letterSpacing = '0.5px';
         const w = ctx.measureText(a.text).width;
         if (w > extent * 1.6 || !space.claim(s.x, s.y, w + 4, size + 2)) continue;
-        this.haloText(a.text, s.x, s.y, 3, COLORS.labelDim);
+        this.haloText(a.text, s.x, s.y, 3, L.labelDim);
       }
       if (this.hasLetterSpacing) ctx.letterSpacing = '0px';
       ctx.globalAlpha = 1;
     }
 
-    // 3. City names when their province is big enough on screen.
-    ctx.font = `600 ${Math.round(12 * iconScale)}px ${FONT_UI}`;
-    for (const { p, s, ps, r } of shownCities) {
-      if (ps < (p.isCapital ? 34 : 48)) continue;
+    // 2. Cities: capitals and big provinces first; names once there's room.
+    const iconScale = clamp(0.8 + (provincePx - 30) / 200, 0.8, 1.3);
+    ctx.font = `${italic}600 ${Math.round(12 * iconScale)}px ${L.font}`;
+    for (const p of cache.cities) {
+      const ps = Math.sqrt(p.area) * z; // this province's size on screen
+      const nation = map.nations[p.owner];
+      const major = p.isCapital && nation?.major;
+      if (!(major || (p.isCapital ? ps >= 12 : ps >= 18))) continue;
+      const pos = p.cityPos ?? p.center;
+      const s = cam.worldToScreen(pos.x, pos.y);
+      if (!onScreen(s)) continue;
+      const r = p.isCapital ? 6 * iconScale : 3.6 * iconScale;
+      // Major powers' capitals always show; everything else yields to what's already placed.
+      if (!space.claim(s.x, s.y, r * 2 + 2, r * 2 + 2) && !major) continue;
+      if (p.isCapital) this.drawCapitalIcon(s.x, s.y, r);
+      else this.drawCityIcon(s.x, s.y, r);
+      if (ps < (p.isCapital ? 30 : 42)) continue;
+      const name = p.cityName ?? p.name;
       const y = s.y + r + 9;
-      const w = ctx.measureText(p.name).width;
-      if (!space.claim(s.x, y, w + 4, 14)) continue;
-      this.haloText(p.name, s.x, y, 3);
+      const w = ctx.measureText(name).width;
+      if (space.claim(s.x, y, w + 4, 14)) this.haloText(name, s.x, y, 3);
     }
 
-    // 4. Province names when zoomed far in.
-    if (provincePx > 95) {
-      ctx.font = `500 11px ${FONT_UI}`;
-      ctx.globalAlpha = clamp((provincePx - 95) / 40, 0, 1) * 0.8;
+    // 3. Province names when zoomed in far enough for them to fit.
+    if (provincePx > 70) {
+      ctx.font = `${italic}500 11px ${L.font}`;
+      ctx.globalAlpha = clamp((provincePx - 70) / 40, 0, 1) * 0.85;
       const view = this.viewRect(0);
       for (const p of map.provinces) {
-        if (p.isCity || Math.sqrt(p.area) * z < 110 || !intersects(p.bbox, view)) continue;
+        if ((p.isCity && p.cityName === p.name) || Math.sqrt(p.area) * z < 80 || !intersects(p.bbox, view)) continue;
         const s = cam.worldToScreen(p.center.x, p.center.y);
-        const text = p.name.toUpperCase();
+        const text = L.upper ? p.name.toUpperCase() : p.name;
         if (!space.claim(s.x, s.y, ctx.measureText(text).width + 4, 13)) continue;
-        this.haloText(text, s.x, s.y, 3);
+        this.haloText(text, s.x, s.y, 3, L.labelDim);
       }
       ctx.globalAlpha = 1;
     }
   }
 
-  haloText(text, x, y, halo, color = COLORS.label) {
+  haloText(text, x, y, halo, color) {
     const ctx = this.ctx;
-    ctx.strokeStyle = COLORS.labelHalo;
+    const t = this.theme ?? LOOKS.political;
+    color = color ?? t.label;
+    ctx.strokeStyle = t.halo;
     ctx.lineWidth = halo;
     ctx.strokeText(text, x, y);
     ctx.fillStyle = color;

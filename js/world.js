@@ -102,6 +102,9 @@ export function buildWorldMap(data, era) {
       terrain: TERRAIN_CODES[p.t] ?? 'plains',
       isCity: !!p.c,
       isCapital: p.c === 2,
+      // Modern provinces are real regions: the city keeps its own name and position.
+      cityName: p.c ? (p.cn ?? p.n) : null,
+      cityPos: p.cp ? { x: p.cp[0] * q, y: p.cp[1] * q } : null,
       owner: p.o,
       region: p.g ?? null,
     };

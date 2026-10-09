@@ -14,7 +14,7 @@ import { brandIcon } from './brand-icons.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const PROVIDER_LABEL = Object.fromEntries([...PROVIDERS.map((p) => [p.id, p.label]), ['email', 'Email link'], ['twitter', 'X']]);
+const PROVIDER_LABEL = Object.fromEntries([...PROVIDERS.map((p) => [p.id, p.label]), ['email', 'Email link'], ['twitter', 'X'], ['demo', 'Demo']]);
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 const STATUS_TEXT = { pending: 'Pending', approved: 'Approved', denied: 'Denied' };
 
@@ -113,6 +113,8 @@ export class Launcher {
   grant() {
     this.stopWatching();
     this.hide();
+    const signOutItem = document.querySelector('[data-menu="signout"]');
+    if (signOutItem) signOutItem.hidden = false;
     const account = $('#account');
     if (account) {
       account.hidden = false;
@@ -155,8 +157,14 @@ export class Launcher {
             <span class="provider-label">${p.enabled ? `Continue with ${escapeHtml(p.label)}` : escapeHtml(p.label)}</span>
             ${p.enabled ? '' : '<span class="soon">Coming soon</span>'}
           </button>`).join('');
+        const demo = this.auth.demo ? `
+          <div class="demo-box">
+            <p><b>Preview build.</b> Real sign-in is off here. Try the full flow with a demo owner account.</p>
+            <button type="button" class="btn primary" data-action="demo">DEMO SIGN-IN</button>
+          </div>` : '';
         this.card.innerHTML = `
           <h2>Sign in</h2>
+          ${demo}
           <p class="card-lead">Use any account below. You'll stay signed in on this device.</p>
           <div class="provider-list">${buttons}</div>
           <div class="divider"><span>or</span></div>
@@ -169,6 +177,7 @@ export class Launcher {
           </form>
           <p class="card-msg" role="status" aria-live="polite">${escapeHtml(opts.message ?? '')}</p>
           <p class="fine">Closed beta. New accounts need approval before they can play. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p>`;
+        if (this.auth.demo) for (const el of this.card.querySelectorAll('.provider-btn, .magic-form input, .magic-form button')) el.disabled = true;
         this.card.querySelector('.provider-list').addEventListener('click', (e) => {
           const b = e.target.closest('[data-provider]');
           if (b && !b.disabled) this.signInWith(b.dataset.provider, b);
@@ -237,6 +246,7 @@ export class Launcher {
       if (a === 'retry') location.reload();
       if (a === 'back') this.render('signin');
       if (a === 'request') this.requestAccess(e.target.closest('button'));
+      if (a === 'demo') this.auth.signInDemo().then(() => this.checkAccess());
     };
   }
 

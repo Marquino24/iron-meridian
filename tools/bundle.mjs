@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fragment = process.argv.includes('--fragment');
@@ -69,7 +70,7 @@ const safeJs = js.replace(/<\/script/gi, '<\\/script');
 const eraDir = join(root, 'data/eras');
 const eraTags = existsSync(eraDir)
   ? readdirSync(eraDir).filter((f) => f.endsWith('.json')).sort().map((f) =>
-    `<script type="application/json" id="era-data-${f.replace(/\.json$/, '')}">${readFileSync(join(eraDir, f), 'utf8').replace(/</g, '\\u003c')}</script>`)
+    `<script type="application/gzip-base64" id="era-data-${f.replace(/\.json$/, '')}">${gzipSync(readFileSync(join(eraDir, f)), { level: 9 }).toString('base64')}</script>`)
   : [];
 
 const inner = [

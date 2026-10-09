@@ -19,7 +19,10 @@ import { GameState } from './state.js';
 import { Renderer } from './render.js';
 import { Camera, InputController } from './camera.js';
 import { UI } from './ui.js';
-import { AuthService, authEnabled } from './auth.js';
+import { AuthService, DemoAuthService, authEnabled } from './auth.js';
+import { Settings } from './settings.js';
+import { Screens } from './menu.js';
+import { loadImagery } from './assets.js';
 import { Launcher } from './launcher.js';
 
 const canvas = document.getElementById('map-canvas');
@@ -44,7 +47,8 @@ function hudInsets() {
   const narrow = window.innerWidth <= 760;
   const ins = { left: 0, right: 0, top: 0, bottom: hudEls.status.offsetHeight };
   if (state.phase === 'setup') {
-    if (!narrow) ins.left = hudEls.start.offsetWidth;
+    const panel = document.querySelector('.screen:not([hidden]) .screen-left');
+    if (!narrow && panel) ins.left = panel.getBoundingClientRect().right;
   } else {
     ins.top = hudEls.topbar.offsetHeight;
     if (state.selectedProvinceId >= 0) {
@@ -151,8 +155,29 @@ async function loadEra(id, seed = null) {
   }
 }
 
+const settings = new Settings();
+
+/** Picking an era opens the nation screen once its map is ready. */
+async function chooseEra(id) {
+  if (state.map?.era?.id === id && !getEra(id).fictional) {
+    screens.show('nation');
+    focusOverview();
+    return;
+  }
+  await loadEra(id);
+  if (state.map?.era?.id === id) {
+    screens.show('nation');
+    focusOverview();
+  }
+}
+
+function focusOverview() {
+  const f = overviewFrame();
+  camera.flyTo(f.x, f.y, f.zoom, 0.6);
+}
+
 const ui = new UI(state, {
-  selectEra: (id) => loadEra(id),
+  selectEra: (id) => chooseEra(id),
   newMap: loadMap,
   previewNation(id) {
     const f = nationFrame(id);
@@ -161,6 +186,8 @@ const ui = new UI(state, {
   deploy(id) {
     state.setPlayerNation(id);
     state.setFocusedNation(-1);
+    screens.gameInProgress = true;
+    screens.show('game');
     state.setPhase('playing');
     const cap = state.getProvince(state.getNation(id).capitalId);
     state.setSelected(cap.id);
@@ -172,12 +199,14 @@ const ui = new UI(state, {
     state.setSelected(id);
     focusOn(p.center.x, p.center.y, Math.max(camera.zoom, detailZoom(80)), 0.6);
   },
+  // In-game MENU: pause and go to the main menu (Resume brings you back).
   returnToMenu() {
     state.setSelected(-1);
+    pausedSpeed = state.clock.speed;
+    state.setSpeed(0);
     state.setPhase('setup');
-    if (state.playerNationId >= 0) ui.choosePendingNation(state.playerNationId);
-    const f = overviewFrame();
-    camera.flyTo(f.x, f.y, f.zoom, 0.8);
+    screens.show('menu');
+    menuCamera();
   },
 });
 
@@ -223,15 +252,84 @@ const initialEra = [params.get('era'), params.get('seed') ? 'fictional' : null, 
   .find((id) => id && ERAS.some((e) => e.id === id));
 loadEra(initialEra, params.get('seed'));
 
-// --- Sign-in and beta gate ---
-// Flow: sign-in → beta gate → era/nation select. The map loads behind the
-// launcher meanwhile. Without Supabase settings (js/config.js) or in the
-// dev preview build, the game opens directly.
-state.events.on('phase', (phase) => document.body.classList.toggle('in-game', phase === 'playing'));
-if (authEnabled()) {
-  const launcher = new Launcher(new AuthService());
-  launcher.run();
+// --- Settings applied to the renderer and page ---
+
+function applySettings() {
+  renderer.setQuality(settings.quality);
+  document.documentElement.style.setProperty('--ui-scale', settings.uiScale);
 }
+applySettings();
+let mapStyle = settings.mapStyle;
+settings.onChange((key) => {
+  if (key === 'mapStyle') setMapStyle(settings.mapStyle);
+  applySettings();
+});
+
+/** Map style for this session (the in-game toggle); Settings holds the default. */
+async function setMapStyle(style) {
+  mapStyle = style;
+  for (const b of document.querySelectorAll('#style-toggle [data-style]')) {
+    const on = b.dataset.style === style;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+  renderer.setStyle(style);
+  if (style !== 'political' && !renderer.images[style]) {
+    try { renderer.setImage(style, await loadImagery(style)); } catch (err) { console.error(err); }
+  }
+}
+document.getElementById('style-toggle').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-style]');
+  if (b) setMapStyle(b.dataset.style);
+});
+setMapStyle(mapStyle);
+
+// --- Screens: sign-in → beta gate → main menu → era → nation → game ---
+
+let pausedSpeed = 1;
+let launcher = null;
+const screens = new Screens({
+  settings,
+  actions: {
+    resume() {
+      screens.show('game');
+      state.setPhase('playing');
+      state.setSpeed(pausedSpeed || 1);
+      const cap = state.getProvince(state.playerNation?.capitalId);
+      if (cap) focusOn(cap.center.x, cap.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 0.8);
+    },
+    signOut() { launcher?.signOut(); },
+  },
+});
+
+/** A wide, slowly drifting view of the world behind the menus. */
+function menuCamera() {
+  const map = state.map;
+  if (!map) return;
+  camera.flyTo(map.width * 0.45, map.height * 0.42, camera.refZoom * (map.kind === 'world' ? 1.7 : 1.15), 1.0);
+}
+let ambientDir = 1;
+function ambientPan(dt) {
+  if (!screens.ambient || camera.flight || input.pointers.size) return;
+  const map = state.map;
+  if (!map) return;
+  camera.panBy(-ambientDir * 16 * dt, 0);
+  if (camera.x > map.width * 0.72) ambientDir = -1;
+  if (camera.x < map.width * 0.28) ambientDir = 1;
+  renderer.requestRender();
+}
+
+state.events.on('phase', (phase) => document.body.classList.toggle('in-game', phase === 'playing'));
+state.events.on('map:loaded', () => { if (screens.ambient) menuCamera(); });
+
+// Real sign-in when Supabase is configured; otherwise (claude.ai preview,
+// local dev) a demo sign-in that fakes an approved owner on this device.
+screens.show(null);
+launcher = new Launcher(authEnabled() ? new AuthService() : new DemoAuthService());
+launcher.run().then(() => {
+  screens.show('menu');
+  menuCamera();
+});
 
 // --- Main loop ---
 
@@ -241,6 +339,7 @@ function frame(now) {
   last = now;
 
   if (input.update(dt)) renderer.requestRender();
+  ambientPan(dt);
   if (camera.update(dt)) renderer.requestRender();
 
   const gameHours = state.tick(dt);
@@ -253,4 +352,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle };
