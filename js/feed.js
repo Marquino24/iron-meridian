@@ -7,7 +7,7 @@
  */
 
 import { drawFlag } from './render.js';
-import { fmtHours } from './render-units.js';
+import { fmtHours } from './ui-kit.js';
 
 const MAX_ITEMS = 6;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -48,7 +48,7 @@ export class Feed {
       const go = e.target.closest('[data-report-goto]');
       if (go) { this.actions.focusNode(Number(go.dataset.reportGoto)); this.close(); }
     });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !this.report.hidden) { e.stopPropagation(); this.close(); } }, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !this.report.hidden) { e.preventDefault(); e.stopPropagation(); this.close(); } }, true);
   }
 
   push(e) {

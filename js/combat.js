@@ -6,8 +6,8 @@
  * - Battle: starts when an army arrives where hostile armies stand. Every
  *   game hour each unit hits a random enemy unit:
  *       damage = 8 × attack × matchup ÷ (defense × terrain) × (0.75–1.25)
- *   where terrain (forest 1.25, mountains 1.6, urban 1.4) only shields the
- *   side that was there first, matchup is the rock-paper-scissors table in
+ *   where terrain (forest 1.25, mountains 1.6, urban 1.4, times +25% per
+ *   Fortifications level) only shields the side that was there first, matchup is the rock-paper-scissors table in
  *   units.js, and worn-down units hit softer. Land armies caught at sea
  *   fight at a quarter of their attack and half their defense.
  *   An army below 20% strength retreats to a safe neighbouring node (if
@@ -173,7 +173,8 @@ export class Combat {
       return list;
     });
     if (!units[0].length || !units[1].length) { this.checkEnd(b); return; }
-    const terrainDef = b.sea ? 1 : TERRAIN[b.terrain].defense;
+    // Fortifications add to the terrain bonus of whoever holds the ground.
+    const terrainDef = b.sea ? 1 : TERRAIN[b.terrain].defense * (A.buildings?.fortBonus(b.node) ?? 1);
     const hits = [];
     for (let i = 0; i < 2; i++) {
       const foes = units[1 - i];

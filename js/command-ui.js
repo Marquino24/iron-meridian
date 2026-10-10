@@ -1,9 +1,9 @@
 /**
  * command-ui.js — The military/economic side of the HUD:
- *   - Money and Manpower in the top bar, with a daily-income tooltip;
+ *   - the era's resources in the top bar, with a daily-income tooltip;
  *   - the army panel (units, strength, split/merge, stop);
  *   - extra province-panel sections: forces present, occupation progress,
- *     recruitment queue for your cities, and the foreign nation's relations
+ *     Recruit and Build tabs for your cities, and the foreign nation's relations
  *     with a Declare War button (with confirmation).
  *
  * Panels re-render only when their structure changes (a signature string);
@@ -11,22 +11,12 @@
  * never get replaced under a finger mid-tap.
  */
 
-import { fmtHours } from './render-units.js';
+import { esc, fmtNum, fmtHours, costHtml, ROLE_LABEL, ROLE_GLYPH, BEATS, ROMAN, bar } from './ui-kit.js';
+import { RESOURCES } from './resources.js';
+import { BUILDINGS, MAX_LEVEL } from './buildings.js';
+
 
 const $ = (sel, root = document) => root.querySelector(sel);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-
-export function fmtNum(v) {
-  const n = Math.floor(v);
-  const a = Math.abs(n);
-  if (a >= 1e6) return `${(n / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M`;
-  if (a >= 1e4) return `${(n / 1e3).toFixed(a >= 1e5 ? 0 : 1)}K`;
-  return n.toLocaleString('en-US');
-}
-
-const ROLE_LABEL = { inf: 'Infantry', mob: 'Mobile', rng: 'Ranged', nav: 'Naval' };
-const ROLE_GLYPH = { inf: '✕', mob: '⬭', rng: '●', nav: '⛴' };
-const BEATS = { inf: 'mob', mob: 'rng', rng: 'inf' };
 
 export class CommandUI {
   /**
@@ -44,15 +34,15 @@ export class CommandUI {
     this.timer = 0;
     this.lastRes = '';
 
+    this.cityTab = 'recruit';      // city panel: 'recruit' | 'build'
+
     this.el = {
-      money: $('#res-money'),
-      moneyInc: $('#res-money-inc'),
-      manpower: $('#res-manpower'),
-      manpowerInc: $('#res-manpower-inc'),
+      chips: $('#res-chips'),
       tip: $('#res-tip'),
       resources: $('#resources'),
     };
     this.bindResources();
+    state.events.on('map:loaded', () => this.buildChips());
     state.events.on('select:army', () => { this.checked.clear(); this.confirmWar = -1; });
     state.events.on('select', () => { this.confirmWar = -1; });
   }
@@ -67,43 +57,58 @@ export class CommandUI {
     const hide = () => { tip.hidden = true; };
     resources.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') show(); });
     resources.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hide(); });
-    resources.addEventListener('click', () => (tip.hidden ? show() : hide()));
+    // Mouse: hover shows it. Touch and keyboard: click toggles.
+    resources.addEventListener('click', (e) => { if (e.pointerType !== 'mouse') (tip.hidden ? show() : hide()); });
     document.addEventListener('pointerdown', (e) => { if (!resources.contains(e.target)) hide(); });
+  }
+
+  /** One chip per era resource. */
+  buildChips() {
+    const E = this.sim.economy;
+    this.el.chips.innerHTML = E.keys.map((k) => `
+      <button type="button" class="res" data-res="${k}" aria-describedby="res-tip">
+        <span class="res-ico" style="color:${RESOURCES[k].color}">${RESOURCES[k].icon}</span>
+        <span class="res-body"><span class="eyebrow">${esc(E.label(k).toUpperCase())}</span><b data-res-val="${k}">0</b></span>
+        <small data-res-inc="${k}">+0</small>
+      </button>`).join('');
+    this.lastRes = '';
   }
 
   renderTip() {
     const id = this.state.playerNationId;
     if (id < 0) return;
-    const inc = this.sim.economy.income(id);
-    const cur = this.roster.currency;
-    const row = (label, n, share) => `<tr><th>${label}</th><td>${n}</td><td>${fmtNum(n * share * inc.perShare.money * inc.factor)}</td><td>${fmtNum(n * share * inc.perShare.manpower * inc.factor)}</td></tr>`;
+    const E = this.sim.economy;
+    const inc = E.income(id);
+    const rows = E.keys.map((k) => `<tr>
+      <th><i style="color:${RESOURCES[k].color}">${RESOURCES[k].icon}</i> ${esc(E.label(k))}</th>
+      <td>${fmtNum(inc.base[k])}</td><td>${inc.built[k] ? `+${fmtNum(inc.built[k])}` : '—'}</td><td>${inc.roads[k] >= 1 ? `+${fmtNum(inc.roads[k])}` : '—'}</td>
+      <td class="tot">+${fmtNum(inc.perDay[k])}</td></tr>`).join('');
     this.el.tip.innerHTML = `
       <div class="eyebrow">DAILY INCOME</div>
       <table>
-        <thead><tr><th></th><th>#</th><th>Money</th><th>Manpower</th></tr></thead>
-        <tbody>
-          ${row('Provinces', inc.land, 1)}
-          ${row('Cities ×3', inc.cities, 3)}
-          ${row('Capital ×5', inc.capitals, 5)}
-        </tbody>
-        <tfoot><tr><th>Per day</th><td></td><td>+${fmtNum(inc.money)}</td><td>+${fmtNum(inc.manpower)}</td></tr></tfoot>
+        <thead><tr><th></th><th title="Provinces">Land</th><th title="Buildings">Bldg</th><th title="${esc(this.sim.buildings.name('roads'))}">Roads</th><th>/day</th></tr></thead>
+        <tbody>${rows}</tbody>
       </table>
-      ${inc.factor < 1 ? '<p class="warn">Capital lost: production −50% until you retake it.</p>' : ''}
-      <p>Money is in ${esc(cur)}. Manpower comes from population, which follows the same shares (cities 3×, capitals 5×). Income arrives every hour.</p>`;
+      ${inc.factor < 1 ? '<p class="warn">Capital lost: everything ×0.5 until you retake it.</p>' : ''}
+      <p>${inc.land} provinces, ${inc.cities} cities, ${inc.capitals} capital. Each province yields money and manpower by size (city 3×, capital 5×), food by fertility, ${esc(E.label('steel').toLowerCase())} more in mountains${E.keys.includes('oil') ? ', oil only from deposits' : ''}${E.keys.includes('electronics') ? ', electronics from cities and factories' : ''}. Buildings add more. Income arrives every hour.</p>`;
   }
 
   renderResources() {
     const id = this.state.playerNationId;
     if (id < 0) return;
-    const s = this.sim.economy.get(id);
-    const inc = this.sim.economy.income(id);
-    const text = `${fmtNum(s.money)}|${fmtNum(s.manpower)}|${fmtNum(inc.money)}|${fmtNum(inc.manpower)}|${inc.factor}`;
+    const E = this.sim.economy;
+    const s = E.get(id);
+    const inc = E.income(id);
+    const text = E.keys.map((k) => `${fmtNum(s[k])}/${fmtNum(inc.perDay[k])}`).join('|') + inc.factor;
     if (text === this.lastRes) return;
+    if (!this.el.chips.children.length) this.buildChips();
     this.lastRes = text;
-    this.el.money.textContent = fmtNum(s.money);
-    this.el.manpower.textContent = fmtNum(s.manpower);
-    this.el.moneyInc.textContent = `+${fmtNum(inc.money)}/d`;
-    this.el.manpowerInc.textContent = `+${fmtNum(inc.manpower)}/d`;
+    for (const k of E.keys) {
+      const v = this.el.chips.querySelector(`[data-res-val="${k}"]`);
+      if (v) v.textContent = fmtNum(s[k]);
+      const i = this.el.chips.querySelector(`[data-res-inc="${k}"]`);
+      if (i) i.textContent = `+${fmtNum(inc.perDay[k])}`;
+    }
     this.el.resources.classList.toggle('penalty', inc.factor < 1);
     if (!this.el.tip.hidden) this.renderTip();
   }
@@ -194,8 +199,10 @@ export class CommandUI {
   provinceSignature(p) {
     const A = this.sim.armies, C = this.sim.combat, st = this.state;
     const me = st.playerNationId;
-    const afford = this.roster.units.map((t) => (this.sim.economy.canAfford(me, t.cost) ? 1 : 0)).join('');
-    return ['prov', p.id, p.owner, A.queue(p.id).length, [...A.at(p.id)].map((a) => `${a.id}.${a.units.length}`).join(','),
+    const B = this.sim.buildings, E = this.sim.economy;
+    const afford = this.roster.units.map((t) => (E.canAfford(me, t.cost) ? 1 : 0)).join('')
+      + B.types.map((k) => (E.canAfford(me, B.check(p.id, k, { ignoreCost: true }).cost) ? 1 : 0)).join('');
+    return ['prov', p.id, p.owner, this.cityTab, Object.values(B.of(p.id)).join(''), B.construction.get(p.id)?.type ?? '', A.queue(p.id).length, [...A.at(p.id)].map((a) => `${a.id}.${a.units.length}`).join(','),
       C.atWar(me, p.owner), C.occupations.has(p.id), C.active.has(p.id), afford, this.confirmWar, me].join('|');
   }
 
@@ -227,9 +234,17 @@ export class CommandUI {
       out.push(`<div class="section-title">FORCES HERE</div><ul class="neighbor-list forces">${here.map((a) => item(a, false)).join('')}${passing.map((a) => item(a, true)).join('')}</ul>`);
     }
 
+    if (p.oil && this.sim.buildings.set.industrial) out.push('<p class="hint-line oil-note">⬮ Oil deposit: an oil well here produces oil.</p>');
     if (p.owner === me) {
-      if (p.isCity) out.push(this.recruitHtml(p));
-      else out.push('<p class="hint-line">Recruit units in cities you own.</p>');
+      const site = p.isCity || (p.oil && this.sim.buildings.set.industrial);
+      if (site) {
+        const tab = p.isCity ? this.cityTab : 'build';
+        out.push(`<div class="tabs panel-tabs" role="tablist">
+          ${p.isCity ? `<button type="button" role="tab" data-cmd="city-tab" data-tab="recruit" aria-selected="${tab === 'recruit'}" class="${tab === 'recruit' ? 'on' : ''}">Recruit${A.queue(p.id).length ? ` · ${A.queue(p.id).length}` : ''}</button>` : ''}
+          <button type="button" role="tab" data-cmd="city-tab" data-tab="build" aria-selected="${tab === 'build'}" class="${tab === 'build' ? 'on' : ''}">Build${this.sim.buildings.construction.has(p.id) ? ' · 1' : ''}</button>
+        </div>`);
+        out.push(tab === 'recruit' ? this.recruitHtml(p) : this.buildHtml(p));
+      } else out.push('<p class="hint-line">Recruit and build in cities you own.</p>');
     } else if (p.owner >= 0) {
       out.push(this.nationHtml(st.getNation(p.owner)));
     } else {
@@ -242,7 +257,8 @@ export class CommandUI {
     const A = this.sim.armies, E = this.sim.economy, st = this.state;
     const me = st.playerNationId;
     const rows = this.roster.units.map((t) => {
-      const ok = A.canRecruit(p.id, t.key);
+      const c = A.recruitCheck(p.id, t.key, { ignoreCost: true });
+      const ok = c.ok;
       const afford = E.canAfford(me, t.cost);
       return `<li class="recruit-row${ok ? '' : ' na'}">
         <div class="recruit-main">
@@ -252,11 +268,10 @@ export class CommandUI {
         </div>
         <div class="recruit-stats">ATK ${t.attack} · DEF ${t.defense} · HP ${t.hp} · ${t.speed} km/h</div>
         <div class="recruit-cost">
-          <span class="${E.get(me).money >= t.cost.money ? '' : 'short'}">◉ ${fmtNum(t.cost.money)}</span>
-          <span class="${E.get(me).manpower >= t.cost.manpower ? '' : 'short'}">♟ ${fmtNum(t.cost.manpower)}</span>
-          <span>⏱ ${fmtHours(t.build)}</span>
-          <button type="button" class="btn small" data-cmd="recruit" data-type="${t.key}" ${ok && afford ? '' : 'disabled'}>${ok ? 'Recruit' : 'No port'}</button>
+          ${costHtml(t.cost, E.get(me), E.set)}<span class="cost-chip">⏱ ${fmtHours(c.hours ?? t.build)}</span>
         </div>
+        <div class="recruit-act">${ok ? '' : `<span class="why">${esc(c.reason)}</span>`}
+          <button type="button" class="btn small" data-cmd="recruit" data-type="${t.key}" ${ok && afford ? '' : 'disabled'}>Recruit</button></div>
       </li>`;
     }).join('');
     const q = A.queue(p.id);
@@ -265,14 +280,44 @@ export class CommandUI {
       return `<li class="queue-row">
         <span class="unit-glyph r-${t.role}">${ROLE_GLYPH[t.role]}</span>
         <span class="unit-name">${esc(t.name)}</span>
-        <span class="progress"><i data-qbar="${p.id}:${i}" style="width:${((100 * item.done) / t.build).toFixed(0)}%"></i></span>
-        <span class="q-left" data-qleft="${p.id}:${i}">${i === 0 ? fmtHours(t.build - item.done) : 'queued'}</span>
+        <span class="progress"><i data-qbar="${p.id}:${i}" style="width:${((100 * item.done) / item.total).toFixed(0)}%"></i></span>
+        <span class="q-left" data-qleft="${p.id}:${i}">${i === 0 ? fmtHours(item.total - item.done) : 'queued'}</span>
         <button type="button" class="icon-btn" data-cmd="cancel" data-index="${i}" aria-label="Cancel and refund">✕</button>
       </li>`;
     }).join('');
-    return `<div class="section-title">RECRUIT</div>
-      <ul class="recruit-list">${rows}</ul>
+    return `<ul class="recruit-list">${rows}</ul>
       ${q.length ? `<div class="section-title">QUEUE · ${q.length}</div><ul class="queue-list">${queue}</ul>` : ''}`;
+  }
+
+  buildHtml(p) {
+    const B = this.sim.buildings, E = this.sim.economy;
+    const me = this.state.playerNationId;
+    const job = B.construction.get(p.id);
+    const rows = B.types.map((k) => {
+      const lv = B.level(p.id, k);
+      const c = B.check(p.id, k, { ignoreCost: true });
+      const na = !c.ok && lv === 0 && /only|coastal|No oil|WWI/.test(c.reason);
+      if (na) return '';
+      const afford = E.canAfford(me, c.cost);
+      return `<li class="recruit-row build-row">
+        <div class="recruit-main">
+          <span class="unit-glyph">${BUILDINGS[k].glyph}</span>
+          <span class="unit-name">${esc(B.name(k))}</span>
+          <span class="pips">${[1, 2, 3].map((i) => `<i class="${i <= lv ? 'on' : job?.type === k && i === job.level ? 'next' : ''}"></i>`).join('')}</span>
+        </div>
+        <div class="recruit-stats">${lv < MAX_LEVEL ? `Level ${ROMAN[lv + 1]}: ${esc(B.describe(k, lv + 1))}` : `Max level: ${esc(B.describe(k, lv))}`}</div>
+        ${lv < MAX_LEVEL ? `<div class="recruit-cost">${costHtml(c.cost, E.get(me), E.set)}<span class="cost-chip">⏱ ${fmtHours(c.hours)}</span></div>` : ''}
+        <div class="recruit-act">${c.ok ? '' : `<span class="why">${esc(c.reason)}</span>`}
+          ${lv < MAX_LEVEL ? `<button type="button" class="btn small" data-cmd="build" data-type="${k}" ${c.ok && afford ? '' : 'disabled'}>${lv ? 'Upgrade' : 'Build'}</button>` : ''}</div>
+      </li>`;
+    }).join('');
+    const current = job ? `<div class="section-title">UNDER CONSTRUCTION</div>
+      <div class="queue-row build-job"><span class="unit-glyph">${BUILDINGS[job.type].glyph}</span>
+        <span class="unit-name">${esc(B.name(job.type))} ${ROMAN[job.level]}</span>
+        ${bar(job.done / job.total, `data-c="${p.id}"`)}<span class="q-left" data-c-left="${p.id}">${fmtHours(job.total - job.done)}</span>
+        <button type="button" class="icon-btn" data-cmd="cancel-build" aria-label="Cancel and refund">✕</button></div>` : '';
+    return `${current}<ul class="recruit-list">${rows}</ul>
+      <p class="hint-line">One construction at a time per city. All cities at once: Production (P) and Buildings (B) windows.</p>`;
   }
 
   nationHtml(n) {
@@ -334,6 +379,13 @@ export class CommandUI {
         break;
       }
       case 'cancel': A.cancel(st.selectedProvinceId, Number(b.dataset.index)); break;
+      case 'city-tab': this.cityTab = b.dataset.tab; break;
+      case 'build': {
+        const r = this.sim.buildings.build(st.selectedProvinceId, b.dataset.type);
+        if (r.error) this.actions.notice(r.error);
+        break;
+      }
+      case 'cancel-build': this.sim.buildings.cancel(st.selectedProvinceId); break;
       case 'war': this.confirmWar = Number(b.dataset.nation); break;
       case 'war-cancel': this.confirmWar = -1; break;
       case 'war-confirm': C.declareWar(st.playerNationId, Number(b.dataset.nation)); this.confirmWar = -1; break;
@@ -382,8 +434,8 @@ export class CommandUI {
         if (u) el.textContent = Math.ceil(Math.max(0, u.hp));
       }
       const str = A.strength(army);
-      const bar = panel.querySelector('[data-strength]');
-      if (bar) { bar.style.width = `${(str * 100).toFixed(0)}%`; bar.className = str > 0.6 ? 'ok' : str > 0.3 ? 'mid' : 'low'; }
+      const sb = panel.querySelector('[data-strength]');
+      if (sb) { sb.style.width = `${(str * 100).toFixed(0)}%`; sb.className = str > 0.6 ? 'ok' : str > 0.3 ? 'mid' : 'low'; }
       const num = panel.querySelector('[data-strength-num]');
       if (num) num.textContent = `${Math.round(str * 100)}%`;
       const status = panel.querySelector('[data-army-status]');
@@ -396,10 +448,16 @@ export class CommandUI {
       const q = A.queue(p.id);
       for (const el of panel.querySelectorAll('[data-qbar]')) {
         const item = q[Number(el.dataset.qbar.split(':')[1])];
-        if (item) el.style.width = `${((100 * item.done) / this.roster.byKey[item.type].build).toFixed(0)}%`;
+        if (item) el.style.width = `${((100 * item.done) / item.total).toFixed(0)}%`;
       }
       const first = panel.querySelector('[data-qleft]');
-      if (first && q[0]) first.textContent = fmtHours(this.roster.byKey[q[0].type].build - q[0].done);
+      if (first && q[0]) first.textContent = fmtHours(q[0].total - q[0].done);
+      const job = this.sim.buildings.construction.get(p.id);
+      const cb = panel.querySelector('[data-c]');
+      if (job && cb) {
+        cb.style.width = `${((100 * job.done) / job.total).toFixed(0)}%`;
+        panel.querySelector('[data-c-left]').textContent = fmtHours(job.total - job.done);
+      }
       const occ = C.occupations.get(p.id);
       const occBar = panel.querySelector('[data-occ]');
       if (occ && occBar) {

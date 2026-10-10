@@ -46,7 +46,7 @@ const info = await IM(() => {
 });
 check(info.name === 'German Reich', `playing ${info.name}`);
 check(info.armies >= 3, `player has ${info.armies} armies (field: ${info.field.length})`);
-const resText = await page.textContent('#res-money');
+const resText = await page.textContent('[data-res-val="money"]');
 check(Number(resText.replace(/[^\d.]/g, '')) > 0, `money shown in top bar: ${resText}`);
 
 // Income tooltip.
@@ -124,6 +124,7 @@ const hit2 = await IM((id) => window.ironMeridian.renderer.hits.find((h) => h.ki
 await tap((hit2.x0 + hit2.x1) / 2, (hit2.y0 + hit2.y1) / 2);
 await page.waitForTimeout(800);
 s = await screenOf(czech.capital);
+await shot(page, 'w3b-before-order');
 if (!MOBILE) { await page.mouse.move(s.x, s.y + 4); await page.waitForTimeout(200); }
 await tap(s.x, s.y + 4);
 await page.waitForTimeout(300);
@@ -183,7 +184,7 @@ const berlin = await IM(() => window.ironMeridian.state.playerNation.capitalId);
 await IM((id) => window.ironMeridian.state.setSelected(id), berlin);
 await page.waitForTimeout(300);
 await page.click('[data-cmd="recruit"][data-type="infantry"]');
-await page.click('[data-cmd="recruit"][data-type="tank"]');
+await page.click('[data-cmd="recruit"][data-type="artillery"]');
 check(await page.locator('.queue-row').count() === 2, 'two units queued');
 await IM(() => window.ironMeridian.state.setSpeed(4));
 await page.waitForTimeout(2500);

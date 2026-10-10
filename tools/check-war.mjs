@@ -20,6 +20,7 @@ import { ERAS, getEra } from '../js/eras.js';
 import { Economy } from '../js/economy.js';
 import { Armies } from '../js/armies.js';
 import { Combat } from '../js/combat.js';
+import { Buildings } from '../js/buildings.js';
 import { ROSTERS } from '../js/units.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,13 +31,16 @@ const check = (ok, msg) => { if (!ok) { failures++; console.error(`  ✗ ${msg}`
 function setup(eraId, playerName) {
   const state = new GameState();
   const economy = new Economy(state);
+  const buildings = new Buildings(state, economy);
   const armies = new Armies(state, economy);
+  armies.buildings = buildings;
   const combat = new Combat(state, armies);
   const era = getEra(eraId);
   const map = era.fictional ? Object.assign(generateMap('TEST-1234'), { era }) : buildWorldMap(JSON.parse(readFileSync(join(root, 'data/eras', `${eraId}.json`), 'utf8')), era);
   state.loadMap(map);
   const player = playerName == null ? map.nations.find((n) => n.major).id : map.nations.findIndex((n) => n.name === playerName);
   state.setPlayerNation(player);
+  buildings.start();
   economy.start();
   armies.spawnInitial(player);
   state.setPhase('playing');
@@ -46,11 +50,12 @@ function setup(eraId, playerName) {
     for (let t = 0; t < hours; t += dt) {
       state.clock.time += dt * 3600e3;
       economy.update(state, dt);
+      buildings.update(state, dt);
       armies.update(state, dt);
       combat.update(state, dt);
     }
   };
-  return { state, economy, armies, combat, map, player, step, log };
+  return { state, economy, buildings, armies, combat, map, player, step, log };
 }
 const fmtT = (state) => `${((state.clock.time - state.clock.start) / 36e5).toFixed(1)}h`;
 
@@ -133,16 +138,20 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   const g = setup('ww2', 'German Reich');
   const { economy, armies, state, player } = g;
   const inc = economy.income(player);
-  console.log(`   Germany: ${inc.land} provinces + ${inc.cities} cities + ${inc.capitals} capital → ${inc.money}/day money, ${inc.manpower}/day manpower; start ${Math.round(economy.get(player).money)} / ${Math.round(economy.get(player).manpower)}`);
+  const fmt = (o) => economy.keys.map((k) => `${k} ${Math.round(o[k])}`).join(', ');
+  console.log(`   Germany: ${inc.land} provinces + ${inc.cities} cities + ${inc.capitals} capital\n     per day: ${fmt(inc.perDay)}\n     start:   ${fmt(economy.get(player))}`);
+  check(economy.keys.join() === 'money,food,steel,oil,manpower', 'WWII resource set');
   const berlin = state.getNation(player).capitalId;
   const money0 = economy.get(player).money;
   check(armies.recruit(berlin, 'infantry').ok, 'recruit infantry in Berlin');
   check(Math.abs(money0 - economy.get(player).money - ROSTERS.ww2.byKey.infantry.cost.money) < 1e-6, 'cost paid up front');
   const before = [...armies.at(berlin)].reduce((n, a) => n + a.units.length, 0);
-  g.step(23.5);
-  check([...armies.at(berlin)].reduce((n, a) => n + a.units.length, 0) === before, 'not ready before 24h');
+  const hrs = armies.recruitCheck(berlin, 'infantry', { ignoreCost: true }).hours;
+  check(hrs === Math.round(24 * 0.85), `Barracks II trains 15% faster (${hrs}h instead of 24h)`);
+  g.step(hrs - 0.5);
+  check([...armies.at(berlin)].reduce((n, a) => n + a.units.length, 0) === before, `not ready before ${hrs}h`);
   g.step(1);
-  check([...armies.at(berlin)].reduce((n, a) => n + a.units.length, 0) === before + 1, 'infantry ready after 24h');
+  check([...armies.at(berlin)].reduce((n, a) => n + a.units.length, 0) === before + 1, `infantry ready after ${hrs}h`);
   const notCity = state.provincesOf(player).find((p) => !p.isCity);
   check(!armies.canRecruit(notCity.id, 'infantry'), 'no recruiting outside cities');
   const inland = state.provincesOf(player).find((p) => p.isCity && !p.seaNeighbors.length);
@@ -155,9 +164,28 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   check(armies.merge(field.id, half.id) && field.units.length === n0 && !armies.list.has(half.id), 'merge back');
   // Capital loss halves income.
   const france = state.nations.findIndex((n) => n.name === 'France');
-  const fi = economy.income(france).money;
+  const fi = economy.income(france).perDay.money;
   state.setOwner(state.getNation(france).capitalId, player);
-  check(Math.abs(economy.income(france).factor - 0.5) < 1e-9 && economy.income(france).money < fi, 'capital lost → production −50%');
+  check(Math.abs(economy.income(france).factor - 0.5) < 1e-9 && economy.income(france).perDay.money < fi, 'capital lost → production −50%');
+  // Buildings: barracks gate units, construction takes time, yields and roads apply.
+  const B = g.buildings;
+  check(B.level(berlin, 'barracks') === 2, 'Berlin starts with Barracks II');
+  check(!armies.recruitCheck(berlin, 'tank', { ignoreCost: true }).ok && /Barracks III/.test(armies.recruitCheck(berlin, 'tank', { ignoreCost: true }).reason), 'tanks need Barracks III');
+  check(armies.recruitCheck(berlin, 'artillery', { ignoreCost: true }).ok, 'artillery with Barracks II');
+  const steel0 = economy.income(player).perDay.steel;
+  check(B.build(berlin, 'mine').ok, 'start Factory II in Berlin');
+  check(!!B.build(berlin, 'farm').error, 'one construction per city');
+  g.step(B.hoursOf('mine', 2) + 1);
+  check(B.level(berlin, 'mine') === 2 && economy.income(player).perDay.steel > steel0, `Factory II done, steel/day ${Math.round(steel0)} → ${Math.round(economy.income(player).perDay.steel)}`);
+  check(!!B.check(berlin, 'oilwell').reason, `no oil well in Berlin: ${B.check(berlin, 'oilwell').reason}`);
+  const noCoast = state.provincesOf(player).find((p) => p.isCity && !p.seaNeighbors.length);
+  if (noCoast) check(B.check(noCoast.id, 'port').reason === 'Not coastal', 'no port inland');
+  const field2 = [...armies.list.values()].find((a) => a.nation === player && !a.garrison && a.kind === 'land');
+  const nb = state.getProvince(berlin).neighbors.find((n) => state.provinces[n].owner === player);
+  const h0 = armies.hopHours(field2, berlin, nb);
+  B.setLevel(berlin, 'roads', 3); B.setLevel(nb, 'roads', 3);
+  check(armies.hopHours(field2, berlin, nb) < h0 * 0.6, `roads speed up movement (${h0.toFixed(1)}h → ${armies.hopHours(field2, berlin, nb).toFixed(1)}h)`);
+  check(B.fortBonus(berlin) === 1 && (B.setLevel(berlin, 'fort', 2), B.fortBonus(berlin) === 1.5), 'fortifications II = +50% defense');
   // A fleet can't go on land; a land army can't enter neutral land.
   const fleet = [...armies.list.values()].find((a) => a.nation === player && a.kind === 'naval');
   if (fleet) check(!!armies.findPath(fleet, berlin).error, 'fleet cannot sail onto land');
@@ -183,6 +211,11 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
     const t2 = performance.now();
     check(all.length > 0 && mine.length > 0, `${era.id}: armies spawned`);
     console.log(`   ${era.id.padEnd(9)} ${g.map.nations[g.player].shortName.padEnd(14)} armies ${String(all.length).padStart(4)} (player ${mine.length}) · spawn ${(t1 - t0).toFixed(0)}ms · path to farthest own province ${r.error ? r.error : `${r.path.length} hops ${r.hours.toFixed(0)}h`} in ${(t2 - t1).toFixed(1)}ms`);
+    const oil = g.map.provinces.filter((p) => p.oil).length;
+    const sites = g.buildings.sites(g.player).length;
+    const inc = g.economy.income(g.player).perDay;
+    console.log(`             resources ${g.economy.keys.join('/')} · oil deposits ${oil} · player sites ${sites} · per day ${g.economy.keys.map((k) => Math.round(inc[k])).join('/')}`);
+    check(era.id === 'rome' || era.id === 'medieval' || oil > 0, `${era.id}: oil deposits exist`);
   }
 }
 

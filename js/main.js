@@ -30,6 +30,10 @@ import { Combat } from './combat.js';
 import { CommandUI } from './command-ui.js';
 import { Feed } from './feed.js';
 import { hitTest } from './render-units.js';
+import { Buildings } from './buildings.js';
+import { WindowManager } from './windows.js';
+import { ArmyWindow } from './win-army.js';
+import { ProductionWindow, BuildingsWindow } from './win-production.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
@@ -38,13 +42,15 @@ const renderer = new Renderer(canvas, camera, state);
 
 // Simulation: economy → recruitment and movement → battles and occupation.
 const economy = new Economy(state);
+const buildings = new Buildings(state, economy);
 const armies = new Armies(state, economy);
+armies.buildings = buildings;
 const combat = new Combat(state, armies);
-const sim = { economy, armies, combat };
+const sim = { economy, buildings, armies, combat };
 renderer.sim = sim;
 
 /** Simulation systems, run in order each frame with the game hours elapsed. */
-const systems = [economy, armies, combat];
+const systems = [economy, buildings, armies, combat];
 
 // --- Camera framing ---------------------------------------------------------
 
@@ -63,7 +69,8 @@ function hudInsets() {
     const panel = document.querySelector('.screen:not([hidden]) .screen-left');
     if (!narrow && panel) ins.left = panel.getBoundingClientRect().right;
   } else {
-    ins.top = hudEls.topbar.offsetHeight;
+    ins.top = hudEls.topbar.offsetHeight + (narrow ? document.getElementById('resources').offsetHeight : 0);
+    ins.bottom += document.getElementById('command-bar').offsetHeight;
     if (state.selectedProvinceId >= 0 || state.selectedArmyId >= 0) {
       if (narrow) ins.bottom += hudEls.panel.offsetHeight + 8;
       else ins.right = hudEls.panel.offsetWidth + 12;
@@ -199,6 +206,7 @@ const ui = new UI(state, {
   },
   deploy(id) {
     state.setPlayerNation(id);
+    buildings.start();
     economy.start();
     armies.spawnInitial(id);
     state.setFocusedNation(-1);
@@ -260,6 +268,28 @@ ui.command = new CommandUI(state, sim, {
   rerender: () => { ui.renderProvincePanel(); renderer.requestRender(); },
   notice,
 });
+
+/** Select an army and fly to it (Army window rows). */
+function selectArmy(id) {
+  const a = armies.list.get(id);
+  if (!a) return;
+  state.setSelected(-1);
+  state.setSelectedArmy(id);
+  const p = armies.armyPos(a);
+  focusOn(p.x, p.y, Math.max(camera.zoom, detailZoom(70)), 0.6);
+}
+
+/** Open a city's panel from a window (on phones the window makes way for it). */
+function openCity(id) {
+  if (window.innerWidth <= 760) windows.closeAll();
+  ui.actions.focusProvince(id);
+}
+
+const windows = new WindowManager(state, [
+  new ArmyWindow(state, sim, { selectArmy, closeWindow: (id) => windows.close(id) }),
+  new ProductionWindow(state, sim, { notice, openCity }),
+  new BuildingsWindow(state, sim, { notice, openCity }),
+]);
 
 const input = new InputController(canvas, camera, {
   onHover(sx, sy) {
@@ -427,7 +457,9 @@ state.events.on('select:army', (id) => {
     const s = camera.worldToScreen(p.x, p.y);
     const i = hudInsets();
     const m = 40;
-    if (s.x < i.left + m || s.x > camera.viewW - i.right - m || s.y < i.top + m || s.y > camera.viewH - i.bottom - m) focusOn(p.x, p.y, camera.zoom, 0.5);
+    // Phones: always centre it, so the land around it (where you'll tap next) is in view.
+    if (window.innerWidth <= 760) focusOn(p.x, p.y, camera.zoom, 0.5);
+    else if (s.x < i.left + m || s.x > camera.viewW - i.right - m || s.y < i.top + m || s.y > camera.viewH - i.bottom - m) focusOn(p.x, p.y, camera.zoom, 0.5);
   });
 });
 state.events.on('phase', (phase) => document.body.classList.toggle('in-game', phase === 'playing'));
@@ -460,6 +492,7 @@ function frame(now) {
   for (const system of systems) system.update(state, gameHours);
   if (gameHours > 0 && armies.list.size) renderer.requestRender(); // armies move, battles pulse
   feed.update(dt);
+  windows.update(dt);
 
   renderer.render();
   adaptQuality(dt);
@@ -469,4 +502,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows };

@@ -280,9 +280,9 @@ export class InputController {
   }
 
   onKey(e, down) {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
     const k = e.key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', '+', '=', '-', '_'].includes(k)) {
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', '+', '=', '-', '_'].includes(k)) {
       if (down) this.keys.add(k); else this.keys.delete(k);
       if (k.startsWith('arrow')) e.preventDefault();
     }
@@ -293,10 +293,10 @@ export class InputController {
     if (!this.keys.size) return false;
     const speed = 700 * dt;
     let dx = 0, dy = 0;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) dx += speed;
-    if (this.keys.has('d') || this.keys.has('arrowright')) dx -= speed;
-    if (this.keys.has('w') || this.keys.has('arrowup')) dy += speed;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) dy -= speed;
+    if (this.keys.has('arrowleft')) dx += speed;
+    if (this.keys.has('arrowright')) dx -= speed;
+    if (this.keys.has('arrowup')) dy += speed;
+    if (this.keys.has('arrowdown')) dy -= speed;
     if (dx || dy) { this.camera.flight = null; this.camera.panBy(dx, dy); }
     const cx = this.camera.viewW / 2, cy = this.camera.viewH / 2;
     if (this.keys.has('+') || this.keys.has('=')) this.camera.zoomAt(Math.exp(dt * 2.2), cx, cy);

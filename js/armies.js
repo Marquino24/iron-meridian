@@ -19,6 +19,7 @@
 import { MinHeap, TERRAIN } from './map.js';
 import { unproject } from './projection.js';
 import { rosterFor, makeUnit } from './units.js';
+import { UNIT_REQUIREMENT, TRAIN_FACTOR } from './buildings.js';
 
 /** Hours to board or leave transports. */
 export const EMBARK_HOURS = 6;
@@ -39,7 +40,8 @@ export class Armies {
   constructor(state, economy) {
     this.state = state;
     this.economy = economy;
-    this.combat = null; // set once Combat exists (main.js)
+    this.combat = null;    // set once Combat exists (main.js)
+    this.buildings = null; // set by main.js (recruit requirements, roads)
     this.reset();
     state.events.on('map:loaded', () => this.reset());
     state.events.on('province:owner', ({ provinceId }) => this.clearQueue(provinceId));
@@ -149,7 +151,8 @@ export class Armies {
     if (army.kind === 'naval' || (seaA && seaB)) return km / this.speedOf(army, true);
     if (seaA !== seaB) return km / this.speedOf(army, true) + EMBARK_HOURS;
     const pa = this.state.map.provinces[a], pb = this.state.map.provinces[b];
-    const cost = (TERRAIN[pa.terrain].moveCost + TERRAIN[pb.terrain].moveCost) / 2;
+    const road = (id) => this.buildings?.roadsMove(id) ?? 1;
+    const cost = (TERRAIN[pa.terrain].moveCost * road(a) + TERRAIN[pb.terrain].moveCost * road(b)) / 2;
     return (km * cost) / this.speedOf(army, false);
   }
 
@@ -429,21 +432,35 @@ export class Armies {
   queue(provinceId) { return this.queues.get(provinceId) ?? []; }
 
   /** Can this province recruit this unit type for its owner? */
-  canRecruit(provinceId, typeKey) {
+  /**
+   * Can this city train this unit? Land units need Barracks (L1 infantry,
+   * L2 ranged, L3 mobile); ships need a Port. → { ok, reason?, hours }
+   */
+  recruitCheck(provinceId, typeKey, opts = {}) {
     const p = this.state.getProvince(provinceId);
     const t = this.roster.byKey[typeKey];
-    if (!p || !t || !p.isCity || p.owner < 0) return false;
-    if (t.role === 'nav' && !p.seaNeighbors.length) return false;
-    return true;
+    if (!p || !t || p.owner < 0) return { ok: false, reason: 'Not yours' };
+    if (!p.isCity) return { ok: false, reason: 'Cities only' };
+    const [building, need] = UNIT_REQUIREMENT[t.role];
+    const B = this.buildings;
+    const have = B ? B.level(provinceId, building) : need;
+    const hours = Math.round(t.build * TRAIN_FACTOR[have]);
+    if (t.role === 'nav' && !p.seaNeighbors.length) return { ok: false, reason: 'Not coastal', hours };
+    if (have < need) return { ok: false, reason: `Needs ${B.name(building)} ${['', 'I', 'II', 'III'][need]}`, hours };
+    if (!opts.ignoreCost && !this.economy.canAfford(p.owner, t.cost)) return { ok: false, reason: 'Not enough resources', hours };
+    return { ok: true, hours };
   }
+
+  canRecruit(provinceId, typeKey) { return this.recruitCheck(provinceId, typeKey, { ignoreCost: true }).ok; }
 
   recruit(provinceId, typeKey) {
     const p = this.state.getProvince(provinceId);
     const t = this.roster.byKey[typeKey];
-    if (!this.canRecruit(provinceId, typeKey)) return { error: 'This province can\'t build that.' };
-    if (!this.economy.spend(p.owner, t.cost)) return { error: 'Not enough money or manpower.' };
+    const c = this.recruitCheck(provinceId, typeKey, { ignoreCost: true });
+    if (!c.ok) return { error: c.reason };
+    if (!this.economy.spend(p.owner, t.cost)) return { error: 'Not enough resources.' };
     if (!this.queues.has(provinceId)) this.queues.set(provinceId, []);
-    this.queues.get(provinceId).push({ type: typeKey, done: 0 });
+    this.queues.get(provinceId).push({ type: typeKey, done: 0, total: c.hours });
     this.changed();
     return { ok: true };
   }
@@ -489,8 +506,7 @@ export class Armies {
     for (const [pid, q] of this.queues) {
       const item = q[0];
       item.done += hours;
-      const t = this.roster.byKey[item.type];
-      if (item.done >= t.build) {
+      if (item.done >= item.total) {
         q.shift();
         if (!q.length) this.queues.delete(pid);
         this.finishUnit(pid, item.type);

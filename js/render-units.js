@@ -8,17 +8,11 @@
  *                 clicking armies and battles (hitTest).
  */
 
+import { fmtHours } from './ui-kit.js';
+
 const ICON_W = 30, ICON_H = 20, GAP = 4;
 /** Counters float this far above their spot (like a map pin) so city icons and names stay readable. */
 const LIFT = 22;
-
-export const fmtHours = (h) => {
-  if (!isFinite(h)) return '—';
-  const r = Math.max(0, Math.round(h));
-  if (r < 24) return `${r}h`;
-  const d = Math.floor(r / 24), hh = r % 24;
-  return hh ? `${d}d ${hh}h` : `${d}d`;
-};
 
 /** Coarse occupancy grid so foreign counters don't pile on top of each other. */
 class Occupancy {

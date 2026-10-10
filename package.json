@@ -10,7 +10,7 @@
     "bundle": "node tools/bundle.mjs && node tools/bundle.mjs --fragment",
     "build:eras": "node tools/build-eras.mjs",
     "test:policies": "sudo -u postgres bash supabase/test/run.sh",
-    "test:e2e": "node tools/e2e/launcher.test.mjs && node tools/e2e/war.test.mjs && node tools/e2e/war.test.mjs --mobile"
+    "test:e2e": "node tools/e2e/launcher.test.mjs && node tools/e2e/war.test.mjs && node tools/e2e/war.test.mjs --mobile && node tools/e2e/windows.test.mjs && node tools/e2e/windows.test.mjs --mobile"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.117.3",

@@ -2,7 +2,7 @@
 
 A browser-based real-time grand strategy game. Vanilla JavaScript (ES modules) and HTML Canvas, with no frameworks and no build step.
 
-**Current scope (step 3):** real-world maps in seven eras, sign-in and closed beta, and now armies, war and conquest paid for by a basic economy.
+**Current scope (step 4A):** real-world maps in seven eras, sign-in and closed beta, armies, war and conquest, era resources, city buildings, and command windows for managing everything at once.
 
 ## Run
 
@@ -59,7 +59,36 @@ The game's files are public on GitHub Pages, so the gate controls who can play t
 
 ## Armies, war and economy
 
-**Economy.** Every nation has Money and Manpower. Each province yields money daily: 1 share for ordinary land, 3 for a city, 5 for a capital (10 money per share per day). Population follows the same shares and yields manpower (120 per share per day); the map data has no real population figures. A nation whose capital is held by an enemy produces at half rate. Income arrives every game hour; hover or tap the top bar for the daily breakdown. Everyone starts with about ten days of income. Armies have no upkeep yet.
+**Resources.** Each era has its own set:
+
+| Eras | Resources |
+|---|---|
+| Roman, Medieval | Gold, Grain, Iron, Manpower |
+| WWI, WWII | Money, Food, Steel, Oil, Manpower |
+| Cold War, Modern, Fictional | Money, Food, Steel, Oil, Electronics, Manpower |
+
+Every province yields daily: money 10 × share and manpower 120 × share (share: land 1, city 3, capital 5; the map has no population data, so population follows the same shares), food 8 × fertility (plains 1.5, forest 1, urban 0.6, mountains 0.5), iron/steel 2 × share (+4 in mountains), oil 8 on an oil deposit, electronics 3 × (share − 1) from cities. Buildings add to that, Roads multiply the province's output, and a nation whose capital is held by an enemy produces at half rate. Oil deposits are about 35 real oil regions (Baku, Ploiești, the Persian Gulf, Texas, Maracaibo, Sumatra…) placed on the province that contains them; the Fictional World gets random ones. Income arrives every game hour; hover or tap the resource bar for the breakdown per resource. Everyone starts with about ten days of income plus a stockpile (300 oil, so nations without oil can still field some tanks). Armies have no upkeep yet.
+
+**Buildings** (cities only, levels I–III; cost ×1 / ×2 / ×3.5 and time ×1 / ×1.5 / ×2 per level; one construction per city at a time, paid up front, refunded if cancelled; a captured city keeps its buildings but loses the construction):
+
+| Building | Effect per level | Era names |
+|---|---|---|
+| Farm | +20 / 40 / 70 food | Latifundium, Manor Farm, Farms, Agriculture |
+| Mine / Factory | +10 / 20 / 35 iron or steel; a Factory also +20 / 40 / 70 money, and from the Cold War +4 / 8 / 14 electronics | Iron Mine, Factory |
+| Oil Well | +15 / 30 / 50 oil; WWI on, oil-deposit provinces only (the one building allowed outside cities) | Oil Well, Oil Field |
+| Barracks | I: infantry, II: + ranged, III: + mobile units; II and III train 15% / 30% faster | Castra, Barracks, Military Base |
+| Port | coastal only; needed for ships, II and III build them faster | Harbor, Port, Naval Base |
+| Fortifications | +25% defense per level for whoever defends the province | Walls, Castle Walls, Fortifications |
+| Roads | +10% output per level, and 15% / 30% / 45% faster movement through the province | Roman Roads, Roads, Railways, Infrastructure |
+
+Starting buildings: capitals have Barracks II, a Mine/Factory, a Farm and (if coastal) a Port; one other city in three has Barracks I (and a Port if coastal).
+
+**Command windows.** The command bar (bottom centre; a bottom row on phones) opens three windows that float over the map (drag them by the title bar; on phones they're full-screen sheets, one at a time). The game keeps running underneath. Shortcuts: **A** Army, **P** Production, **B** Buildings, **Esc** closes the top one. Map panning by keyboard uses the arrow keys.
+- **Army:** totals per unit type, then every army and fleet with location, units by type, HP and status (idle, moving, in battle, embarked, occupying, retreating). Filter and sort; click a row to fly there and select it.
+- **Production:** every city with its recruit queue and construction (progress bars). Bulk recruit: pick a unit and a quantity per city, tick cities (Select all / All with Barracks), see the total cost, confirm. Bulk build works the same for buildings. Cities that can't do it are greyed out with the reason (needs Barracks III, not coastal, already building…).
+- **Buildings:** cities as rows, buildings as columns, levels as pips. Tap a cell for the next level's effect, cost and time, then upgrade; tick rows to upgrade one building type in all of them.
+
+The city panel keeps quick single-city actions in **Recruit** and **Build** tabs.
 
 **Clock.** 1 real second = 1 game hour at 1×; pause / 1× / 2× / 4×.
 
@@ -74,11 +103,11 @@ The game's files are public on GitHub Pages, so the gate controls who can play t
 | Cold War | Mech Infantry | Main Battle Tank | Artillery | Frigate |
 | Modern / Fictional | Infantry | MBT | Rocket Artillery | Destroyer |
 
-Full stats are in `js/units.js` (attack, defense, HP, speed in km/h, money + manpower cost, build hours).
+Full stats are in `js/units.js` (attack, defense, HP, speed in km/h, cost in era resources, base build hours). Infantry costs mostly money, food and men; mobile units need iron/steel and (WWI on) oil; ranged units need steel; ships need steel, oil and (Cold War on) electronics.
 
 **Armies.** Every nation starts with a garrison in its capital (bigger nations, bigger garrison) and in up to 12 cities; coastal major powers get a home fleet. The player also gets 1–3 field armies near its borders. Click a counter to open its panel (units with HP, split selected / split in half, merge with armies in the same place, stop), then click a province to march there. The route follows neighbouring provinces (fastest by distance × terrain move cost ÷ the slowest unit's speed) and shows its ETA, also as a preview while you hover. From a coastal province an army can embark into a sea zone and land on another coast: slow (era transport speed, 6 h to board and 6 h to land) and weak if caught at sea (¼ attack, ½ defense).
 
-**Recruiting.** In a city you own, the province panel lists the era's units with stats, cost and build time. Cost is paid when queued (cancel refunds it); each city builds one unit at a time. Finished units appear there as a new army (units finishing in a row join it); ships appear in the adjacent sea zone. A captured city loses its queue.
+**Recruiting.** In a city you own, the province panel's Recruit tab lists the era's units with stats, cost and build time (or why the city can't build it). Land units need Barracks and ships a Port (see Buildings). Cost is paid when queued (cancel refunds it); each city trains one unit at a time. Finished units appear there as a new army (units finishing in a row join it); ships appear in the adjacent sea zone. A captured city loses its queue.
 
 **War.** Click any foreign province to see its nation and **Declare war** (with a confirmation). Your armies can't enter a nation's land unless you're at war with it; unclaimed land is open to anyone.
 - An army entering enemy (or unclaimed) land with no enemy army there occupies it: 6 h, 12 h for a city, 24 h for a capital (progress ring on the map). Moving on resets it. An army on a longer route stops to take each enemy province it passes, then carries on.
@@ -88,7 +117,7 @@ Full stats are in `js/units.js` (attack, defense, HP, speed in km/h, money + man
 
 **Feedback.** The event feed (bottom left) lists wars, battles, captures and finished units; click an entry to open its battle report (units fielded and lost on each side) or fly to the place. Clicking crossed swords opens the live report.
 
-`npm test` includes `tools/check-war.mjs`, a headless run of the simulation: the German Reich conquering Czechoslovakia (9 provinces, about 20 game days = 8 real minutes at 1×), Italy landing in Albania by sea, recruitment timing, split/merge, capital loss, and spawning plus pathfinding in every era. `tools/e2e/war.test.mjs` plays the same war through the UI in a browser (desktop and phone).
+`npm test` includes `tools/check-war.mjs`, a headless run of the simulation: the German Reich conquering Czechoslovakia (9 provinces, about 20 game days = 8 real minutes at 1×), Italy landing in Albania by sea, recruitment timing, split/merge, capital loss, and spawning plus pathfinding in every era. `tools/e2e/war.test.mjs` plays the same war through the UI in a browser (desktop and phone), and `tools/e2e/windows.test.mjs` drives the command windows (`ERA=modern NATION="United States"` to try another nation).
 
 ## Map styles and settings
 
@@ -104,11 +133,12 @@ Switch styles in game (bottom right); the default is in **Settings**, along with
 |---|---|
 | Drag (mouse / one finger) | Pan, with inertia |
 | Scroll wheel / pinch / trackpad pinch | Zoom toward the cursor |
-| WASD / arrow keys, `+` / `-` | Pan / zoom |
+| Arrow keys, `+` / `-` | Pan / zoom |
 | Click a province | Inspect it (on the start screen, clicking picks that nation) |
 | Click an army counter | Select it; then click a province or sea zone to move, or an enemy counter to attack it |
 | Click crossed swords / a feed entry | Battle report |
-| Esc | Deselect (army first, then province) |
+| A / P / B | Army / Production / Buildings window |
+| Esc | Close the top window, else deselect (army first, then province) |
 | Space | Pause / resume the clock |
 
 ## File structure
@@ -154,13 +184,19 @@ js/
                   InputController (pointer events, pinch, wheel, keys)
   ui.js           DOM HUD: start screen, top bar/clock, province panel, status bar
   units.js        Era rosters (unit stats) and the rock-paper-scissors matchups
-  economy.js      Money and Manpower per nation, daily income, capital-lost penalty
+  economy.js      Era resources per nation: stockpiles, daily income with breakdown, capital-lost penalty
   armies.js       Armies and fleets: spawning, land+sea movement graph, pathfinding,
                   marching, split/merge, recruitment queues
   combat.js       Wars, hourly battles, retreats, occupation, capture, conquest
   render-units.js Army counters, routes with ETA, battle and occupation markers, hit testing
   command-ui.js   Money/manpower bar, army panel, recruit/war sections of the province panel
   feed.js         Event feed and battle report popup
+  resources.js    Era resource sets, province yields, oil deposits
+  buildings.js    City buildings: levels, effects, construction queue, era names
+  ui-kit.js       Shared HUD helpers (number/time formatting, cost chips)
+  windows.js      Command bar and window manager (drag, z-order, phone sheets, shortcuts)
+  win-army.js     Army window
+  win-production.js  Production and Buildings windows (bulk recruit / build)
 ```
 
 ## Data model (from `generateMap(seed)`)
