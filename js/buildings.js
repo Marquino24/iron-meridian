@@ -13,6 +13,8 @@
  *   Roads           +10% production per level and faster movement through it
  *
  * Cost and time grow with the level (×1, ×2, ×3.5 cost; ×1, ×1.5, ×2 time).
+ * Level III of each building needs a tech (research.js); some techs also
+ * make construction faster or cheaper.
  * One construction per city at a time; it's paid up front and refunded if
  * cancelled. A captured city keeps its buildings but loses the construction.
  */
@@ -72,6 +74,7 @@ export class Buildings {
     this.state = state;
     this.economy = economy;
     economy.buildings = this;
+    this.research = null; // set by main.js (level III unlocks, cost/time bonuses)
     this.reset();
     state.events.on('map:loaded', () => this.reset());
     state.events.on('province:owner', ({ provinceId }) => {
@@ -105,18 +108,23 @@ export class Buildings {
   }
 
   /** Resource cost of a level, limited to this era's resources. */
-  costOf(type, level) {
+  costOf(type, level, nation = -1) {
+    const m = nation >= 0 ? this.research?.buildCostMult(nation) ?? 1 : 1;
     const c = {};
-    for (const [k, v] of Object.entries(BUILDINGS[type].cost)) if (this.set.keys.includes(k)) c[k] = Math.round(v * LEVEL_COST[level - 1]);
+    for (const [k, v] of Object.entries(BUILDINGS[type].cost)) if (this.set.keys.includes(k)) c[k] = Math.round(v * LEVEL_COST[level - 1] * m);
     return c;
   }
-  hoursOf(type, level) { return Math.round(BUILDINGS[type].hours * LEVEL_TIME[level - 1]); }
+  hoursOf(type, level, nation = -1) {
+    const m = nation >= 0 ? this.research?.buildTimeMult(nation) ?? 1 : 1;
+    return Math.round(BUILDINGS[type].hours * LEVEL_TIME[level - 1] * m);
+  }
 
   /** Can this province build the next level of `type`? → { ok, reason?, level, cost, hours } */
   check(pid, type, opts = {}) {
     const p = this.state.getProvince(pid);
     const level = this.level(pid, type) + 1;
-    const out = { ok: false, level, cost: level <= MAX_LEVEL ? this.costOf(type, level) : {}, hours: level <= MAX_LEVEL ? this.hoursOf(type, level) : 0 };
+    const owner = p?.owner ?? -1;
+    const out = { ok: false, level, cost: level <= MAX_LEVEL ? this.costOf(type, level, owner) : {}, hours: level <= MAX_LEVEL ? this.hoursOf(type, level, owner) : 0 };
     if (!p || p.owner < 0) return { ...out, reason: 'Not yours' };
     if (type === 'oilwell') {
       if (!this.set.industrial) return { ...out, reason: 'From WWI on' };
@@ -124,6 +132,9 @@ export class Buildings {
     } else if (!p.isCity) return { ...out, reason: 'Cities only' };
     if (type === 'port' && !p.seaNeighbors.length) return { ...out, reason: 'Not coastal' };
     if (level > MAX_LEVEL) return { ...out, reason: 'Max level' };
+    if (this.research && level > this.research.maxBuildingLevel(owner, type)) {
+      return { ...out, reason: `Needs ${this.research.unlockerOf(type)?.name ?? 'research'}`, needsTech: this.research.unlockerOf(type)?.id };
+    }
     const busy = this.construction.get(pid);
     if (busy) return { ...out, reason: `Building ${this.name(busy.type)}` };
     if (!opts.ignoreCost && !this.economy.canAfford(p.owner, out.cost)) return { ...out, reason: 'Not enough resources' };
@@ -135,7 +146,7 @@ export class Buildings {
     if (!c.ok) return { error: c.reason };
     const p = this.state.getProvince(pid);
     if (!this.economy.spend(p.owner, c.cost)) return { error: 'Not enough resources' };
-    this.construction.set(pid, { type, level: c.level, done: 0, total: c.hours });
+    this.construction.set(pid, { type, level: c.level, done: 0, total: c.hours, cost: c.cost });
     this.changed();
     return { ok: true };
   }
@@ -145,7 +156,7 @@ export class Buildings {
     const p = this.state.getProvince(pid);
     if (!job || !p) return;
     this.construction.delete(pid);
-    this.economy.spend(p.owner, this.costOf(job.type, job.level), -1);
+    this.economy.spend(p.owner, job.cost ?? this.costOf(job.type, job.level), -1);
     this.changed();
   }
 

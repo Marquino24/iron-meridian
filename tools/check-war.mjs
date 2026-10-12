@@ -21,6 +21,9 @@ import { Economy } from '../js/economy.js';
 import { Armies } from '../js/armies.js';
 import { Combat } from '../js/combat.js';
 import { Buildings } from '../js/buildings.js';
+import { Research } from '../js/research.js';
+import { techTree } from '../js/tech.js';
+import { resourceSet } from '../js/resources.js';
 import { ROSTERS } from '../js/units.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +38,11 @@ function setup(eraId, playerName) {
   const armies = new Armies(state, economy);
   armies.buildings = buildings;
   const combat = new Combat(state, armies);
+  const research = new Research(state, economy);
+  research.armies = armies;
+  research.buildings = buildings;
+  armies.research = research;
+  buildings.research = research;
   const era = getEra(eraId);
   const map = era.fictional ? Object.assign(generateMap('TEST-1234'), { era }) : buildWorldMap(JSON.parse(readFileSync(join(root, 'data/eras', `${eraId}.json`), 'utf8')), era);
   state.loadMap(map);
@@ -50,12 +58,13 @@ function setup(eraId, playerName) {
     for (let t = 0; t < hours; t += dt) {
       state.clock.time += dt * 3600e3;
       economy.update(state, dt);
+      research.update(state, dt);
       buildings.update(state, dt);
       armies.update(state, dt);
       combat.update(state, dt);
     }
   };
-  return { state, economy, buildings, armies, combat, map, player, step, log };
+  return { state, economy, buildings, armies, combat, research, map, player, step, log };
 }
 const fmtT = (state) => `${((state.clock.time - state.clock.start) / 36e5).toFixed(1)}h`;
 
@@ -189,6 +198,60 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   // A fleet can't go on land; a land army can't enter neutral land.
   const fleet = [...armies.list.values()].find((a) => a.nation === player && a.kind === 'naval');
   if (fleet) check(!!armies.findPath(fleet, berlin).error, 'fleet cannot sail onto land');
+}
+
+// --- 3b. Research -----------------------------------------------------------------
+{
+  console.log('3b. Research');
+  for (const era of ERAS) {
+    const tree = techTree(era.id, resourceSet(era.id).keys);
+    const ids = new Set(tree.map((t) => t.id));
+    const tierOf = Object.fromEntries(tree.map((t) => [t.id, t.tier]));
+    const bad = tree.filter((t) => !t.name || !t.effects.length || t.req.some((q) => !ids.has(q) || tierOf[q] >= t.tier));
+    check(tree.length >= 25 && tree.length <= 35 && !bad.length, `${era.id}: ${tree.length} techs, requirements point to lower tiers${bad.length ? ` (bad: ${bad.map((t) => t.id)})` : ''}`);
+    check(new Set(tree.map((t) => t.name)).size === tree.length, `${era.id}: unique names`);
+    check(tree.some((t) => t.branch === 'eco' && t.effects.some((e) => e.slots)), `${era.id}: an Economy tech adds a research slot`);
+  }
+  const g = setup('ww2', 'German Reich');
+  const { research: R, armies, economy, state, player, buildings: B } = g;
+  const berlin = state.getNation(player).capitalId;
+  check(R.status(player, 'm1') === 'available' && R.status(player, 'm4') === 'locked', 'tier-1 available, tier-2 locked');
+  check(/Requires Armoured Divisions/.test(R.check(player, 'm4').reason), `locked reason: ${R.check(player, 'm4').reason}`);
+  const m0 = economy.get(player).money;
+  check(R.start(player, 'm1').ok && Math.abs(m0 - economy.get(player).money - R.byId.m1.cost.money) < 1e-6, 'start research, cost paid');
+  check(/slot busy/.test(R.start(player, 'm3').error ?? ''), 'one slot to start');
+  const field = [...armies.list.values()].find((a) => a.nation === player && !a.garrison && a.kind === 'land' && a.node === berlin);
+  const away = [...armies.list.values()].find((a) => a.nation === player && !a.garrison && a.kind === 'land' && a.node !== berlin);
+  const inf = field.units.find((u) => u.type === 'infantry');
+  inf.hp = 50;
+  g.step(R.byId.m1.hours + 2);
+  check(R.status(player, 'm1') === 'done' && R.unitLevel(player, 'inf') === 2, 'research completes: infantry level 2');
+  check(g.log.some((e) => e.kind === 'research'), `feed: "${g.log.find((e) => e.kind === 'research')?.text}"`);
+  check(inf.lvl === 2 && Math.abs(inf.hp - 50 * 1.15) < 0.01, `infantry resting in Berlin refits to level 2 (HP 50 → ${inf.hp.toFixed(1)})`);
+  const awayInf = away?.units.find((u) => u.type === 'infantry');
+  if (awayInf) check((awayInf.lvl ?? 1) === 1 && armies.outdated(away).length > 0, 'army away from a barracks city keeps level 1 until it refits');
+  check(armies.unitType(inf).attack > armies.roster.byKey.infantry.attack, `level 2 stats: attack ${armies.roster.byKey.infantry.attack} → ${armies.unitType(inf).attack}`);
+  // Building level III needs research.
+  B.setLevel(berlin, 'barracks', 2);
+  check(/Needs Armoured Divisions/.test(B.check(berlin, 'barracks', { ignoreCost: true }).reason ?? ''), `Barracks III locked: ${B.check(berlin, 'barracks', { ignoreCost: true }).reason}`);
+  R.grant(player, 'm2');
+  check(B.check(berlin, 'barracks', { ignoreCost: true }).ok, 'Barracks III after research');
+  // Production, slots, movement.
+  const money = economy.income(player).perDay.money;
+  R.grant(player, 'e2');
+  check(Math.abs(economy.income(player).perDay.money / money - 1.1) < 0.001, `+10% money (${Math.round(money)} → ${Math.round(economy.income(player).perDay.money)})`);
+  R.grant(player, 'e4');
+  check(R.slots(player) === 2, 'Economy tech unlocks a 2nd research slot');
+  check(R.start(player, 'm3').ok && R.start(player, 'e1').ok, 'two techs at once');
+  const nb = state.getProvince(berlin).neighbors.find((n) => state.provinces[n].owner === player);
+  const h0 = armies.hopHours(field, berlin, nb);
+  R.grant(player, 'i1');
+  check(armies.hopHours(field, berlin, nb) < h0 * 0.93, `+10% movement (${h0.toFixed(1)}h → ${armies.hopHours(field, berlin, nb).toFixed(1)}h)`);
+  const t0 = armies.recruitCheck(berlin, 'infantry', { ignoreCost: true }).hours;
+  R.grant(player, 'i5');
+  check(armies.recruitCheck(berlin, 'infantry', { ignoreCost: true }).hours < t0, 'faster recruitment');
+  R.cancel(player, 'e1');
+  check(R.status(player, 'e1') === 'available', 'cancel research');
 }
 
 // --- 4. Every era -------------------------------------------------------------------

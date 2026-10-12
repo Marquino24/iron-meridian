@@ -17,11 +17,13 @@ export class Economy {
   constructor(state) {
     this.state = state;
     this.buildings = null; // set by Buildings (building yields and roads)
+    this.research = null;  // set by Research (production bonuses)
     this.set = resourceSet('modern');
     this.stock = [];
     this.tally = [];
     state.events.on('map:loaded', () => this.reset());
     state.events.on('province:owner', () => this.recount());
+    state.events.on('research', (e) => { if (e.done) this.recount(); });
   }
 
   get keys() { return this.set.keys; }
@@ -73,6 +75,18 @@ export class Economy {
         t.roads[k] += (b + e) * (y.mult - 1);
         t.total[k] += y.total[k];
       }
+    }
+    // Research bonuses multiply each nation's whole output.
+    if (this.research) {
+      tally.forEach((t, n) => {
+        t.tech = zero(keys);
+        for (const k of keys) {
+          const m = this.research.prodMult(n, k);
+          if (m === 1) continue;
+          t.tech[k] = t.total[k] * (m - 1);
+          t.total[k] *= m;
+        }
+      });
     }
     this.tally = tally;
   }

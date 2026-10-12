@@ -18,7 +18,7 @@
 
 import { MinHeap, TERRAIN } from './map.js';
 import { unproject } from './projection.js';
-import { rosterFor, makeUnit } from './units.js';
+import { rosterFor, makeUnit, levelStats } from './units.js';
 import { UNIT_REQUIREMENT, TRAIN_FACTOR } from './buildings.js';
 
 /** Hours to board or leave transports. */
@@ -42,6 +42,7 @@ export class Armies {
     this.economy = economy;
     this.combat = null;    // set once Combat exists (main.js)
     this.buildings = null; // set by main.js (recruit requirements, roads)
+    this.research = null;  // set by main.js (unit levels, speed and training bonuses)
     this.reset();
     state.events.on('map:loaded', () => this.reset());
     state.events.on('province:owner', ({ provinceId }) => this.clearQueue(provinceId));
@@ -54,6 +55,8 @@ export class Armies {
     this.queues = new Map();     // provinceId → [{ type, done }]
     this.nextId = 1;
     this.counters = new Map();   // `${nation}:${kind}` → last ordinal
+    this.statCache = new Map();  // `${type}:${level}` → stats
+    this.refitClock = 0;
     this.preview = null;         // { armyId, node, path, hours } for the hover route
     this.version = 0;            // bumps on any structural change (UI refresh)
     this.started = false;        // starting forces spawned (a game is under way on this map)
@@ -134,14 +137,25 @@ export class Armies {
     return owner === nation || owner < 0 || !!this.combat?.atWar(nation, owner);
   }
 
-  unitType(u) { return this.roster.byKey[u.type]; }
+  /** A unit's stats at its level (cached per type and level). */
+  unitType(u) {
+    const lvl = u.lvl ?? 1;
+    if (lvl <= 1) return this.roster.byKey[u.type];
+    const k = `${u.type}:${lvl}`;
+    if (!this.statCache.has(k)) this.statCache.set(k, levelStats(this.roster.byKey[u.type], lvl));
+    return this.statCache.get(k);
+  }
 
-  /** Speed (km/h) of the slowest unit; land armies at sea use transports. */
+  /** The level a nation's new units of this type get from research. */
+  levelFor(nation, typeKey) { return this.research?.unitLevel(nation, this.roster.byKey[typeKey].role) ?? 1; }
+
+  /** Speed (km/h) of the slowest unit; land armies at sea use transports. Research adds to both. */
   speedOf(army, atSea) {
-    if (army.kind === 'land' && atSea) return this.roster.transport;
+    const m = this.research?.moveMult(army.nation) ?? 1;
+    if (army.kind === 'land' && atSea) return Math.round(this.roster.transport * m * 10) / 10;
     let s = Infinity;
     for (const u of army.units) s = Math.min(s, this.unitType(u).speed);
-    return isFinite(s) ? s : 1;
+    return isFinite(s) ? Math.round(s * m * 10) / 10 : 1;
   }
 
   /** Game hours for one hop. */
@@ -359,11 +373,12 @@ export class Armies {
   }
 
   /** Units of the era roster by role, e.g. { inf: 3, rng: 1 }. */
-  makeUnits(mix) {
+  makeUnits(mix, nation = -1) {
     const out = [];
     for (const [role, n] of Object.entries(mix)) {
       const t = this.roster.byRole[role];
-      for (let i = 0; i < n; i++) out.push(makeUnit(t));
+      const lvl = nation >= 0 ? this.levelFor(nation, t.key) : 1;
+      for (let i = 0; i < n; i++) out.push(makeUnit(t, lvl));
     }
     return out;
   }
@@ -444,7 +459,7 @@ export class Armies {
     const [building, need] = UNIT_REQUIREMENT[t.role];
     const B = this.buildings;
     const have = B ? B.level(provinceId, building) : need;
-    const hours = Math.round(t.build * TRAIN_FACTOR[have]);
+    const hours = Math.round(t.build * TRAIN_FACTOR[have] * (this.research?.trainTimeMult(p.owner) ?? 1));
     if (t.role === 'nav' && !p.seaNeighbors.length) return { ok: false, reason: 'Not coastal', hours };
     if (have < need) return { ok: false, reason: `Needs ${B.name(building)} ${['', 'I', 'II', 'III'][need]}`, hours };
     if (!opts.ignoreCost && !this.economy.canAfford(p.owner, t.cost)) return { ok: false, reason: 'Not enough resources', hours };
@@ -488,8 +503,9 @@ export class Armies {
     const node = naval ? this.P + p.seaNeighbors[0] : provinceId;
     // Units finished in a row at the same place gather into one new army.
     const host = [...this.at(node)].find((a) => a.fresh && a.nation === p.owner && a.kind === (naval ? 'naval' : 'land') && !a.seg && !this.combat?.inBattle(a));
-    if (host) host.units.push(makeUnit(t));
-    else this.create(p.owner, naval ? 'naval' : 'land', node, [makeUnit(t)], { fresh: true });
+    const unit = makeUnit(t, this.levelFor(p.owner, typeKey));
+    if (host) host.units.push(unit);
+    else this.create(p.owner, naval ? 'naval' : 'land', node, [unit], { fresh: true });
     this.state.events.emit('feed', {
       kind: 'unit', tone: p.owner === this.state.playerNationId ? 'good' : 'info',
       text: `${t.name} ready in ${p.cityName ?? p.name}`, node, nation: p.owner,
@@ -513,6 +529,11 @@ export class Armies {
       }
     }
 
+    // Refits: once per game hour, armies resting in a city with Barracks
+    // (fleets: next to a city with a Port) take on researched unit levels.
+    this.refitClock += hours;
+    if (this.refitClock >= 1) { this.refitClock = 0; this.refit(); }
+
     // Movement.
     for (const army of [...this.list.values()]) {
       let budget = hours;
@@ -529,6 +550,44 @@ export class Armies {
         if (s.done >= s.hours - 1e-9) this.arrive(army);
         else break;
       }
+    }
+  }
+
+  /** Where an army can refit right now, or null. */
+  refitSite(army) {
+    if (army.seg || this.combat?.inBattle(army) || !this.buildings) return null;
+    const B = this.buildings;
+    if (army.kind === 'land') {
+      const p = this.province(army.node);
+      return p && p.isCity && p.owner === army.nation && B.level(p.id, 'barracks') >= 1 ? p : null;
+    }
+    if (!this.isSea(army.node)) return null;
+    const coast = this.sea(army.node).coastalProvinces.map((id) => this.state.map.provinces[id]);
+    return coast.find((p) => p.isCity && p.owner === army.nation && B.level(p.id, 'port') >= 1) ?? null;
+  }
+
+  /** Units below their nation's researched level that a refit would upgrade. */
+  outdated(army) {
+    if (!this.research) return [];
+    return army.units.filter((u) => (u.lvl ?? 1) < this.levelFor(army.nation, u.type));
+  }
+
+  refit() {
+    if (!this.research) return;
+    for (const army of this.list.values()) {
+      const old = this.outdated(army);
+      if (!old.length) continue;
+      const site = this.refitSite(army);
+      if (!site) continue;
+      for (const u of old) {
+        const before = this.unitType(u).hp;
+        u.lvl = this.levelFor(army.nation, u.type);
+        u.hp *= this.unitType(u).hp / before; // keep the same share of health
+      }
+      if (army.nation === this.state.playerNationId) {
+        this.state.events.emit('feed', { kind: 'refit', tone: 'good', node: army.node, text: `${army.name} upgraded ${old.length} unit${old.length > 1 ? 's' : ''} in ${site.cityName ?? site.name}` });
+      }
+      this.changed();
     }
   }
 

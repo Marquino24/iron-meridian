@@ -81,12 +81,12 @@ export class CommandUI {
     const inc = E.income(id);
     const rows = E.keys.map((k) => `<tr>
       <th><i style="color:${RESOURCES[k].color}">${RESOURCES[k].icon}</i> ${esc(E.label(k))}</th>
-      <td>${fmtNum(inc.base[k])}</td><td>${inc.built[k] ? `+${fmtNum(inc.built[k])}` : '—'}</td><td>${inc.roads[k] >= 1 ? `+${fmtNum(inc.roads[k])}` : '—'}</td>
+      <td>${fmtNum(inc.base[k])}</td><td>${inc.built[k] ? `+${fmtNum(inc.built[k])}` : '—'}</td><td>${inc.roads[k] >= 1 ? `+${fmtNum(inc.roads[k])}` : '—'}</td><td>${inc.tech?.[k] >= 1 ? `+${fmtNum(inc.tech[k])}` : '—'}</td>
       <td class="tot">+${fmtNum(inc.perDay[k])}</td></tr>`).join('');
     this.el.tip.innerHTML = `
       <div class="eyebrow">DAILY INCOME</div>
       <table>
-        <thead><tr><th></th><th title="Provinces">Land</th><th title="Buildings">Bldg</th><th title="${esc(this.sim.buildings.name('roads'))}">Roads</th><th>/day</th></tr></thead>
+        <thead><tr><th></th><th title="Provinces">Land</th><th title="Buildings">Bldg</th><th title="${esc(this.sim.buildings.name('roads'))}">Roads</th><th title="Research">Tech</th><th>/day</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${inc.factor < 1 ? '<p class="warn">Capital lost: everything ×0.5 until you retake it.</p>' : ''}
@@ -133,7 +133,8 @@ export class CommandUI {
   armySignature(army) {
     const A = this.sim.armies;
     return ['army', army.id, army.units.length, army.node, !!army.seg, army.path.length, army.retreating,
-      this.sim.combat.inBattle(army), A.mergeable(army.id).map((a) => a.id).join(','), this.state.playerNationId].join('|');
+      this.sim.combat.inBattle(army), A.mergeable(army.id).map((a) => a.id).join(','), this.state.playerNationId,
+      army.units.map((u) => u.lvl ?? 1).join(''), A.outdated(army).length].join('|');
   }
 
   armyHtml(army) {
@@ -159,7 +160,7 @@ export class CommandUI {
       return `<li class="unit-row">
         ${own ? `<label class="unit-check"><input type="checkbox" data-unit="${i}" ${this.checked.has(u) ? 'checked' : ''} aria-label="Select ${esc(t.name)}"></label>` : ''}
         <span class="unit-glyph r-${t.role}" title="${ROLE_LABEL[t.role]}">${ROLE_GLYPH[t.role]}</span>
-        <span class="unit-name">${esc(t.name)}</span>
+        <span class="unit-name">${esc(t.name)}${(u.lvl ?? 1) > 1 ? ` <em class="lvl">${ROMAN[u.lvl]}</em>` : ''}</span>
         <span class="hpbar"><i data-hpbar="${army.id}:${i}" style="width:${(pct * 100).toFixed(0)}%" class="${pct > 0.6 ? 'ok' : pct > 0.3 ? 'mid' : 'low'}"></i></span>
         <span class="hp-num" data-hpnum="${army.id}:${i}">${Math.ceil(Math.max(0, u.hp))}</span>
       </li>`;
@@ -184,6 +185,7 @@ export class CommandUI {
       </dl>
       <div class="section-title">UNITS · ${army.units.length}</div>
       <ul class="unit-list">${rows}</ul>
+      ${own && A.outdated(army).length ? `<p class="hint-line refit-note">▲ ${A.outdated(army).length} unit${A.outdated(army).length > 1 ? 's' : ''} can be upgraded with your research: ${army.kind === 'naval' ? 'anchor next to a city with a Port' : `rest in a city with ${esc(this.sim.buildings.name('barracks'))}`}.</p>` : ''}
       ${own ? `
         <div class="btn-row">
           <button type="button" class="btn small" data-cmd="split" ${canEdit && this.checked.size && this.checked.size < army.units.length ? '' : 'disabled'}>Split selected</button>
@@ -259,6 +261,8 @@ export class CommandUI {
     const rows = this.roster.units.map((t) => {
       const c = A.recruitCheck(p.id, t.key, { ignoreCost: true });
       const ok = c.ok;
+      const lvl = A.levelFor(me, t.key);
+      const ts = A.unitType({ type: t.key, lvl });
       const afford = E.canAfford(me, t.cost);
       return `<li class="recruit-row${ok ? '' : ' na'}">
         <div class="recruit-main">
@@ -266,7 +270,7 @@ export class CommandUI {
           <span class="unit-name">${esc(t.name)}</span>
           <small>${t.role === 'nav' ? 'sea only' : `beats ${ROLE_LABEL[BEATS[t.role]].toLowerCase()}`}</small>
         </div>
-        <div class="recruit-stats">ATK ${t.attack} · DEF ${t.defense} · HP ${t.hp} · ${t.speed} km/h</div>
+        <div class="recruit-stats">${lvl > 1 ? `<em class="lvl">LV ${ROMAN[lvl]}</em> ` : ''}ATK ${ts.attack} · DEF ${ts.defense} · HP ${ts.hp} · ${t.speed} km/h</div>
         <div class="recruit-cost">
           ${costHtml(t.cost, E.get(me), E.set)}<span class="cost-chip">⏱ ${fmtHours(c.hours ?? t.build)}</span>
         </div>

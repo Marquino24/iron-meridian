@@ -34,6 +34,8 @@ import { Buildings } from './buildings.js';
 import { WindowManager } from './windows.js';
 import { ArmyWindow } from './win-army.js';
 import { ProductionWindow, BuildingsWindow } from './win-production.js';
+import { Research } from './research.js';
+import { ResearchWindow } from './win-research.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
@@ -46,11 +48,16 @@ const buildings = new Buildings(state, economy);
 const armies = new Armies(state, economy);
 armies.buildings = buildings;
 const combat = new Combat(state, armies);
-const sim = { economy, buildings, armies, combat };
+const research = new Research(state, economy);
+research.armies = armies;
+research.buildings = buildings;
+armies.research = research;
+buildings.research = research;
+const sim = { economy, buildings, armies, combat, research };
 renderer.sim = sim;
 
 /** Simulation systems, run in order each frame with the game hours elapsed. */
-const systems = [economy, buildings, armies, combat];
+const systems = [economy, research, buildings, armies, combat];
 
 // --- Camera framing ---------------------------------------------------------
 
@@ -289,6 +296,7 @@ const windows = new WindowManager(state, [
   new ArmyWindow(state, sim, { selectArmy, closeWindow: (id) => windows.close(id) }),
   new ProductionWindow(state, sim, { notice, openCity }),
   new BuildingsWindow(state, sim, { notice, openCity }),
+  new ResearchWindow(state, sim, { notice }),
 ]);
 
 const input = new InputController(canvas, camera, {

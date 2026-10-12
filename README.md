@@ -2,7 +2,7 @@
 
 A browser-based real-time grand strategy game. Vanilla JavaScript (ES modules) and HTML Canvas, with no frameworks and no build step.
 
-**Current scope (step 4A):** real-world maps in seven eras, sign-in and closed beta, armies, war and conquest, era resources, city buildings, and command windows for managing everything at once.
+**Current scope (step 4B):** real-world maps in seven eras, sign-in and closed beta, armies, war and conquest, era resources, city buildings, research, and command windows for managing everything at once.
 
 ## Run
 
@@ -90,6 +90,11 @@ Starting buildings: capitals have Barracks II, a Mine/Factory, a Farm and (if co
 
 The city panel keeps quick single-city actions in **Recruit** and **Build** tabs.
 
+**Research** (window **R**). Each era has its own 28-tech tree in three tiers across Military (10), Economy (9) and Infrastructure (9), themed per era (Roman: Iron Working, Aqueducts, Professional Legions…; WWII: Radar, Blitzkrieg Doctrine, Synthetic Fuel…). All eras share one skeleton of effects and requirements so balance carries across; `docs/TECH.md` lists every era's tree (regenerate it with `node tools/print-tech.mjs`).
+- Techs cost resources up front (tier I/II/III: about 1, 2 and 4 days of a mid-size nation's money) and take 3, 5 or 8 game days. One research slot to start; the tier II Economy tech (Census and Scribes, Operational Research, Supercomputing…) opens a second. Cancelling refunds.
+- Effects: unit levels 2 and 3 per role (+15% / +30% attack, defense and HP; new recruits come at the researched level, existing units upgrade when they rest in a city with Barracks, fleets next to a city with a Port); level III of every building (each building stops at level II until its tech); production bonuses (+10–25% per resource, +10% everything at the top of Infrastructure); movement (+10/+10/+15%), defense (+10% twice), mobile attack (+10%), faster and cheaper construction, faster recruitment.
+- The window draws the tree with lines from each requirement; techs are locked (dashed), available (amber), researching (progress bar) or done (green). Tap one for its effects, requirements, cost and time; start or cancel it there. Finished research is announced in the event feed.
+
 **Clock.** 1 real second = 1 game hour at 1×; pause / 1× / 2× / 4×.
 
 **Units.** Each era has four units in the same four roles, rock-paper-scissors style: infantry beats mobile, mobile beats ranged, ranged beats infantry (×1.5 damage, ×0.67 the other way). Ships move only through sea zones.
@@ -117,7 +122,7 @@ Full stats are in `js/units.js` (attack, defense, HP, speed in km/h, cost in era
 
 **Feedback.** The event feed (bottom left) lists wars, battles, captures and finished units; click an entry to open its battle report (units fielded and lost on each side) or fly to the place. Clicking crossed swords opens the live report.
 
-`npm test` includes `tools/check-war.mjs`, a headless run of the simulation: the German Reich conquering Czechoslovakia (9 provinces, about 20 game days = 8 real minutes at 1×), Italy landing in Albania by sea, recruitment timing, split/merge, capital loss, and spawning plus pathfinding in every era. `tools/e2e/war.test.mjs` plays the same war through the UI in a browser (desktop and phone), and `tools/e2e/windows.test.mjs` drives the command windows (`ERA=modern NATION="United States"` to try another nation).
+`npm test` includes `tools/check-war.mjs`, a headless run of the simulation: the German Reich conquering Czechoslovakia (9 provinces, about 20 game days = 8 real minutes at 1×), Italy landing in Albania by sea, recruitment timing, split/merge, capital loss, and spawning plus pathfinding in every era. `tools/e2e/war.test.mjs` plays the same war through the UI in a browser (desktop and phone), `tools/e2e/research.test.mjs` the research window, and `tools/e2e/windows.test.mjs` drives the other command windows (`ERA=modern NATION="United States"` to try another nation).
 
 ## Map styles and settings
 
@@ -137,7 +142,7 @@ Switch styles in game (bottom right); the default is in **Settings**, along with
 | Click a province | Inspect it (on the start screen, clicking picks that nation) |
 | Click an army counter | Select it; then click a province or sea zone to move, or an enemy counter to attack it |
 | Click crossed swords / a feed entry | Battle report |
-| A / P / B | Army / Production / Buildings window |
+| A / P / B / R | Army / Production / Buildings / Research window |
 | Esc | Close the top window, else deselect (army first, then province) |
 | Space | Pause / resume the clock |
 
@@ -197,6 +202,9 @@ js/
   windows.js      Command bar and window manager (drag, z-order, phone sheets, shortcuts)
   win-army.js     Army window
   win-production.js  Production and Buildings windows (bulk recruit / build)
+  tech.js         Era tech trees (shared skeleton + era names, costs per tier)
+  research.js     Research per nation: slots, progress, effect queries used by the other systems
+  win-research.js Research window (tree view with requirement lines, details)
 ```
 
 ## Data model (from `generateMap(seed)`)
@@ -209,7 +217,7 @@ js/
 
 ## Extending in later steps
 
-- **Simulation systems** (AI and research next): add an object with `update(state, gameHours)` to `systems` in `main.js`, next to the economy, armies and combat. It runs every frame with the in-game hours elapsed (0 while paused). An AI can use the same calls the UI does: `armies.order()`, `armies.recruit()`, `combat.declareWar()`.
+- **Simulation systems** (AI next): add an object with `update(state, gameHours)` to `systems` in `main.js`, next to the economy, armies and combat. It runs every frame with the in-game hours elapsed (0 while paused). An AI can use the same calls the UI does: `armies.order()`, `armies.recruit()`, `combat.declareWar()`.
 - **State changes:** add methods to `GameState` that mutate data and `emit` an event. `setOwner()` is the template: the renderer rebuilds borders and colours on `province:owner`, and the panel re-renders.
 - **New map layers** (fronts, supply lines): draw them in `Renderer.render()` between the province layer and the screen-space overlay, as `render-units.js` does. Call `renderer.requestRender()` whenever they change.
 

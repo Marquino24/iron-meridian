@@ -102,5 +102,17 @@ for (const r of Object.values(ROSTERS)) {
 /** The roster for an era id (Fictional World uses Modern). */
 export const rosterFor = (eraId) => ROSTERS[eraId] ?? ROSTERS.modern;
 
+/** Stat multiplier per unit level (research raises levels 2 and 3). */
+export const LEVEL_MULT = [1, 1, 1.15, 1.3];
+
+/** A unit type's stats at a level (attack, defense and HP scaled). */
+export const levelStats = (type, lvl = 1) => (lvl <= 1 ? type : {
+  ...type,
+  lvl,
+  attack: Math.round(type.attack * LEVEL_MULT[lvl] * 10) / 10,
+  defense: Math.round(type.defense * LEVEL_MULT[lvl] * 10) / 10,
+  hp: Math.round(type.hp * LEVEL_MULT[lvl]),
+});
+
 /** A fresh unit of a type at full strength. */
-export const makeUnit = (type) => ({ type: type.key, hp: type.hp });
+export const makeUnit = (type, lvl = 1) => ({ type: type.key, lvl, hp: levelStats(type, lvl).hp });

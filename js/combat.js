@@ -8,7 +8,8 @@
  *       damage = 8 × attack × matchup ÷ (defense × terrain) × (0.75–1.25)
  *   where terrain (forest 1.25, mountains 1.6, urban 1.4, times +25% per
  *   Fortifications level) only shields the side that was there first, matchup is the rock-paper-scissors table in
- *   units.js, and worn-down units hit softer. Land armies caught at sea
+ *   units.js, and worn-down units hit softer. Unit levels and research
+ *   (defense and attack bonuses) scale attack and defense. Land armies caught at sea
  *   fight at a quarter of their attack and half their defense.
  *   An army below 20% strength retreats to a safe neighbouring node (if
  *   there is none it fights on). The battle ends when one side is gone.
@@ -182,8 +183,9 @@ export class Combat {
         const target = foes[Math.floor(Math.random() * foes.length)];
         const embarked = army.kind === 'land' && b.sea;
         const targetEmbarked = target.army.kind === 'land' && b.sea;
-        const attack = t.attack * (embarked ? 0.25 : 1) * (0.5 + 0.5 * u.hp / t.hp);
-        const defense = target.t.defense * (i === 0 ? terrainDef : 1) * (targetEmbarked ? 0.5 : 1);
+        const R = A.research;
+        const attack = t.attack * (embarked ? 0.25 : 1) * (0.5 + 0.5 * u.hp / t.hp) * (R ? R.attackMult(army.nation, t.role) : 1);
+        const defense = target.t.defense * (i === 0 ? terrainDef : 1) * (targetEmbarked ? 0.5 : 1) * (R ? R.defenseMult(target.army.nation) : 1);
         const dmg = DAMAGE_BASE * attack * MATCHUP[t.role][target.t.role] / defense * (0.75 + Math.random() * 0.5);
         hits.push([target.u, dmg]);
       }
