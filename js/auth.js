@@ -198,10 +198,10 @@ export class DemoAuthService {
     this.listeners = new Set();
     this.rows = [
       { user_id: 'demo-owner', provider: 'demo', display_name: 'Demo Commander', email: 'demo@iron-meridian.test', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 3).toISOString() },
-      { user_id: 'demo-1', provider: 'google', display_name: 'Ada Lovelace', email: 'ada@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 5).toISOString() },
-      { user_id: 'demo-2', provider: 'discord', display_name: 'Basil Hart', email: 'basil@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 2).toISOString() },
-      { user_id: 'demo-3', provider: 'azure', display_name: 'Chen Wei', email: 'chen@example.com', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 2).toISOString() },
-      { user_id: 'demo-4', provider: 'x', display_name: 'Dana Ruiz', email: 'dana@example.com', status: 'denied', requested_at: new Date(Date.now() - 864e5 * 4).toISOString() },
+      { user_id: 'demo-1', provider: 'google', display_name: '[Sample] Ada Lovelace', email: 'ada@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 5).toISOString() },
+      { user_id: 'demo-2', provider: 'discord', display_name: '[Sample] Basil Hart', email: 'basil@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 2).toISOString() },
+      { user_id: 'demo-3', provider: 'azure', display_name: '[Sample] Chen Wei', email: 'chen@example.com', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 2).toISOString() },
+      { user_id: 'demo-4', provider: 'x', display_name: '[Sample] Dana Ruiz', email: 'dana@example.com', status: 'denied', requested_at: new Date(Date.now() - 864e5 * 4).toISOString() },
     ];
   }
 

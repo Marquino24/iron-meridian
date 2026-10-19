@@ -369,6 +369,7 @@ export class Launcher {
             <button type="button" class="icon-btn" data-admin="close" aria-label="Close admin panel">✕</button>
           </div>
         </header>
+        ${this.auth.demo ? '<p class="demo-banner" role="note">DEMO DATA — not real users. This preview has no sign-in server; these sample testers live only in this browser.</p>' : ''}
         <div class="admin-tabs" role="tablist">
           ${['pending', 'approved', 'denied'].map((t) => `
             <button type="button" role="tab" aria-selected="${t === tab}" class="${t === tab ? 'active' : ''}" data-tab="${t}">

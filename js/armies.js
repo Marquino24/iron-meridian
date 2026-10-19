@@ -26,6 +26,8 @@ export const EMBARK_HOURS = 6;
 /** Fictional maps: km per world unit (AREA_KM2_PER_UNIT = 4). */
 const KM_PER_UNIT_FICTIONAL = 2;
 const MAX_CITY_GARRISONS = 12;
+/** Refitting a unit to a researched level costs this share of its price per level. */
+export const REFIT_SHARE = 0.2;
 
 const ordinal = (n) => {
   const t = n % 100;
@@ -572,6 +574,26 @@ export class Armies {
     return army.units.filter((u) => (u.lvl ?? 1) < this.levelFor(army.nation, u.type));
   }
 
+  /** Cost to bring one unit up to a level: 20% of its price (not men or food) per level gained. */
+  refitCost(u, toLvl) {
+    const steps = toLvl - (u.lvl ?? 1);
+    const c = {};
+    if (steps <= 0) return c;
+    for (const [k, v] of Object.entries(this.roster.byKey[u.type].cost)) {
+      if (k !== 'manpower' && k !== 'food') c[k] = Math.ceil(v * REFIT_SHARE * steps);
+    }
+    return c;
+  }
+
+  /** Total refit cost of an army's outdated units. */
+  refitCostOf(army) {
+    const total = {};
+    for (const u of this.outdated(army)) {
+      for (const [k, v] of Object.entries(this.refitCost(u, this.levelFor(army.nation, u.type)))) total[k] = (total[k] ?? 0) + v;
+    }
+    return total;
+  }
+
   refit() {
     if (!this.research) return;
     for (const army of this.list.values()) {
@@ -579,13 +601,22 @@ export class Armies {
       if (!old.length) continue;
       const site = this.refitSite(army);
       if (!site) continue;
+      let done = 0;
+      const paid = {};
       for (const u of old) {
+        const lvl = this.levelFor(army.nation, u.type);
+        const cost = this.refitCost(u, lvl);
+        if (!this.economy.spend(army.nation, cost)) break; // the rest wait for resources
+        for (const [k, v] of Object.entries(cost)) paid[k] = (paid[k] ?? 0) + v;
         const before = this.unitType(u).hp;
-        u.lvl = this.levelFor(army.nation, u.type);
+        u.lvl = lvl;
         u.hp *= this.unitType(u).hp / before; // keep the same share of health
+        done++;
       }
+      if (!done) continue;
       if (army.nation === this.state.playerNationId) {
-        this.state.events.emit('feed', { kind: 'refit', tone: 'good', node: army.node, text: `${army.name} upgraded ${old.length} unit${old.length > 1 ? 's' : ''} in ${site.cityName ?? site.name}` });
+        const price = Object.entries(paid).map(([k, v]) => `${Math.round(v)} ${this.economy.label(k).toLowerCase()}`).join(', ');
+        this.state.events.emit('feed', { kind: 'refit', tone: 'good', node: army.node, text: `${army.name} upgraded ${done} unit${done > 1 ? 's' : ''} in ${site.cityName ?? site.name} (${price})` });
       }
       this.changed();
     }

@@ -52,6 +52,17 @@ export class WindowManager {
       </button>`).join('');
   }
 
+  /** Small badge on a command-bar button ('' hides it). */
+  setBadge(id, text, title = '') {
+    const b = this.bar.querySelector(`[data-win="${id}"]`);
+    if (!b) return;
+    let el = b.querySelector('.cb-badge');
+    if (!text) { el?.remove(); return; }
+    if (!el) { el = document.createElement('span'); el.className = 'cb-badge'; b.appendChild(el); }
+    if (el.textContent !== text) el.textContent = text;
+    el.title = title;
+  }
+
   isOpen(id) { return this.open.includes(id); }
 
   toggle(id) { if (this.isOpen(id) && this.top() === id) this.close(id); else this.show(id); }

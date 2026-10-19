@@ -17,6 +17,8 @@
  *   { buildCost: pct }            constructions pct% cheaper
  *   { trainTime: pct }            recruitment pct% faster
  *   { slots: 1 }                  one more research slot
+ *   { synth: from, to, pct }      pct% of one resource's output also yields
+ *                                 another (synthetic fuel from steel)
  * An effect may be { ancient, industrial, modern } to differ by era group.
  */
 
@@ -35,15 +37,15 @@ export const SKELETON = [
   { id: 'm10', branch: 'mil', tier: 3, req: ['m7'], fx: [{ unit: 'nav', level: 3 }] },
   // Economy
   { id: 'e1', branch: 'eco', tier: 1, req: [], fx: [{ building: 'farm', maxLevel: 3 }, { prod: 'food', pct: 10 }] },
-  { id: 'e2', branch: 'eco', tier: 1, req: [], fx: [{ prod: 'money', pct: 10 }] },
+  { id: 'e2', branch: 'eco', tier: 1, req: [], fx: [{ slots: 1 }] },
   { id: 'e3', branch: 'eco', tier: 1, req: [], fx: [{ building: 'mine', maxLevel: 3 }, { prod: 'steel', pct: 10 }] },
-  { id: 'e4', branch: 'eco', tier: 2, req: ['e2'], fx: [{ slots: 1 }] },
+  { id: 'e4', branch: 'eco', tier: 2, req: ['e2'], fx: [{ prod: 'money', pct: 10 }] },
   { id: 'e5', branch: 'eco', tier: 2, req: ['e1'], fx: [{ prod: 'manpower', pct: 15 }] },
   {
     id: 'e6', branch: 'eco', tier: 2, req: ['e3'],
-    fx: [{ ancient: { prod: 'money', pct: 15 }, industrial: { building: 'oilwell', maxLevel: 3 } }, { ancient: null, industrial: { prod: 'oil', pct: 15 } }],
+    fx: [{ ancient: { prod: 'money', pct: 15 }, industrial: { building: 'oilwell', maxLevel: 3 } }, { ancient: null, industrial: { synth: 'steel', to: 'oil', pct: 15 } }],
   },
-  { id: 'e7', branch: 'eco', tier: 3, req: ['e4'], fx: [{ prod: 'money', pct: 15 }] },
+  { id: 'e7', branch: 'eco', tier: 3, req: ['e4'], fx: [{ slots: 1 }, { prod: 'money', pct: 15 }] },
   { id: 'e8', branch: 'eco', tier: 3, req: ['e5'], fx: [{ prod: 'food', pct: 15 }, { prod: 'manpower', pct: 15 }] },
   { id: 'e9', branch: 'eco', tier: 3, req: ['e3', 'e6'], fx: [{ ancient: { prod: 'steel', pct: 15 }, industrial: { prod: 'steel', pct: 15 }, modern: { prod: 'electronics', pct: 25 } }] },
   // Infrastructure
@@ -63,63 +65,68 @@ const NAMES = {
   rome: [
     'Iron Working', 'Horse Breeding', 'Composite Bows', 'Cataphracts', 'Professional Legions',
     'Castra Fortification', 'Corvus Boarding Bridge', 'Scorpio Bolt-Throwers', 'Alae Cavalry', 'Quinqueremes',
-    'Crop Rotation', 'Coinage Reform', 'Deep Mining', 'Census and Scribes', 'Latin Rights',
-    'Mediterranean Trade', 'Imperial Treasury', 'Coloniae Settlements', 'Metallurgy',
+    'Crop Rotation', 'Census and Scribes', 'Deep Mining', 'Coinage Reform', 'Latin Rights',
+    'Mediterranean Trade', 'Imperial Bureaucracy', 'Coloniae Settlements', 'Metallurgy',
     'Marching Camps', 'Roman Concrete', 'Harbor Engineering', 'Aqueducts', 'Fabricae Workshops',
     'Cursus Publicus', 'Limes Frontier', 'Standardised Bricks', 'Imperial Road Network',
   ],
   medieval: [
-    'Chainmail', 'Stirrups', 'Longbow Drill', 'Destriers', 'Plate Armour',
-    'Concentric Castles', 'Stern Rudder', 'Trebuchets', 'Military Orders', 'Carracks',
-    'Three-Field System', 'Banking Houses', 'Blast Furnace', 'Universities', 'Town Charters',
-    'Hanseatic Trade', 'Letters of Credit', 'Heavy Plough', 'Water-Powered Forges',
+    'Chainmail', 'Stirrups', 'Crossbows', 'Destriers', 'Plate Armour',
+    'Castles', 'Stern Rudder', 'Trebuchets', 'Military Orders', 'Carracks',
+    'Three-Field System', 'Monastic Scriptoria', 'Blast Furnace', 'Banking Houses', 'Town Charters',
+    'Hanseatic Trade', 'Universities', 'Heavy Plough', 'Water-Powered Forges',
     'Pack Trains', 'Stone Bridges', "Shipwrights' Guilds", 'Master Masons', 'Royal Armouries',
     'King\'s Highways', 'Watchtowers', 'Brick Kilns', 'Trade Fair Network',
   ],
   ww1: [
-    'Bolt-Action Rifles', 'Cavalry Remounts', 'Indirect Fire', 'Armoured Cars', 'Stormtrooper Tactics',
-    'Trench Systems', 'Fire Control', 'Creeping Barrage', 'Mechanised Cavalry', 'Super-Dreadnoughts',
-    'Nitrogen Fertiliser', 'War Bonds', 'Bessemer Steel', 'Central Planning Office', 'Total Mobilisation',
-    'Oil Refining', 'War Economy', 'Mechanised Agriculture', 'Open-Hearth Steel',
-    'Motor Lorries', 'Standard-Gauge Railways', 'Dry Docks', 'Prefabrication', 'Shell Factories',
+    'Machine Guns', 'Cavalry Remounts', 'Indirect Fire', 'Armoured Cars', 'Stormtrooper Tactics',
+    'Trench Warfare', 'Fire Control', 'Creeping Barrage', 'Mechanised Cavalry', 'Super-Dreadnoughts',
+    'Nitrogen Fertiliser', 'General Staff Office', 'Bessemer Steel', 'War Bonds', 'Total Mobilisation',
+    'Oil Refining', 'Research Laboratories', 'Mechanised Agriculture', 'Open-Hearth Steel',
+    'Motor Lorries', 'Railways', 'Dry Docks', 'Prefabrication', 'Shell Factories',
     'Light Railways', 'Barbed Wire', 'Assembly Lines', 'Electrification',
   ],
   ww2: [
     'Semi-Automatic Rifles', 'Armoured Divisions', 'Radio-Directed Fire', 'Sloped Armour', 'Combined Arms',
     'Fortified Lines', 'Radar', 'Rocket Artillery', 'Blitzkrieg Doctrine', 'Sonar and Depth Charges',
-    'Hybrid Crops', 'War Finance', 'Mass Steel Production', 'Operational Research', 'Women in Industry',
-    'Synthetic Fuel', 'Total War Economy', 'Rationing', 'Alloy Steels',
+    'Hybrid Crops', 'Operational Research', 'Mass Steel Production', 'War Finance', 'Women in Industry',
+    'Synthetic Fuel', 'Big Science', 'Rationing', 'Alloy Steels',
     'Motorised Supply', 'Motorways', 'Liberty Shipyards', 'Prefabricated Construction', 'Mass Production',
     'Fuel Logistics', 'Anti-Aircraft Defence', 'Standardised Parts', 'Strategic Logistics',
   ],
   coldwar: [
     'Assault Rifles', 'Mechanised Divisions', 'Self-Propelled Guns', 'Composite Armour', 'Airmobile Infantry',
     'Hardened Bunkers', 'Guided Missiles', 'Counter-Battery Radar', 'AirLand Battle', 'Gas-Turbine Ships',
-    'Green Revolution', 'Bretton Woods', 'Basic Oxygen Steel', 'Mainframe Computers', 'Baby Boom',
+    'Green Revolution', 'Mainframe Computers', 'Basic Oxygen Steel', 'Bretton Woods', 'Baby Boom',
     'Offshore Drilling', 'Military-Industrial Complex', 'Agro-Industry', 'Transistors',
     'Helicopter Transport', 'Interstate Highways', 'Container Ports', 'Precast Concrete', 'Automated Assembly',
-    'Strategic Airlift', 'Early-Warning Radar', 'Modular Construction', 'Satellite Communications',
+    'Jet Engines', 'Nuclear Deterrence', 'Modular Construction', 'Satellites',
   ],
   modern: [
-    'Body Armour', 'Network-Centric Brigades', 'GPS-Guided Rounds', 'Active Protection Systems', 'Special Forces',
-    'Missile Defence', 'Aegis Combat System', 'Precision Rocket Fire', 'Multi-Domain Operations', 'Stealth Hulls',
-    'Precision Agriculture', 'Global Finance', 'Recycled Steel', 'Supercomputing', 'Volunteer Force',
-    'Fracking', 'Sovereign Wealth Fund', 'Vertical Farming', 'Semiconductor Fabs',
+    'Body Armour', 'Network-Centric Brigades', 'Drones', 'Active Protection Systems', 'Special Forces',
+    'Missile Defence', 'Aegis Combat System', 'Precision Strikes', 'Multi-Domain Operations', 'Stealth Hulls',
+    'Precision Agriculture', 'Supercomputing', 'Recycled Steel', 'Global Finance', 'Volunteer Force',
+    'Fracking', 'AI Research', 'Vertical Farming', 'Semiconductor Fabs',
     'Logistics Software', 'Smart Highways', 'Automated Ports', '3D-Printed Construction', 'Robotic Assembly',
-    'Rapid Deployment', 'Cyber Defence', 'Modular Building', '5G Networks',
+    'Rapid Deployment', 'Cyber Defense', 'Modular Building', '5G Networks',
   ],
 };
 NAMES.fictional = NAMES.modern;
 
 const GROUP = { rome: 'ancient', medieval: 'ancient', ww1: 'industrial', ww2: 'industrial', coldwar: 'modern', modern: 'modern', fictional: 'modern' };
 
-/** Base research cost and time per tier (filtered to the era's resources). */
+/**
+ * Research cost and time per tier (filtered to the era's resources).
+ * Tuned so a medium nation (about 400 money/day) that also spends on its
+ * army finishes the whole tree in roughly 2–3 real hours at 1× (1 game hour
+ * = 1 real second): tier I takes 2½ minutes, tier II 9, tier III 21.
+ */
 const TIER_COST = {
-  1: { money: 300, food: 100, steel: 60 },
-  2: { money: 700, food: 150, steel: 150, oil: 40, electronics: 40 },
-  3: { money: 1500, food: 300, steel: 300, oil: 100, electronics: 120 },
+  1: { money: 400, food: 120, steel: 80 },
+  2: { money: 1500, food: 400, steel: 300, oil: 40, electronics: 60 },
+  3: { money: 4000, food: 1000, steel: 800, oil: 120, electronics: 200 },
 };
-const TIER_HOURS = { 1: 72, 2: 120, 3: 192 };
+const TIER_HOURS = { 1: 150, 2: 540, 3: 1260 };
 
 export const BRANCHES = [
   { id: 'mil', label: 'Military' },

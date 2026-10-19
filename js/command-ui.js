@@ -185,7 +185,7 @@ export class CommandUI {
       </dl>
       <div class="section-title">UNITS · ${army.units.length}</div>
       <ul class="unit-list">${rows}</ul>
-      ${own && A.outdated(army).length ? `<p class="hint-line refit-note">▲ ${A.outdated(army).length} unit${A.outdated(army).length > 1 ? 's' : ''} can be upgraded with your research: ${army.kind === 'naval' ? 'anchor next to a city with a Port' : `rest in a city with ${esc(this.sim.buildings.name('barracks'))}`}.</p>` : ''}
+      ${own && A.outdated(army).length ? `<p class="hint-line refit-note">▲ ${A.outdated(army).length} unit${A.outdated(army).length > 1 ? 's' : ''} can be upgraded with your research (${costHtml(A.refitCostOf(army), null, this.sim.economy.set)}): ${army.kind === 'naval' ? 'anchor next to a city with a Port' : `rest in a city with ${esc(this.sim.buildings.name('barracks'))}`}.${A.refitSite(army) && !this.sim.economy.canAfford(army.nation, A.refitCostOf(army)) ? ' <b>Waiting for resources.</b>' : ''}</p>` : ''}
       ${own ? `
         <div class="btn-row">
           <button type="button" class="btn small" data-cmd="split" ${canEdit && this.checked.size && this.checked.size < army.units.length ? '' : 'disabled'}>Split selected</button>

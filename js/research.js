@@ -6,8 +6,11 @@
  *   prodMult(nation, key)         → production multiplier (economy.js)
  *   moveMult / defenseMult / attackMult / buildTimeMult / buildCostMult / trainTimeMult
  *
- * One research slot to start; an Economy tech adds a second. A tech is paid
- * up front, takes game time, and can be cancelled for a refund.
+ * One research slot to start; a tier I Economy tech adds a second and a
+ * tier III one a third. A tech is paid up front, takes game time, and can be
+ * cancelled for a refund. Up to 5 more techs can wait in a queue: the first
+ * one whose requirements are done and that you can afford starts as soon as
+ * a slot is free.
  */
 
 import { techTree } from './tech.js';
@@ -15,8 +18,9 @@ import { resourceSet } from './resources.js';
 
 export const BASE_SLOTS = 1;
 export const BASE_MAX_BUILDING = 2;
+export const QUEUE_MAX = 5;
 
-const fresh = () => ({ done: new Set(), active: [], fx: null });
+const fresh = () => ({ done: new Set(), active: [], queue: [], fx: null });
 
 export class Research {
   /**
@@ -49,7 +53,7 @@ export class Research {
   effects(nation) {
     const r = this.of(nation);
     if (r.fx) return r.fx;
-    const fx = { units: { inf: 1, mob: 1, rng: 1, nav: 1 }, buildings: {}, prod: {}, move: 0, defense: 0, attack: {}, buildTime: 0, buildCost: 0, trainTime: 0, slots: BASE_SLOTS };
+    const fx = { units: { inf: 1, mob: 1, rng: 1, nav: 1 }, buildings: {}, prod: {}, synth: [], move: 0, defense: 0, attack: {}, buildTime: 0, buildCost: 0, trainTime: 0, slots: BASE_SLOTS };
     for (const id of r.done) {
       for (const e of this.byId[id]?.effects ?? []) {
         if (e.unit) fx.units[e.unit] = Math.max(fx.units[e.unit], e.level);
@@ -57,6 +61,7 @@ export class Research {
         else if (e.prod) fx.prod[e.prod] = (fx.prod[e.prod] ?? 0) + e.pct;
         else if (e.attack) fx.attack[e.attack] = (fx.attack[e.attack] ?? 0) + e.pct;
         else if (e.slots) fx.slots += e.slots;
+        else if (e.synth) fx.synth.push(e);
         else for (const k of ['move', 'defense', 'buildTime', 'buildCost', 'trainTime']) if (e[k]) fx[k] += e[k];
       }
     }
@@ -74,6 +79,9 @@ export class Research {
   buildCostMult(nation) { return 1 - this.effects(nation).buildCost / 100; }
   trainTimeMult(nation) { return 1 - this.effects(nation).trainTime / 100; }
   slots(nation) { return this.effects(nation).slots; }
+  /** Free research slots. */
+  idle(nation) { return Math.max(0, this.slots(nation) - this.of(nation).active.length); }
+  queued(nation, id) { return this.of(nation).queue.includes(id); }
 
   /** The tech that unlocks level III of a building, if any. */
   unlockerOf(type) { return this.tree.find((t) => t.effects.some((e) => e.building === type)); }
@@ -122,6 +130,90 @@ export class Research {
     this.state.events.emit('research', { nation, id, cancelled: true });
   }
 
+  /** Can this tech join the queue? Its requirements may still be researching or queued ahead of it. */
+  canQueue(nation, id) {
+    const r = this.of(nation);
+    const t = this.byId[id];
+    if (!t) return { ok: false, reason: 'Unknown tech' };
+    const st = this.status(nation, id);
+    if (st === 'done' || st === 'active') return { ok: false, reason: st === 'done' ? 'Researched' : 'In progress' };
+    if (r.queue.includes(id)) return { ok: false, reason: 'Already queued' };
+    if (r.queue.length >= QUEUE_MAX) return { ok: false, reason: `Queue full (${QUEUE_MAX})` };
+    const coming = (q) => r.done.has(q) || r.active.some((a) => a.id === q) || r.queue.includes(q);
+    const missing = t.req.filter((q) => !coming(q));
+    if (missing.length) return { ok: false, reason: `Queue ${missing.map((q) => this.byId[q].name).join(' and ')} first` };
+    return { ok: true };
+  }
+
+  enqueue(nation, id) {
+    const c = this.canQueue(nation, id);
+    if (!c.ok) return { error: c.reason };
+    this.of(nation).queue.push(id);
+    this.autoStart(nation);
+    this.state.events.emit('research', { nation, id, queued: true });
+    return { ok: true };
+  }
+
+  dequeue(nation, id) {
+    const r = this.of(nation);
+    // Dropping a tech also drops queued techs that needed it.
+    const drop = new Set([id]);
+    for (const q of r.queue) if (this.byId[q].req.some((x) => drop.has(x)) && !r.done.has(q)) drop.add(q);
+    r.queue = r.queue.filter((q) => !drop.has(q) || r.done.has(q));
+    this.state.events.emit('research', { nation, id, dequeued: true });
+  }
+
+  /** Why a queued tech hasn't started yet. */
+  waitingReason(nation, id) {
+    const r = this.of(nation);
+    const t = this.byId[id];
+    if (!t.req.every((q) => r.done.has(q))) return 'after its requirements';
+    if (!this.idle(nation)) return 'when a slot frees up';
+    if (!this.economy.canAfford(nation, t.cost)) return 'waiting for resources';
+    return 'starting';
+  }
+
+  /** Start queued techs while slots are free (first startable in queue order). */
+  autoStart(nation) {
+    const r = this.of(nation);
+    let started = false;
+    for (let guard = 0; guard < QUEUE_MAX && this.idle(nation) > 0; guard++) {
+      const id = r.queue.find((q) => this.check(nation, q).ok);
+      if (!id) break;
+      r.queue = r.queue.filter((q) => q !== id);
+      if (this.start(nation, id).ok) started = true;
+    }
+    return started;
+  }
+
+  /**
+   * Active bonuses with the techs they come from, for the Bonuses tab:
+   * [{ key, label, value, sources: [names] }]
+   */
+  bonuses(nation) {
+    const r = this.of(nation);
+    const rows = new Map();
+    const add = (key, label, value, src) => {
+      if (!rows.has(key)) rows.set(key, { key, label, value: 0, sources: [] });
+      const row = rows.get(key);
+      row.value = typeof value === 'number' ? row.value + value : value;
+      row.sources.push(src);
+    };
+    for (const id of r.done) {
+      const t = this.byId[id];
+      for (const e of t.effects) {
+        if (e.unit) add(`unit:${e.unit}`, e.unit, Math.max(rows.get(`unit:${e.unit}`)?.value ?? 1, e.level), t.name);
+        else if (e.building) add(`b:${e.building}`, e.building, 3, t.name);
+        else if (e.prod) add(`prod:${e.prod}`, e.prod, e.pct, t.name);
+        else if (e.synth) add(`synth:${e.to}`, e.synth, e.pct, t.name); // label = source resource
+        else if (e.attack) add(`attack:${e.attack}`, e.attack, e.pct, t.name);
+        else if (e.slots) add('slots', 'slots', e.slots, t.name);
+        else for (const k of ['move', 'defense', 'buildTime', 'buildCost', 'trainTime']) if (e[k]) add(k, k, e[k], t.name);
+      }
+    }
+    return [...rows.values()];
+  }
+
   /** Effect lines for a tech, with this era's unit, building and resource names. */
   describe(t) {
     return describeEffects(t.effects, {
@@ -135,6 +227,7 @@ export class Research {
   grant(nation, id) {
     const r = this.of(nation);
     r.active = r.active.filter((a) => a.id !== id);
+    r.queue = r.queue.filter((q) => q !== id);
     r.done.add(id);
     r.fx = null;
     this.state.events.emit('research', { nation, id, done: true });
@@ -149,9 +242,10 @@ export class Research {
         this.grant(nation, a.id);
         if (nation === state.playerNationId) {
           const t = this.byId[a.id];
-          state.events.emit('feed', { kind: 'research', tone: 'good', text: `Research complete: ${t.name} — ${this.describe(t).join('; ')}`, research: a.id });
+          state.events.emit('feed', { kind: 'research', tone: 'good', text: `Research complete: ${t.name} — ${this.describe(t).join('; ')}`, research: a.id, toast: `Research complete: ${t.name}` });
         }
       }
+      if (r.queue.length && this.idle(nation) > 0) this.autoStart(nation);
     }
   }
 }
@@ -175,6 +269,7 @@ export function describeEffects(effects, ctx = {}) {
     if (e.buildCost) return `Construction ${e.buildCost}% cheaper`;
     if (e.trainTime) return `Recruitment ${e.trainTime}% faster`;
     if (e.slots) return `+${e.slots} research slot`;
+    if (e.synth) return `Synthetic ${label(e.to).toLowerCase()}: +${e.pct}% of your ${label(e.synth).toLowerCase()} output`;
     return '';
   }).filter(Boolean);
 }

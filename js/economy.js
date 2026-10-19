@@ -86,6 +86,13 @@ export class Economy {
           t.tech[k] = t.total[k] * (m - 1);
           t.total[k] *= m;
         }
+        // Synthetic production (e.g. fuel from steel).
+        for (const e of this.research.effects(n).synth) {
+          if (!keys.includes(e.to) || !keys.includes(e.synth)) continue;
+          const extra = t.total[e.synth] * e.pct / 100;
+          t.tech[e.to] += extra;
+          t.total[e.to] += extra;
+        }
       });
     }
     this.tally = tally;

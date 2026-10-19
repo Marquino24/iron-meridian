@@ -1496,3 +1496,54 @@ body:not([data-screen="era"]):not([data-screen="nation"]):not([data-screen="sett
 .win-research .tree-wrap { flex: 1 1 auto; min-height: 140px; max-height: none; }
 .win-research .tech-detail { position: static; flex: none; }
 @media (max-width: 760px) { .win-research { height: auto; width: auto; } }
+.demo-banner { margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--accent); background: rgba(255, 181, 71, 0.14); color: #ffe2b0; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; }
+
+/* ---------- Step 4B (revised): queue, bonuses, badge ---------- */
+.command-bar button { position: relative; }
+.cb-badge {
+  position: absolute; top: 4px; right: 4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+  background: var(--red); color: #fff; font-family: var(--font-mono); font-size: 11px; line-height: 17px; text-align: center;
+  box-shadow: 0 0 0 2px rgba(8, 13, 16, 0.94); animation: badge-pulse 1.6s ease-in-out infinite;
+}
+@keyframes badge-pulse { 50% { transform: scale(1.15); } }
+.slots { grid-template-columns: repeat(3, 1fr); }
+button.slot { text-align: left; font-family: var(--font-ui); color: var(--text); cursor: pointer; }
+.slot.free { border-color: rgba(255, 107, 91, 0.55); }
+.slot.free span { color: #ffb0a5; }
+.r-queue { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 4px; font-size: 13px; }
+.q-title { flex: none; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text-dim); text-transform: uppercase; padding-top: 6px; }
+.q-empty { color: var(--text-dim); font-size: 12px; padding-top: 4px; }
+.r-queue ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.q-item { display: flex; align-items: center; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.25); }
+.q-item .icon-btn { width: 24px; height: 24px; border: 0; font-size: 11px; }
+.q-name { display: flex; flex-direction: column; align-items: flex-start; padding: 3px 4px 3px 8px; background: none; border: 0; color: var(--text); font-family: var(--font-ui); font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
+.q-name b { color: var(--accent); margin-right: 4px; }
+.q-name small { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); font-weight: normal; }
+.tech.queued { border-color: rgba(255, 199, 102, 0.9); border-style: dashed; }
+.tech.queued .tech-ico { font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
+.tech.st-active .tech-fx { color: var(--cyan); }
+.td-act .btn { margin-left: 0; }
+.td-act .btn:first-of-type { margin-left: auto; }
+.bonuses { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; padding-bottom: 12px; overflow: auto; }
+.bonuses section { min-width: 0; }
+.bonuses h4 { margin: 4px 0 6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--accent); text-transform: uppercase; font-weight: normal; }
+.bonuses ul { list-style: none; margin: 0; padding: 0; }
+.bonuses li { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; padding: 5px 0; border-bottom: 1px solid rgba(120, 170, 180, 0.12); font-size: 13px; }
+.bonuses li b { text-align: right; font-family: var(--font-mono); font-size: 12px; font-weight: normal; color: #f0ead8; }
+.bonuses li b.dim, .bonuses li.dim { color: var(--text-dim); }
+.bonuses li small { grid-column: 1 / -1; font-family: var(--font-mono); font-size: 10px; color: var(--green); }
+@media (max-width: 760px) {
+  .slots { grid-template-columns: 1fr; }
+  .bonuses { grid-template-columns: 1fr; }
+  .r-queue { flex-direction: column; gap: 4px; }
+  .cb-badge { top: 2px; right: 2px; }
+}
+@media (max-width: 760px) {
+  /* Keep the tree visible: slots side by side, queue in one swipeable row. */
+  .win-research .slots { grid-template-columns: 1fr 1fr; }
+  .win-research .slot { padding: 5px 8px; }
+  .r-queue ol { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .r-queue ol::-webkit-scrollbar { display: none; }
+  .q-item { flex: none; }
+  .r-queue .q-empty { font-size: 11px; }
+}

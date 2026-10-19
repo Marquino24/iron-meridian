@@ -299,6 +299,22 @@ const windows = new WindowManager(state, [
   new ResearchWindow(state, sim, { notice }),
 ]);
 
+// Research button badge: idle slots while there's something you could research.
+let badgeTimer = 0;
+function updateBadges(dt) {
+  badgeTimer += dt;
+  if (badgeTimer < 0.5) return;
+  badgeTimer = 0;
+  const me = state.playerNationId;
+  if (state.phase !== 'playing' || me < 0) { windows.setBadge('research', ''); return; }
+  const idle = research.idle(me);
+  const any = research.tree.some((t) => research.status(me, t.id) === 'available');
+  windows.setBadge('research', idle && any ? String(idle) : '', `${idle} research slot${idle === 1 ? '' : 's'} idle`);
+}
+
+// A small toast when research completes (the feed keeps the details).
+state.events.on('feed', (e) => { if (e.toast) notice(e.toast); });
+
 const input = new InputController(canvas, camera, {
   onHover(sx, sy) {
     const w = camera.screenToWorld(sx, sy);
@@ -501,6 +517,7 @@ function frame(now) {
   if (gameHours > 0 && armies.list.size) renderer.requestRender(); // armies move, battles pulse
   feed.update(dt);
   windows.update(dt);
+  updateBadges(dt);
 
   renderer.render();
   adaptQuality(dt);

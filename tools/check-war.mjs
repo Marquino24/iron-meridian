@@ -210,7 +210,8 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
     const bad = tree.filter((t) => !t.name || !t.effects.length || t.req.some((q) => !ids.has(q) || tierOf[q] >= t.tier));
     check(tree.length >= 25 && tree.length <= 35 && !bad.length, `${era.id}: ${tree.length} techs, requirements point to lower tiers${bad.length ? ` (bad: ${bad.map((t) => t.id)})` : ''}`);
     check(new Set(tree.map((t) => t.name)).size === tree.length, `${era.id}: unique names`);
-    check(tree.some((t) => t.branch === 'eco' && t.effects.some((e) => e.slots)), `${era.id}: an Economy tech adds a research slot`);
+    const slotTiers = tree.filter((t) => t.effects.some((e) => e.slots)).map((t) => `${t.branch}${t.tier}`).join();
+    check(slotTiers === 'eco1,eco3', `${era.id}: research slots from Economy tier I and tier III (${slotTiers})`);
   }
   const g = setup('ww2', 'German Reich');
   const { research: R, armies, economy, state, player, buildings: B } = g;
@@ -225,9 +226,13 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   const inf = field.units.find((u) => u.type === 'infantry');
   inf.hp = 50;
   g.step(R.byId.m1.hours + 2);
-  check(R.status(player, 'm1') === 'done' && R.unitLevel(player, 'inf') === 2, 'research completes: infantry level 2');
-  check(g.log.some((e) => e.kind === 'research'), `feed: "${g.log.find((e) => e.kind === 'research')?.text}"`);
+  check(R.status(player, 'm1') === 'done' && R.unitLevel(player, 'inf') === 2, `research completes after ${R.byId.m1.hours}h: infantry level 2`);
+  const fe = g.log.find((e) => e.kind === 'research');
+  check(!!fe && !!fe.toast, `feed + toast: "${fe?.text}"`);
   check(inf.lvl === 2 && Math.abs(inf.hp - 50 * 1.15) < 0.01, `infantry resting in Berlin refits to level 2 (HP 50 → ${inf.hp.toFixed(1)})`);
+  const refitFeed = g.log.find((e) => e.kind === 'refit');
+  check(!!refitFeed && /money/.test(refitFeed.text), `refit is paid: "${refitFeed?.text}"`);
+  check(JSON.stringify(armies.refitCost({ type: 'infantry', lvl: 1 }, 2)) === JSON.stringify({ money: 16, steel: 2 }), `refit cost per infantry: ${JSON.stringify(armies.refitCost({ type: 'infantry', lvl: 1 }, 2))}`);
   const awayInf = away?.units.find((u) => u.type === 'infantry');
   if (awayInf) check((awayInf.lvl ?? 1) === 1 && armies.outdated(away).length > 0, 'army away from a barracks city keeps level 1 until it refits');
   check(armies.unitType(inf).attack > armies.roster.byKey.infantry.attack, `level 2 stats: attack ${armies.roster.byKey.infantry.attack} → ${armies.unitType(inf).attack}`);
@@ -236,13 +241,32 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   check(/Needs Armoured Divisions/.test(B.check(berlin, 'barracks', { ignoreCost: true }).reason ?? ''), `Barracks III locked: ${B.check(berlin, 'barracks', { ignoreCost: true }).reason}`);
   R.grant(player, 'm2');
   check(B.check(berlin, 'barracks', { ignoreCost: true }).ok, 'Barracks III after research');
-  // Production, slots, movement.
+  // Production, slots, queue.
   const money = economy.income(player).perDay.money;
-  R.grant(player, 'e2');
-  check(Math.abs(economy.income(player).perDay.money / money - 1.1) < 0.001, `+10% money (${Math.round(money)} → ${Math.round(economy.income(player).perDay.money)})`);
   R.grant(player, 'e4');
-  check(R.slots(player) === 2, 'Economy tech unlocks a 2nd research slot');
+  check(Math.abs(economy.income(player).perDay.money / money - 1.1) < 0.001, `+10% money (${Math.round(money)} → ${Math.round(economy.income(player).perDay.money)})`);
+  const oil = economy.income(player).perDay.oil;
+  R.grant(player, 'e6');
+  check(economy.income(player).perDay.oil > oil + 5, `Synthetic Fuel: oil ${Math.round(oil)} → ${Math.round(economy.income(player).perDay.oil)}/day from steel`);
+  check(R.slots(player) === 1, 'one slot to start');
+  R.grant(player, 'e2');
+  check(R.slots(player) === 2, 'tier I Economy tech: 2nd research slot');
   check(R.start(player, 'm3').ok && R.start(player, 'e1').ok, 'two techs at once');
+  check(R.enqueue(player, 'e5').ok, 'queue a tech whose requirement is researching');
+  check(R.enqueue(player, 'e8').ok, 'queue a tech whose requirement is queued');
+  check(!!R.enqueue(player, 'm10').error, `refuse an unreachable tech: ${R.canQueue(player, 'm10').reason ?? ''}`);
+  for (const id of ['i1', 'i2', 'i3']) R.enqueue(player, id);
+  check(R.of(player).queue.length === 5 && /full/.test(R.enqueue(player, 'm4').error ?? ''), `queue holds 5 (${R.of(player).queue} · active ${R.of(player).active.map((a) => a.id)} · m2: ${R.enqueue(player, 'm4').error})`);
+  for (const k of economy.keys) economy.get(player)[k] += 1e5;
+  g.step(R.byId.e1.hours + 2);
+  check(R.status(player, 'e5') === 'active' && R.of(player).active.length === 2, `queued tech started by itself when a slot freed (${R.of(player).active.map((a) => a.id)})`);
+  R.dequeue(player, 'e8');
+  R.grant(player, 'e7');
+  check(R.slots(player) === 3, 'tier III Economy tech: 3rd research slot');
+  check(R.bonuses(player).some((b) => b.key === 'slots' && b.value === 2) && R.bonuses(player).some((b) => b.key === 'unit:inf'), 'bonuses summary lists slots and unit levels');
+  const c0 = B.costOf('farm', 1, player).money;
+  R.grant(player, 'i4'); R.grant(player, 'i8');
+  check(B.costOf('farm', 1, player).money < c0, `construction 20% cheaper: farm ${c0} → ${B.costOf('farm', 1, player).money}`);
   const nb = state.getProvince(berlin).neighbors.find((n) => state.provinces[n].owner === player);
   const h0 = armies.hopHours(field, berlin, nb);
   R.grant(player, 'i1');
@@ -250,8 +274,37 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   const t0 = armies.recruitCheck(berlin, 'infantry', { ignoreCost: true }).hours;
   R.grant(player, 'i5');
   check(armies.recruitCheck(berlin, 'infantry', { ignoreCost: true }).hours < t0, 'faster recruitment');
-  R.cancel(player, 'e1');
-  check(R.status(player, 'e1') === 'available', 'cancel research');
+  const act = R.of(player).active[0]?.id;
+  if (act) { R.cancel(player, act); check(R.status(player, act) === 'available', 'cancel research'); }
+}
+
+// --- 3c. Research balance: a medium nation researching the whole tree ---------------
+// "Medium" = the major nation with the median money income in that era. It spends
+// half its income on other things (army, buildings) and keeps the research queue full.
+{
+  console.log('3c. Research balance (whole tree at 1×: 1 game hour = 1 real second)');
+  // Medium nation per era (checked), plus a small one for reference (not checked).
+  const runs = ERAS.filter((e) => !e.fictional).map((e) => [e, null]).concat([[getEra('ww2'), 'German Reich']]);
+  for (const [era, fixed] of runs) {
+    const g0 = setup(era.id, null);
+    const majors = g0.map.nations.filter((n) => n.major && g0.state.provincesOf(n.id).length)
+      .map((n) => ({ n, money: g0.economy.income(n.id).perDay.money })).sort((a, b) => a.money - b.money);
+    const pick = fixed ? majors.find((m) => m.n.name === fixed) : majors[Math.floor(majors.length / 2)];
+    const g = setup(era.id, pick.n.name);
+    const { research: R, economy, player } = g;
+    let hours = 0;
+    while (hours < 40000 && R.of(player).done.size < R.tree.length) {
+      for (const t of [...R.tree].sort((a, b) => a.tier - b.tier)) if (R.canQueue(player, t.id).ok) R.enqueue(player, t.id);
+      R.autoStart(player);
+      for (let h = 0; h < 24; h++) { economy.update(g.state, 1); R.update(g.state, 1); }
+      const s = economy.get(player), inc = economy.income(player).perDay;
+      for (const k of economy.keys) s[k] = Math.max(0, s[k] - inc[k] * 0.5);
+      hours += 24;
+    }
+    const done = R.of(player).done.size === R.tree.length;
+    console.log(`   ${era.id.padEnd(9)} ${pick.n.shortName.padEnd(16)} ${String(Math.round(pick.money)).padStart(5)} money/day → ${done ? `whole tree in ${(hours / 3600).toFixed(1)} real hours` : `unfinished after ${(hours / 3600).toFixed(1)} h (${R.of(player).done.size}/${R.tree.length})`} · tier I ${(R.byId.m1.hours / 60).toFixed(1)} min, II ${(R.byId.m4.hours / 60).toFixed(0)} min, III ${(R.byId.m8.hours / 60).toFixed(0)} min`);
+    if (!fixed) check(done && hours / 3600 >= 1.5 && hours / 3600 <= 3.5, `${era.id}: whole tree in 1.5–3.5 real hours`);
+  }
 }
 
 // --- 4. Every era -------------------------------------------------------------------
