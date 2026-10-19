@@ -36,6 +36,8 @@ import { ArmyWindow } from './win-army.js';
 import { ProductionWindow, BuildingsWindow } from './win-production.js';
 import { Research } from './research.js';
 import { ResearchWindow } from './win-research.js';
+import { AI } from './ai.js';
+import { DiplomacyUI } from './diplomacy-ui.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
@@ -54,10 +56,12 @@ research.buildings = buildings;
 armies.research = research;
 buildings.research = research;
 const sim = { economy, buildings, armies, combat, research };
+const ai = new AI(state, sim);
+sim.ai = ai;
 renderer.sim = sim;
 
 /** Simulation systems, run in order each frame with the game hours elapsed. */
-const systems = [economy, research, buildings, armies, combat];
+const systems = [economy, research, buildings, armies, combat, ai];
 
 // --- Camera framing ---------------------------------------------------------
 
@@ -216,6 +220,7 @@ const ui = new UI(state, {
     buildings.start();
     economy.start();
     armies.spawnInitial(id);
+    ai.start(id, settings.difficulty);
     state.setFocusedNation(-1);
     screens.gameInProgress = true;
     screens.show('game');
@@ -314,6 +319,31 @@ function updateBadges(dt) {
 
 // A small toast when research completes (the feed keeps the details).
 state.events.on('feed', (e) => { if (e.toast) notice(e.toast); });
+
+new DiplomacyUI(state, sim, { focusNode, notice });
+
+// Difficulty (nation screen) and the war-lines toggle (map style bar).
+function renderDifficulty() {
+  for (const b of document.querySelectorAll('#difficulty [data-difficulty]')) {
+    const on = b.dataset.difficulty === settings.difficulty;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+}
+document.getElementById('difficulty').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-difficulty]');
+  if (b) { settings.set('difficulty', b.dataset.difficulty); renderDifficulty(); }
+});
+renderDifficulty();
+const warLinesBtn = document.getElementById('btn-war-lines');
+function renderWarLines() {
+  renderer.showWarLines = settings.values.warLines !== false;
+  warLinesBtn.classList.toggle('active', renderer.showWarLines);
+  warLinesBtn.setAttribute('aria-pressed', String(renderer.showWarLines));
+  renderer.requestRender();
+}
+warLinesBtn.addEventListener('click', () => { settings.set('warLines', !renderer.showWarLines); renderWarLines(); });
+renderWarLines();
 
 const input = new InputController(canvas, camera, {
   onHover(sx, sy) {
@@ -504,6 +534,7 @@ launcher.run().then(() => {
 // --- Main loop ---
 
 let last = performance.now();
+let lastSimDraw = 0;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -512,9 +543,12 @@ function frame(now) {
   ambientPan(dt);
   if (camera.update(dt)) renderer.requestRender();
 
+  ai.adaptBudget(dt);
   const gameHours = state.tick(dt);
   for (const system of systems) system.update(state, gameHours);
-  if (gameHours > 0 && armies.list.size) renderer.requestRender(); // armies move, battles pulse
+  // Armies move and battles pulse: redraw for that at most 30 times a second
+  // (camera moves still redraw every frame).
+  if (gameHours > 0 && armies.list.size && now - lastSimDraw > 32) { lastSimDraw = now; renderer.requestRender(); }
   feed.update(dt);
   windows.update(dt);
   updateBadges(dt);
@@ -527,4 +561,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai };

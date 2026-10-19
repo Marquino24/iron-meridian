@@ -1547,3 +1547,28 @@ button.slot { text-align: left; font-family: var(--font-ui); color: var(--text);
   .q-item { flex: none; }
   .r-queue .q-empty { font-size: 11px; }
 }
+
+/* ---------- Step 5: AI, diplomacy ---------- */
+.difficulty-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 8px; }
+.difficulty-row .section-title { margin: 0; }
+.seg-btns { display: flex; border: 1px solid var(--line-strong); }
+.seg-btns button { padding: 6px 12px; background: transparent; border: 0; border-left: 1px solid var(--line); color: var(--text-dim); font-family: var(--font-ui); font-size: 13px; font-weight: 700; letter-spacing: 0.05em; cursor: pointer; }
+.seg-btns button:first-child { border-left: 0; }
+.seg-btns button.active { background: var(--accent); color: #1a1206; }
+.style-toggle .war-lines-btn { color: var(--text-dim); }
+.style-toggle .war-lines-btn.active { color: #ffb0a5; background: rgba(160, 24, 16, 0.45); }
+.war-state.truce { color: var(--cyan); border-color: rgba(111, 211, 224, 0.5); }
+.nation-card-rel { display: flex; flex-wrap: wrap; gap: 4px; }
+.diplo .diplo-card { width: min(460px, 100%); text-align: center; border-width: 2px; }
+.diplo .diplo-card.war { border-color: var(--red); box-shadow: 0 0 0 1px rgba(255, 107, 91, 0.4), 0 20px 70px rgba(160, 24, 16, 0.5); }
+.diplo .diplo-card.peace { border-color: var(--cyan); }
+.diplo-flag { width: 96px; height: 64px; margin: 4px auto 10px; display: block; border: 1px solid var(--line-strong); }
+.alert-kicker { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.3em; color: var(--red); animation: badge-pulse 1.2s ease-in-out infinite; }
+.alert-kicker.peace { color: var(--cyan); animation: none; }
+.diplo h2 { margin: 6px 0 10px; font-size: 26px; color: #f0ead8; line-height: 1.15; }
+.diplo p { margin: 0 0 12px; font-size: 15px; line-height: 1.45; color: var(--text); }
+.diplo-stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; margin: 0 auto 14px; max-width: 280px; font-family: var(--font-mono); font-size: 13px; text-align: left; }
+.diplo-stats dt { color: var(--text-dim); }
+.diplo-stats dd { margin: 0; text-align: right; color: #f0ead8; }
+.diplo .btn-row { justify-content: center; }
+.diplo .btn.primary { width: auto; min-width: 150px; }

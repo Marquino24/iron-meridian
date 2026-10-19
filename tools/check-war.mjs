@@ -222,14 +222,20 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   check(R.start(player, 'm1').ok && Math.abs(m0 - economy.get(player).money - R.byId.m1.cost.money) < 1e-6, 'start research, cost paid');
   check(/slot busy/.test(R.start(player, 'm3').error ?? ''), 'one slot to start');
   const field = [...armies.list.values()].find((a) => a.nation === player && !a.garrison && a.kind === 'land' && a.node === berlin);
-  const away = [...armies.list.values()].find((a) => a.nation === player && !a.garrison && a.kind === 'land' && a.node !== berlin);
+  // An army away from any barracks city (move one onto plain land if needed).
+  let away = [...armies.list.values()].find((a) => a.nation === player && a.kind === 'land' && a.node !== berlin && !armies.refitSite(a));
+  if (!away) {
+    away = [...armies.list.values()].find((a) => a.nation === player && !a.garrison && a.kind === 'land' && a.node !== berlin);
+    const plain = state.provincesOf(player).find((p) => !p.isCity);
+    armies.setNode(away, plain.id);
+  }
   const inf = field.units.find((u) => u.type === 'infantry');
   inf.hp = 50;
   g.step(R.byId.m1.hours + 2);
   check(R.status(player, 'm1') === 'done' && R.unitLevel(player, 'inf') === 2, `research completes after ${R.byId.m1.hours}h: infantry level 2`);
   const fe = g.log.find((e) => e.kind === 'research');
   check(!!fe && !!fe.toast, `feed + toast: "${fe?.text}"`);
-  check(inf.lvl === 2 && Math.abs(inf.hp - 50 * 1.15) < 0.01, `infantry resting in Berlin refits to level 2 (HP 50 → ${inf.hp.toFixed(1)})`);
+  check(inf.lvl === 2 && armies.unitType(inf).hp === 115 && inf.hp > 57, `infantry resting in Berlin refits to level 2 and heals (HP 50 → ${inf.hp.toFixed(1)} of ${armies.unitType(inf).hp})`);
   const refitFeed = g.log.find((e) => e.kind === 'refit');
   check(!!refitFeed && /money/.test(refitFeed.text), `refit is paid: "${refitFeed?.text}"`);
   check(JSON.stringify(armies.refitCost({ type: 'infantry', lvl: 1 }, 2)) === JSON.stringify({ money: 16, steel: 2 }), `refit cost per infantry: ${JSON.stringify(armies.refitCost({ type: 'infantry', lvl: 1 }, 2))}`);

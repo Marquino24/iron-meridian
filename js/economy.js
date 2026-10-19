@@ -8,6 +8,7 @@
  */
 
 import { resourceSet, baseYield, START_BONUS, assignDeposits } from './resources.js';
+import { assignDevelopment } from './development.js';
 
 export const CAPITAL_LOST_FACTOR = 0.5;
 
@@ -18,12 +19,18 @@ export class Economy {
     this.state = state;
     this.buildings = null; // set by Buildings (building yields and roads)
     this.research = null;  // set by Research (production bonuses)
+    this.bonus = null;     // (nation) → multiplier, set by the AI (difficulty)
     this.set = resourceSet('modern');
     this.stock = [];
     this.tally = [];
     state.events.on('map:loaded', () => this.reset());
-    state.events.on('province:owner', () => this.recount());
-    state.events.on('research', (e) => { if (e.done) this.recount(); });
+    // Recounting walks every province, so changes only mark it stale; it
+    // recounts once, the next time income is read.
+    this.dirty = true;
+    state.events.on('province:owner', (e) => this.onOwner(e));
+    // Multiplied totals per nation, cached until something changes them.
+    this.totalsCache = new Map();
+    state.events.on('research', (e) => { if (e.done) this.totalsCache.delete(e.nation); });
   }
 
   get keys() { return this.set.keys; }
@@ -31,7 +38,7 @@ export class Economy {
 
   reset() {
     const map = this.state.map;
-    if (map && !map.depositsAssigned) { assignDeposits(map); map.depositsAssigned = true; }
+    if (map && !map.depositsAssigned) { assignDeposits(map); assignDevelopment(map); map.depositsAssigned = true; }
     this.set = resourceSet(this.state.map?.era?.id);
     this.stock = this.state.nations.map(() => zero(this.keys));
     this.recount();
@@ -59,43 +66,93 @@ export class Economy {
     return { base, built, mult, total };
   }
 
+  invalidate() { this.dirty = true; this.totalsCache?.clear(); }
+
+  /**
+   * Full recount: every province's yield, cached, summed per nation. Later
+   * changes are incremental (owner changes move a province's cached yield,
+   * a finished building refreshes one province); research and difficulty
+   * multipliers are applied when income is read.
+   */
   recount() {
+    this.dirty = false;
+    this.totalsCache.clear();
     const keys = this.keys;
-    const tally = this.state.nations.map(() => ({ land: 0, cities: 0, capitals: 0, base: zero(keys), built: zero(keys), roads: zero(keys), total: zero(keys) }));
+    this.pyield = [];
+    this.tally = this.state.nations.map(() => ({ land: 0, cities: 0, capitals: 0, base: zero(keys), built: zero(keys), roads: zero(keys), raw: zero(keys) }));
     for (const p of this.state.provinces) {
-      if (p.owner < 0) continue;
-      const t = tally[p.owner];
-      if (!t) continue;
-      if (p.isCapital) t.capitals++; else if (p.isCity) t.cities++; else t.land++;
       const y = this.provinceYield(p);
+      this.pyield[p.id] = y;
+      if (p.owner >= 0) this.addYield(p, y, p.owner, 1);
+    }
+  }
+
+  addYield(p, y, nation, sign) {
+    const t = this.tally[nation];
+    if (!t) return;
+    if (p.isCapital) t.capitals += sign; else if (p.isCity) t.cities += sign; else t.land += sign;
+    for (const k of this.keys) {
+      const b = y.base[k] ?? 0, e = y.built[k] ?? 0;
+      t.base[k] += b * sign;
+      t.built[k] += e * sign;
+      t.roads[k] += (b + e) * (y.mult - 1) * sign;
+      t.raw[k] += y.total[k] * sign;
+    }
+  }
+
+  onOwner({ provinceId, from, to }) {
+    if (this.dirty || !this.pyield) return;
+    const p = this.state.getProvince(provinceId), y = this.pyield[provinceId];
+    if (!p || !y) { this.dirty = true; return; }
+    if (from >= 0) this.addYield(p, y, from, -1);
+    if (to >= 0) this.addYield(p, y, to, 1);
+    this.totalsCache.delete(from);
+    this.totalsCache.delete(to);
+  }
+
+  /** A building finished: recompute one province. */
+  refreshProvince(pid) {
+    if (this.dirty || !this.pyield) return;
+    const p = this.state.getProvince(pid);
+    if (!p) return;
+    if (p.owner >= 0) this.addYield(p, this.pyield[pid], p.owner, -1);
+    this.pyield[pid] = this.provinceYield(p);
+    if (p.owner >= 0) this.addYield(p, this.pyield[pid], p.owner, 1);
+    this.totalsCache.delete(p.owner);
+  }
+
+  /** Daily totals for a nation with multipliers applied: { total, tech }. */
+  totals(nationId) {
+    const hit = this.totalsCache.get(nationId);
+    if (hit) return hit;
+    const out = this.computeTotals(nationId);
+    this.totalsCache.set(nationId, out);
+    return out;
+  }
+
+  computeTotals(nationId) {
+    const keys = this.keys;
+    const t = this.tally[nationId];
+    const total = zero(keys), tech = zero(keys);
+    if (!t) return { total, tech };
+    const f = this.bonus ? this.bonus(nationId) : 1;
+    for (const k of keys) total[k] = t.raw[k] * f;
+    if (this.research) {
       for (const k of keys) {
-        const b = y.base[k] ?? 0, e = y.built[k] ?? 0;
-        t.base[k] += b;
-        t.built[k] += e;
-        t.roads[k] += (b + e) * (y.mult - 1);
-        t.total[k] += y.total[k];
+        const m = this.research.prodMult(nationId, k);
+        if (m === 1) continue;
+        tech[k] = total[k] * (m - 1);
+        total[k] *= m;
+      }
+      // Synthetic production (e.g. fuel from steel).
+      for (const e of this.research.effects(nationId).synth) {
+        if (!keys.includes(e.to) || !keys.includes(e.synth)) continue;
+        const extra = total[e.synth] * e.pct / 100;
+        tech[e.to] += extra;
+        total[e.to] += extra;
       }
     }
-    // Research bonuses multiply each nation's whole output.
-    if (this.research) {
-      tally.forEach((t, n) => {
-        t.tech = zero(keys);
-        for (const k of keys) {
-          const m = this.research.prodMult(n, k);
-          if (m === 1) continue;
-          t.tech[k] = t.total[k] * (m - 1);
-          t.total[k] *= m;
-        }
-        // Synthetic production (e.g. fuel from steel).
-        for (const e of this.research.effects(n).synth) {
-          if (!keys.includes(e.to) || !keys.includes(e.synth)) continue;
-          const extra = t.total[e.synth] * e.pct / 100;
-          t.tech[e.to] += extra;
-          t.total[e.to] += extra;
-        }
-      });
-    }
-    this.tally = tally;
+    return { total, tech };
   }
 
   capitalLost(nationId) {
@@ -106,11 +163,13 @@ export class Economy {
 
   /** Daily income with its breakdown (for the top-bar tooltip). */
   income(nationId) {
-    const t = this.tally[nationId] ?? { land: 0, cities: 0, capitals: 0, base: zero(this.keys), built: zero(this.keys), roads: zero(this.keys), total: zero(this.keys) };
+    if (this.dirty) this.recount();
+    const t = this.tally[nationId] ?? { land: 0, cities: 0, capitals: 0, base: zero(this.keys), built: zero(this.keys), roads: zero(this.keys), raw: zero(this.keys) };
     const factor = this.capitalLost(nationId) ? CAPITAL_LOST_FACTOR : 1;
+    const { total, tech } = this.totals(nationId);
     const perDay = {};
-    for (const k of this.keys) perDay[k] = t.total[k] * factor;
-    return { ...t, factor, perDay };
+    for (const k of this.keys) perDay[k] = total[k] * factor;
+    return { ...t, total, tech, factor, perDay };
   }
 
   get(nationId) { return this.stock[nationId] ?? zero(this.keys); }
@@ -139,13 +198,15 @@ export class Economy {
 
   update(state, hours) {
     if (!hours || state.phase !== 'playing') return;
+    if (this.dirty) this.recount();
     const d = hours / 24;
     for (const n of state.nations) {
       const s = this.stock[n.id];
       const t = this.tally[n.id];
       if (!s || !t || !(t.land + t.cities + t.capitals)) continue;
       const k = d * (this.capitalLost(n.id) ? CAPITAL_LOST_FACTOR : 1);
-      for (const key of this.keys) s[key] += t.total[key] * k;
+      const { total } = this.totals(n.id);
+      for (const key of this.keys) s[key] += total[key] * k;
     }
   }
 }

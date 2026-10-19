@@ -36,6 +36,8 @@ await page.fill('#nation-search', NATION);
 await page.click('.nation-row');
 await page.click('#btn-deploy');
 await page.waitForFunction(() => document.body.classList.contains('in-game'));
+// Computer nations stay idle here (tools/e2e/ai.test.mjs covers them), so no AI war alert interrupts the test.
+await page.evaluate(() => { window.ironMeridian.ai.enabled = false; });
 await page.waitForTimeout(1500);
 await page.click('#province-panel [data-action="close"]');
 await IM(() => window.ironMeridian.state.setSpeed(0));

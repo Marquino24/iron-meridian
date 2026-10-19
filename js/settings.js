@@ -23,7 +23,8 @@ export function autoQuality() {
   return { phone: 'low', tablet: 'medium', desktop: 'high' }[deviceClass()];
 }
 
-export const DEFAULTS = () => ({ mapStyle: 'political', quality: null, uiScale: 100, volume: 70 });
+export const DIFFICULTIES = ['easy', 'normal', 'hard'];
+export const DEFAULTS = () => ({ mapStyle: 'political', quality: null, uiScale: 100, volume: 70, difficulty: 'normal', warLines: true });
 
 export class Settings {
   constructor() {
@@ -34,9 +35,11 @@ export class Settings {
     } catch { /* storage unavailable: use defaults */ }
     if (!STYLES.includes(this.values.mapStyle)) this.values.mapStyle = 'political';
     if (!QUALITIES.includes(this.values.quality)) this.values.quality = null;
+    if (!DIFFICULTIES.includes(this.values.difficulty)) this.values.difficulty = 'normal';
   }
 
   get mapStyle() { return this.values.mapStyle; }
+  get difficulty() { return this.values.difficulty; }
   /** Effective quality: the saved choice, or the device default. */
   get quality() { return this.values.quality ?? autoQuality(); }
   get qualityIsAuto() { return this.values.quality == null; }

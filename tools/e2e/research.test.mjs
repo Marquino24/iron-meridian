@@ -35,6 +35,8 @@ await page.fill('#nation-search', NATION);
 await page.click('.nation-row');
 await page.click('#btn-deploy');
 await page.waitForFunction(() => document.body.classList.contains('in-game'));
+// Computer nations stay idle here (tools/e2e/ai.test.mjs covers them), so no AI war alert interrupts the test.
+await page.evaluate(() => { window.ironMeridian.ai.enabled = false; });
 await page.waitForTimeout(1500);
 await page.click('#province-panel [data-action="close"]');
 await IM(() => window.ironMeridian.state.setSpeed(0));
@@ -87,7 +89,7 @@ await page.waitForTimeout(400);
 check(await IM(() => window.ironMeridian.sim.research.status(window.ironMeridian.state.playerNationId, 'm3')) === 'active', 'queued tech started by itself');
 check(await page.locator('.tech[data-tech="m1"].st-done').count() === 1, 'card shows done');
 check(await page.locator('.tech[data-tech="m5"].st-available').count() === 1, 'its follow-up became available');
-check((await page.textContent('#feed')).includes('Research complete'), 'feed: research complete');
+check(await IM(() => window.ironMeridian.feed.items.some((i) => /Research complete/.test(i.text))), 'feed: research complete');
 // Give a few more so the tree shows every state, then screenshot.
 await IM(() => {
   const { sim, state } = window.ironMeridian;

@@ -559,6 +559,22 @@ async function buildEra(era, places) {
     }
   }
 
+  // Curated key cities of the major powers (era-config majorCities): their real
+  // industrial centres, which the population-ranked pick above misses.
+  if (era.majorCities) {
+    stats.curatedCities = 0;
+    for (const [ci, c] of countries.entries()) {
+      for (const [name, lat, lon] of era.majorCities[c.key] ?? []) {
+        const pt = project(lon, lat);
+        const s = snapToLand(pt.x, pt.y, ci);
+        if (!s || s.country !== ci) continue;
+        if (c.cities.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < CFG.cityMergeDist)) continue;
+        c.cities.push({ name, x: s.x, y: s.y, capital: false, priority: 2 });
+        stats.curatedCities++;
+      }
+    }
+  }
+
   // --- Province counts per country ------------------------------------------------
   // Unclaimed land (peoples/cultures) gets fewer, larger provinces so states get the detail.
   const weight = (c) => Math.pow(Math.max(c.area, 1), CFG.sizeExponent) * (c.unclaimed ? 0.3 : 1);

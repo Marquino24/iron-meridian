@@ -25,6 +25,7 @@ export const DAMAGE_BASE = 8;
 export const RETREAT_BELOW = 0.2;
 export const OCCUPY_HOURS = { land: 6, city: 12, capital: 24 };
 const HISTORY = 60;
+export const TRUCE_DAYS = 90;
 
 const warKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
@@ -39,6 +40,8 @@ export class Combat {
 
   reset() {
     this.wars = new Set();
+    this.warInfo = new Map();     // warKey → { a, b, start, captured: [{ pid, from, to }], unitsLost: { [nation]: n } }
+    this.truces = new Map();      // warKey → game time until which neither may declare war
     this.battles = new Map();     // id → battle (active and finished)
     this.active = new Map();      // node → battle
     this.history = [];            // finished battle ids, newest first
@@ -50,14 +53,56 @@ export class Combat {
 
   atWar(a, b) { return a !== b && a >= 0 && b >= 0 && this.wars.has(warKey(a, b)); }
 
+  /** Game time (ms) a truce between two nations lasts until, or null. (Times before 1970 are negative.) */
+  truceUntil(a, b) { const t = this.truces.get(warKey(a, b)); return t != null && t > this.state.clock.time ? t : null; }
+
   declareWar(a, b) {
-    if (a === b || a < 0 || b < 0 || this.atWar(a, b)) return false;
+    if (a === b || a < 0 || b < 0 || this.atWar(a, b) || this.truceUntil(a, b) != null) return false;
     this.wars.add(warKey(a, b));
+    this.warInfo.set(warKey(a, b), { a, b, start: this.state.clock.time, captured: [], unitsLost: { [a]: 0, [b]: 0 } });
     const na = this.state.getNation(a), nb = this.state.getNation(b);
     this.state.events.emit('war', { a, b });
-    this.state.events.emit('feed', { kind: 'war', tone: 'war', text: `${na.name} declared war on ${nb.name}`, nation: b });
+    const me = this.state.playerNationId;
+    this.state.events.emit('feed', { kind: 'war', tone: 'war', text: `${na.name} declared war on ${nb.name}`, nation: b, involvesPlayer: a === me || b === me });
     // Armies already standing together (e.g. a fleet sharing a sea zone) fight at once.
     for (const army of this.armies.list.values()) if (!army.seg && (army.nation === a || army.nation === b)) this.checkContact(army);
+    return true;
+  }
+
+  /**
+   * White peace: the war ends, provinces taken in it go back to their
+   * pre-war owner, armies on the other side's land withdraw home, and a
+   * 90-day truce follows.
+   */
+  makePeace(a, b) {
+    const k = warKey(a, b);
+    if (!this.wars.has(k)) return false;
+    const info = this.warInfo.get(k);
+    this.wars.delete(k);
+    this.warInfo.delete(k);
+    this.truces.set(k, this.state.clock.time + TRUCE_DAYS * 864e5);
+    // Battles between the two stop.
+    for (const bt of [...this.active.values()]) {
+      const ns = bt.sides.map((s) => s.nation);
+      if (ns.includes(a) && ns.includes(b)) {
+        bt.done = true; bt.winner = -1; bt.end = this.state.clock.time;
+        this.active.delete(bt.node);
+        this.history.unshift(bt.id);
+      }
+    }
+    for (const [pid, o] of [...this.occupations]) if (o.nation === a || o.nation === b) this.occupations.delete(pid);
+    // Status quo ante.
+    for (const c of [...(info?.captured ?? [])].reverse()) {
+      const p = this.state.getProvince(c.pid);
+      if (p && p.owner === c.to) this.state.setOwner(c.pid, c.from);
+    }
+    this.armies.withdraw(a, b);
+    this.armies.withdraw(b, a);
+    const na = this.state.getNation(a), nb = this.state.getNation(b);
+    const me = this.state.playerNationId;
+    this.state.events.emit('war', { a, b, peace: true });
+    this.state.events.emit('feed', { kind: 'peace', tone: 'good', text: `${na.name} and ${nb.name} made peace`, nation: b, involvesPlayer: a === me || b === me });
+    this.armies.changed();
     return true;
   }
 
@@ -198,6 +243,8 @@ export class Combat {
         const dead = army.units.filter((u) => u.hp <= 0);
         if (!dead.length) continue;
         for (const u of dead) s.lost[u.type] = (s.lost[u.type] ?? 0) + 1;
+        const info = this.warInfo.get(warKey(b.sides[0].nation, b.sides[1].nation));
+        if (info) info.unitsLost[s.nation] = (info.unitsLost[s.nation] ?? 0) + dead.length;
         army.units = army.units.filter((u) => u.hp > 0);
         if (!army.units.length) { s.armies.delete(army); A.remove(army); }
       }
@@ -288,6 +335,7 @@ export class Combat {
     const from = p.owner;
     this.occupations.delete(p.id);
     st.setOwner(p.id, nation);
+    if (from >= 0) this.warInfo.get(warKey(from, nation))?.captured.push({ pid: p.id, from, to: nation });
     const player = st.playerNationId;
     const winner = st.getNation(nation), loser = st.getNation(from);
     if (nation === player || from === player) {
@@ -305,7 +353,7 @@ export class Combat {
     // A nation with no land left is gone, along with whatever it had in the field.
     if (loser && !st.provinces.some((q) => q.owner === from)) {
       for (const a of [...this.armies.list.values()]) if (a.nation === from) this.armies.remove(a);
-      for (const k of [...this.wars]) if (k.split(':').map(Number).includes(from)) this.wars.delete(k);
+      for (const k of [...this.wars]) if (k.split(':').map(Number).includes(from)) { this.wars.delete(k); this.warInfo.delete(k); }
       st.events.emit('feed', { kind: 'annexed', tone: nation === player ? 'good' : 'bad', node: p.id, text: `${loser.name} has been conquered` });
       st.events.emit('war', { a: from, b: nation });
     }

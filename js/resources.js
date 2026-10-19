@@ -14,6 +14,8 @@
  *   steel        2 × share, +4 in mountains (ore)
  *   oil          8 on an oil deposit (industrial eras)
  *   electronics  3 × (share − 1): cities only (Cold War and later)
+ * Money, steel and electronics are multiplied by the province's devEco,
+ * food and manpower by devPop (development.js).
  */
 
 import { project } from './projection.js';
@@ -43,14 +45,16 @@ const FERTILITY = { plains: 1.5, forest: 1, mountains: 0.5, urban: 0.6 };
 /** Base daily yield of a province before buildings and multipliers. */
 export function baseYield(p, set) {
   const share = shareOf(p);
+  // Development (development.js): real-world weight of the province's region.
+  const eco = p.devEco ?? 1, pop = p.devPop ?? 1;
   const y = {
-    money: 10 * share,
-    manpower: 120 * share,
-    food: 8 * (FERTILITY[p.terrain] ?? 1),
-    steel: 2 * share + (p.terrain === 'mountains' ? 4 : 0),
+    money: 10 * share * eco,
+    manpower: 120 * share * pop,
+    food: 8 * (FERTILITY[p.terrain] ?? 1) * pop,
+    steel: (2 * share + (p.terrain === 'mountains' ? 4 : 0)) * eco,
   };
   if (set.keys.includes('oil')) y.oil = p.oil ? 8 : 0;
-  if (set.keys.includes('electronics')) y.electronics = 3 * (share - 1);
+  if (set.keys.includes('electronics')) y.electronics = 3 * (share - 1) * eco;
   return y;
 }
 

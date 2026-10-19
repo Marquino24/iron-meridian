@@ -141,6 +141,49 @@ const C = {
 
 // --- Eras ---------------------------------------------------------------------
 
+
+/**
+ * Key cities of the 20th-century major powers. The automatic city pick uses
+ * today's populations, which drops historic industrial centres (Hamburg,
+ * Essen, Manchester…) below modern megacities; these lists make sure each
+ * major power has its real cities. Cities outside the country in a given
+ * era are skipped by the build.
+ */
+const K = {
+  hamburg: ['Hamburg', 53.55, 10.0], munich: ['Munich', 48.14, 11.58], cologne: ['Cologne', 50.94, 6.96], frankfurt: ['Frankfurt', 50.11, 8.68],
+  essen: ['Essen', 51.46, 7.01], stuttgart: ['Stuttgart', 48.78, 9.18], dresden: ['Dresden', 51.05, 13.74], leipzig: ['Leipzig', 51.34, 12.37],
+  breslau: ['Breslau', 51.11, 17.03], konigsberg: ['Königsberg', 54.71, 20.51], hanover: ['Hanover', 52.37, 9.73], nuremberg: ['Nuremberg', 49.45, 11.08],
+  bremen: ['Bremen', 53.08, 8.8], dusseldorf: ['Düsseldorf', 51.23, 6.78], danzig: ['Danzig', 54.35, 18.65], posen: ['Posen', 52.41, 16.93], strassburg: ['Strassburg', 48.57, 7.75],
+  birmingham: ['Birmingham', 52.48, -1.9], manchester: ['Manchester', 53.48, -2.24], liverpool: ['Liverpool', 53.41, -2.98], glasgow: ['Glasgow', 55.86, -4.25],
+  edinburgh: ['Edinburgh', 55.95, -3.19], leeds: ['Leeds', 53.8, -1.55], sheffield: ['Sheffield', 53.38, -1.47], bristol: ['Bristol', 51.45, -2.59],
+  newcastle: ['Newcastle', 54.98, -1.62], belfast: ['Belfast', 54.6, -5.93], cardiff: ['Cardiff', 51.48, -3.18], dublin: ['Dublin', 53.35, -6.26],
+  lyon: ['Lyon', 45.76, 4.84], marseille: ['Marseille', 43.3, 5.37], lille: ['Lille', 50.63, 3.06], bordeaux: ['Bordeaux', 44.84, -0.58], toulouse: ['Toulouse', 43.6, 1.44],
+  nantes: ['Nantes', 47.22, -1.55], strasbourg: ['Strasbourg', 48.57, 7.75], nice: ['Nice', 43.7, 7.27], lehavre: ['Le Havre', 49.49, 0.11], algiers: ['Algiers', 36.75, 3.06],
+  kiev: ['Kiev', 50.45, 30.52], kharkov: ['Kharkov', 49.99, 36.23], odessa: ['Odessa', 46.48, 30.73], warsaw: ['Warsaw', 52.23, 21.01], riga: ['Riga', 56.95, 24.11],
+  baku: ['Baku', 40.41, 49.87], tiflis: ['Tiflis', 41.72, 44.79], kazan: ['Kazan', 55.79, 49.12], rostov: ['Rostov', 47.24, 39.71], tashkent: ['Tashkent', 41.3, 69.24],
+  vladivostok: ['Vladivostok', 43.12, 131.89], minsk: ['Minsk', 53.9, 27.57], novosibirsk: ['Novosibirsk', 55.03, 82.92], omsk: ['Omsk', 54.99, 73.37], krasnoyarsk: ['Krasnoyarsk', 56.02, 92.89],
+  newyork: ['New York', 40.71, -74.0], chicago: ['Chicago', 41.88, -87.63], losangeles: ['Los Angeles', 34.05, -118.24], philadelphia: ['Philadelphia', 39.95, -75.17],
+  detroit: ['Detroit', 42.33, -83.05], boston: ['Boston', 42.36, -71.06], sanfrancisco: ['San Francisco', 37.77, -122.42], pittsburgh: ['Pittsburgh', 40.44, -80.0],
+  stlouis: ['St. Louis', 38.63, -90.2], houston: ['Houston', 29.76, -95.37], seattle: ['Seattle', 47.61, -122.33], neworleans: ['New Orleans', 29.95, -90.07],
+  atlanta: ['Atlanta', 33.75, -84.39], dallas: ['Dallas', 32.78, -96.8], miami: ['Miami', 25.76, -80.19],
+  osaka: ['Osaka', 34.69, 135.5], nagoya: ['Nagoya', 35.18, 136.91], yokohama: ['Yokohama', 35.44, 139.64], kyoto: ['Kyoto', 35.01, 135.77], kobe: ['Kobe', 34.69, 135.2],
+  fukuoka: ['Fukuoka', 33.59, 130.4], hiroshima: ['Hiroshima', 34.39, 132.46], sapporo: ['Sapporo', 43.06, 141.35], sendai: ['Sendai', 38.27, 140.87],
+  keijo: ['Keijō', 37.57, 126.98], taihoku: ['Taihoku', 25.03, 121.57],
+  milan: ['Milan', 45.46, 9.19], naples: ['Naples', 40.85, 14.27], turin: ['Turin', 45.07, 7.69], genoa: ['Genoa', 44.41, 8.93], palermo: ['Palermo', 38.12, 13.36],
+  florence: ['Florence', 43.77, 11.26], venice: ['Venice', 45.44, 12.32], bologna: ['Bologna', 44.49, 11.34], bari: ['Bari', 41.12, 16.87], trieste: ['Trieste', 45.65, 13.78],
+  budapest: ['Budapest', 47.5, 19.04], prague: ['Prague', 50.08, 14.44], krakow: ['Kraków', 50.06, 19.94], lemberg: ['Lemberg', 49.84, 24.03], zagreb: ['Zagreb', 45.81, 15.98],
+  brunn: ['Brünn', 49.2, 16.61], sarajevo: ['Sarajevo', 43.86, 18.41],
+  smyrna: ['Smyrna', 38.42, 27.14], baghdad: ['Baghdad', 33.31, 44.36], damascus: ['Damascus', 33.51, 36.29], aleppo: ['Aleppo', 36.2, 37.13], beirut: ['Beirut', 33.89, 35.5],
+  jerusalem: ['Jerusalem', 31.78, 35.23], angora: ['Angora', 39.93, 32.86], trebizond: ['Trebizond', 41.0, 39.72], mosul: ['Mosul', 36.34, 43.13],
+  shanghai: ['Shanghai', 31.23, 121.47], chongqing: ['Chongqing', 29.56, 106.55], wuhan: ['Wuhan', 30.59, 114.3], guangzhou: ['Guangzhou', 23.13, 113.26],
+  chengdu: ['Chengdu', 30.66, 104.07], xian: ["Xi'an", 34.34, 108.94], changsha: ['Changsha', 28.23, 112.94], kunming: ['Kunming', 25.04, 102.71],
+  tianjin: ['Tianjin', 39.14, 117.18], nanjing: ['Nanjing', 32.06, 118.8], shenyang: ['Shenyang', 41.8, 123.43], harbin: ['Harbin', 45.8, 126.53],
+  hangzhou: ['Hangzhou', 30.27, 120.15], shenzhen: ['Shenzhen', 22.54, 114.06], peiping: ['Peiping', 39.9, 116.4],
+  bombay: ['Bombay', 19.08, 72.88], calcutta: ['Calcutta', 22.57, 88.36], madras: ['Madras', 13.08, 80.27], bangalore: ['Bangalore', 12.97, 77.59],
+  hyderabad: ['Hyderabad', 17.39, 78.49], ahmedabad: ['Ahmedabad', 23.02, 72.57], pune: ['Pune', 18.52, 73.86], kanpur: ['Kanpur', 26.45, 80.33], lucknow: ['Lucknow', 26.85, 80.95],
+};
+const n = (city, name) => [name, city[1], city[2]];
+
 export const ERAS = [
   {
     id: 'rome', source: 'hb', dataYear: 100, file: 'world_100.geojson', url: `${HB}/world_100.geojson`,
@@ -226,6 +269,16 @@ export const ERAS = [
     names: { Russia: 'Russian Empire', Italy: 'Kingdom of Italy', 'Manchu Empire': 'Republic of China', France: 'French Republic' },
     shortNames: { 'United Kingdom of Great Britain and Ireland': 'United Kingdom', 'Austro-Hungarian Empire': 'Austria-Hungary', 'Russia': 'Russia', 'Manchu Empire': 'China', 'Rattanakosin Kingdom': 'Siam', 'Arabia (Nejd)': 'Nejd' },
     colors: { 'United Kingdom of Great Britain and Ireland': '#c96f7f', France: '#4d6fb8', Russia: '#4f8a5e', 'German Empire': '#6b7280', 'Austro-Hungarian Empire': '#d4b45a', 'Ottoman Empire': '#9a8a4a', Italy: '#3e8f78', 'United States': '#6f8fc0', 'Empire of Japan': '#c96a3a' },
+    majorCities: {
+      'German Empire': [K.hamburg, K.munich, K.cologne, K.frankfurt, K.essen, K.stuttgart, K.dresden, K.leipzig, K.breslau, K.konigsberg, K.hanover, K.danzig, K.posen, K.strassburg],
+      'United Kingdom of Great Britain and Ireland': [K.birmingham, K.manchester, K.liverpool, K.glasgow, K.edinburgh, K.leeds, K.sheffield, K.bristol, K.newcastle, K.belfast, K.cardiff, K.dublin],
+      France: [K.lyon, K.marseille, K.lille, K.bordeaux, K.toulouse, K.nantes, K.nice, K.lehavre, K.algiers],
+      Russia: [n(['', 55.76, 37.62], 'Moscow'), K.kiev, K.kharkov, K.odessa, K.warsaw, K.riga, K.baku, K.tiflis, K.kazan, n(['', 56.33, 44.0], 'Nizhny Novgorod'), n(['', 53.2, 50.15], 'Samara'), K.rostov, n(['', 56.84, 60.6], 'Yekaterinburg'), K.tashkent, K.vladivostok, K.minsk],
+      'Austro-Hungarian Empire': [K.budapest, K.prague, K.krakow, K.lemberg, K.trieste, K.zagreb, K.brunn, K.sarajevo],
+      'Ottoman Empire': [K.smyrna, K.baghdad, K.damascus, K.aleppo, K.beirut, K.jerusalem, K.angora, K.trebizond, K.mosul],
+      Italy: [K.milan, K.naples, K.turin, K.genoa, K.palermo, K.florence, K.venice, K.bologna, K.bari],
+      'United States': [K.newyork, K.chicago, K.philadelphia, K.detroit, K.boston, K.sanfrancisco, K.pittsburgh, K.stlouis, K.losangeles, K.neworleans, K.seattle, K.atlanta],
+    },
     capitals: {
       'United Kingdom of Great Britain and Ireland': C.london, France: C.paris, Russia: ['Petrograd', 59.939, 30.316], 'German Empire': C.berlin,
       'Austro-Hungarian Empire': C.vienna, 'Ottoman Empire': C.constantinople, Italy: C.rome, 'United States': C.washington, 'Empire of Japan': C.tokyo,
@@ -246,6 +299,16 @@ export const ERAS = [
     names: { 'Chinese warlords': 'Republic of China', Germany: 'German Reich', Italy: 'Kingdom of Italy', USSR: 'Soviet Union', Siam: 'Kingdom of Siam' },
     shortNames: { 'Chinese warlords': 'China', USSR: 'USSR', 'Empire of Japan': 'Japan', 'Union of South Africa': 'South Africa', 'Dominion of Newfoundland': 'Newfoundland', "Emirate of Bin Shal'an": "Bin Sha'lan" },
     colors: { Germany: '#6b7280', 'United Kingdom': '#c96f7f', France: '#4d6fb8', USSR: '#a8423a', 'United States': '#5f9a6a', 'Empire of Japan': '#d9a441', Italy: '#3e8f78', 'Chinese warlords': '#c8783a' },
+    majorCities: {
+      Germany: [K.hamburg, K.munich, K.cologne, K.frankfurt, K.essen, K.stuttgart, K.dresden, K.leipzig, K.breslau, K.konigsberg, K.hanover, K.nuremberg, K.bremen, n(['', 48.21, 16.37], 'Vienna')],
+      'United Kingdom': [K.birmingham, K.manchester, K.liverpool, K.glasgow, K.edinburgh, K.leeds, K.sheffield, K.bristol, K.newcastle, K.belfast, K.cardiff],
+      France: [K.lyon, K.marseille, K.lille, K.bordeaux, K.toulouse, K.nantes, K.strasbourg, K.nice, K.lehavre, K.algiers],
+      USSR: [n(['', 59.94, 30.31], 'Leningrad'), K.kiev, K.kharkov, K.odessa, K.baku, K.tiflis, K.kazan, n(['', 56.33, 44.0], 'Gorky'), n(['', 53.2, 50.15], 'Kuybyshev'), K.rostov, n(['', 56.84, 60.6], 'Sverdlovsk'), K.novosibirsk, K.tashkent, K.vladivostok, K.minsk, n(['', 48.71, 44.51], 'Stalingrad')],
+      'United States': [K.newyork, K.chicago, K.losangeles, K.philadelphia, K.detroit, K.boston, K.sanfrancisco, K.pittsburgh, K.stlouis, K.houston, K.seattle, K.neworleans, K.atlanta],
+      'Empire of Japan': [K.osaka, K.nagoya, K.yokohama, K.kyoto, K.kobe, K.fukuoka, K.hiroshima, K.sapporo, K.sendai, K.keijo, K.taihoku],
+      Italy: [K.milan, K.naples, K.turin, K.genoa, K.palermo, K.florence, K.venice, K.bologna, K.bari, K.trieste],
+      'Chinese warlords': [K.shanghai, K.wuhan, K.guangzhou, K.chengdu, K.xian, K.changsha, K.kunming, K.nanjing, K.peiping],
+    },
     capitals: {
       Germany: C.berlin, 'United Kingdom': C.london, France: C.paris, USSR: C.moscow, 'United States': C.washington, 'Empire of Japan': C.tokyo,
       Italy: C.rome, 'Chinese warlords': C.chungking, Belgium: C.brussels, Portugal: C.lisbon, Spain: C.madrid, Netherlands: C.amsterdam,
@@ -266,6 +329,16 @@ export const ERAS = [
     names: { USSR: 'Soviet Union', China: "People's Republic of China", Taiwan: 'Republic of China (Taiwan)', 'West Germany': 'Federal Republic of Germany', 'East Germany': 'German Democratic Republic', 'Korea, Republic of': 'South Korea', "Korea, Democratic People's Republic of": 'North Korea', 'Tanzania, United Republic of': 'Tanganyika', Zaire: 'Republic of the Congo (Léopoldville)', Congo: 'Republic of the Congo (Brazzaville)' },
     shortNames: { USSR: 'USSR', 'West Germany': 'W. Germany', 'East Germany': 'E. Germany', 'Korea, Republic of': 'S. Korea', "Korea, Democratic People's Republic of": 'N. Korea', 'Tanzania, United Republic of': 'Tanganyika', Zaire: 'Congo-Léo.', Congo: 'Congo-Brazza.' },
     colors: { 'United States': '#5f88c4', USSR: '#a8423a', China: '#c9683a', 'United Kingdom': '#c96f7f', France: '#4d74b0', 'West Germany': '#6b7f8c', Japan: '#d4a548', India: '#e0904a' },
+    majorCities: {
+      'West Germany': [K.hamburg, K.munich, K.cologne, K.frankfurt, K.essen, K.stuttgart, K.hanover, K.nuremberg, K.bremen, K.dusseldorf],
+      'United Kingdom': [K.birmingham, K.manchester, K.liverpool, K.glasgow, K.edinburgh, K.leeds, K.sheffield, K.bristol, K.newcastle, K.belfast, K.cardiff],
+      France: [K.lyon, K.marseille, K.lille, K.bordeaux, K.toulouse, K.nantes, K.strasbourg, K.nice, K.lehavre],
+      USSR: [n(['', 59.94, 30.31], 'Leningrad'), K.kiev, K.kharkov, K.odessa, K.baku, K.tiflis, K.kazan, n(['', 56.33, 44.0], 'Gorky'), n(['', 53.2, 50.15], 'Kuybyshev'), K.rostov, n(['', 56.84, 60.6], 'Sverdlovsk'), K.novosibirsk, K.tashkent, K.vladivostok, K.minsk, n(['', 48.71, 44.51], 'Stalingrad')],
+      'United States': [K.newyork, K.chicago, K.losangeles, K.philadelphia, K.detroit, K.boston, K.sanfrancisco, K.pittsburgh, K.stlouis, K.houston, K.seattle, K.dallas, K.atlanta],
+      Japan: [K.osaka, K.nagoya, K.yokohama, K.kyoto, K.kobe, K.fukuoka, K.hiroshima, K.sapporo, K.sendai],
+      China: [K.shanghai, K.tianjin, K.wuhan, K.guangzhou, K.chongqing, K.chengdu, K.xian, K.shenyang, K.harbin, K.nanjing],
+      India: [K.bombay, K.calcutta, K.madras, K.bangalore, K.hyderabad, K.ahmedabad, K.kanpur, K.lucknow],
+    },
     capitals: {
       'United States': C.washington, USSR: C.moscow, China: C.peking, 'United Kingdom': C.london, France: C.paris, 'West Germany': C.bonn,
       'East Germany': C.eastberlin, Japan: C.tokyo, India: C.newdelhi, Italy: C.rome, Brazil: C.brasilia, Australia: C.canberra, Pakistan: C.rawalpindi,
@@ -286,6 +359,16 @@ export const ERAS = [
     names: {},
     shortNames: { 'United States of America': 'United States', 'Democratic Republic of the Congo': 'DR Congo', 'Republic of the Congo': 'Congo', 'United Republic of Tanzania': 'Tanzania', 'Republic of Serbia': 'Serbia', 'Central African Republic': 'C. African Rep.', 'Bosnia and Herzegovina': 'Bosnia', 'Dominican Republic': 'Dominican Rep.' },
     colors: { 'United States of America': '#5f88c4', China: '#c9583a', Russia: '#4f8a6e', India: '#e0904a', 'United Kingdom': '#c96f7f', France: '#4d74b0', Germany: '#6b7f8c', Japan: '#d4a548' },
+    majorCities: {
+      Germany: [K.hamburg, K.munich, K.cologne, K.frankfurt, K.essen, K.stuttgart, K.dresden, K.leipzig, K.hanover, K.dusseldorf],
+      'United Kingdom': [K.birmingham, K.manchester, K.liverpool, K.glasgow, K.edinburgh, K.leeds, K.bristol, K.newcastle, K.belfast, K.cardiff],
+      France: [K.lyon, K.marseille, K.lille, K.bordeaux, K.toulouse, K.nantes, K.strasbourg, K.nice],
+      Russia: [n(['', 59.94, 30.31], 'Saint Petersburg'), K.novosibirsk, n(['', 56.84, 60.6], 'Yekaterinburg'), K.kazan, n(['', 56.33, 44.0], 'Nizhny Novgorod'), n(['', 53.2, 50.15], 'Samara'), n(['', 47.24, 39.71], 'Rostov-on-Don'), n(['', 48.71, 44.51], 'Volgograd'), K.omsk, K.krasnoyarsk, K.vladivostok],
+      'United States of America': [K.newyork, K.chicago, K.losangeles, K.philadelphia, K.detroit, K.boston, K.sanfrancisco, K.houston, K.seattle, K.dallas, K.atlanta, K.miami],
+      Japan: [K.osaka, K.nagoya, K.yokohama, K.kyoto, K.kobe, K.fukuoka, K.hiroshima, K.sapporo, K.sendai],
+      China: [K.shanghai, K.tianjin, K.wuhan, K.guangzhou, K.shenzhen, K.chongqing, K.chengdu, K.xian, K.shenyang, K.harbin, K.nanjing, K.hangzhou],
+      India: [n(K.bombay, 'Mumbai'), n(K.calcutta, 'Kolkata'), n(K.madras, 'Chennai'), K.bangalore, K.hyderabad, K.ahmedabad, K.pune, K.kanpur, K.lucknow],
+    },
     capitals: { Netherlands: C.amsterdam, 'Sri Lanka': ['Colombo', 6.93, 79.85], Bolivia: ['La Paz', -16.5, -68.15], 'South Africa': ['Pretoria', -25.75, 28.19], Israel: ['Jerusalem', 31.78, 35.23] },
   },
 ];

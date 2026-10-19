@@ -15,6 +15,8 @@ import { esc, fmtNum, fmtHours, costHtml, ROLE_LABEL, ROLE_GLYPH, BEATS, ROMAN, 
 import { RESOURCES } from './resources.js';
 import { BUILDINGS, MAX_LEVEL } from './buildings.js';
 
+const PERSONALITY_LABEL = { aggressive: 'Aggressive', balanced: 'Balanced', defensive: 'Defensive', expansionist: 'Expansionist' };
+
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -205,7 +207,7 @@ export class CommandUI {
     const afford = this.roster.units.map((t) => (E.canAfford(me, t.cost) ? 1 : 0)).join('')
       + B.types.map((k) => (E.canAfford(me, B.check(p.id, k, { ignoreCost: true }).cost) ? 1 : 0)).join('');
     return ['prov', p.id, p.owner, this.cityTab, Object.values(B.of(p.id)).join(''), B.construction.get(p.id)?.type ?? '', A.queue(p.id).length, [...A.at(p.id)].map((a) => `${a.id}.${a.units.length}`).join(','),
-      C.atWar(me, p.owner), C.occupations.has(p.id), C.active.has(p.id), afford, this.confirmWar, me].join('|');
+      C.atWar(me, p.owner), C.truceUntil(me, p.owner), C.enemiesOf(p.owner).join('.'), C.occupations.has(p.id), C.active.has(p.id), afford, this.confirmWar, me].join('|');
   }
 
   provinceHtml(p) {
@@ -330,9 +332,17 @@ export class CommandUI {
     const war = C.atWar(me, n.id);
     const stats = st.nationStats(n.id);
     const capLost = this.sim.economy.capitalLost(n.id);
+    const ai = this.sim.ai;
+    const truce = C.truceUntil(me, n.id);
+    const pers = ai?.personalityOf(n.id);
     let action;
-    if (war) action = '<div class="war-state">⚔ AT WAR — your armies may enter its land</div>';
-    else if (this.confirmWar === n.id) {
+    if (war) {
+      action = `<div class="war-state">⚔ AT WAR — your armies may enter its land</div>
+        <button type="button" class="btn ghost wide" data-cmd="offer-peace" data-nation="${n.id}">Offer white peace</button>`;
+    } else if (truce != null) {
+      const d = new Date(truce);
+      action = `<div class="war-state truce">☮ Truce until ${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCFullYear()}: no war can be declared before then</div>`;
+    } else if (this.confirmWar === n.id) {
       action = `<div class="confirm">
         <p>Declare war on <b>${esc(n.name)}</b>? Your armies can then enter its land, and its garrisons will fight back.</p>
         <div class="btn-row"><button type="button" class="btn small danger" data-cmd="war-confirm" data-nation="${n.id}">Declare war</button>
@@ -342,7 +352,10 @@ export class CommandUI {
       <div class="nation-card" style="--nation:${n.color}">
         <div class="nation-card-name">${esc(n.name)}</div>
         <div class="nation-card-stats">${stats.provinces} provinces · ${stats.cities} cities${capLost ? ' · <span class="short">capital lost</span>' : ''}</div>
-        <div class="nation-card-rel">${war ? '<span class="tag red">AT WAR</span>' : '<span class="tag">AT PEACE</span>'}</div>
+        <div class="nation-card-rel">${war ? '<span class="tag red">AT WAR</span>' : '<span class="tag">AT PEACE</span>'}
+          ${pers ? `<span class="tag">${esc(PERSONALITY_LABEL[pers] ?? pers).toUpperCase()}</span>` : ''}
+          ${ai ? `<span class="tag">ARMY ${Math.round(ai.powerOf(n.id))} · YOURS ${Math.round(ai.powerOf(me))}</span>` : ''}
+          ${C.enemiesOf(n.id).filter((e) => e !== me).length ? `<span class="tag red">AT WAR WITH ${C.enemiesOf(n.id).filter((e) => e !== me).map((e) => esc(st.getNation(e).shortName.toUpperCase())).join(', ')}</span>` : ''}</div>
       </div>
       ${action}`;
   }
@@ -393,6 +406,17 @@ export class CommandUI {
       case 'war': this.confirmWar = Number(b.dataset.nation); break;
       case 'war-cancel': this.confirmWar = -1; break;
       case 'war-confirm': C.declareWar(st.playerNationId, Number(b.dataset.nation)); this.confirmWar = -1; break;
+      case 'offer-peace': {
+        const other = Number(b.dataset.nation);
+        if (this.sim.ai?.acceptsPeace(other, st.playerNationId) ?? true) {
+          C.makePeace(st.playerNationId, other);
+          this.actions.notice(`${st.getNation(other).shortName} accepts a white peace`);
+        } else {
+          this.actions.notice(`${st.getNation(other).shortName} refuses: they think they're winning`);
+          st.events.emit('feed', { kind: 'peace', tone: 'bad', text: `${st.getNation(other).name} refused your peace offer` });
+        }
+        break;
+      }
       default: return false;
     }
     this.actions.rerender();

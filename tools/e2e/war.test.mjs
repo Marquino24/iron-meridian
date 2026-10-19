@@ -32,6 +32,8 @@ await page.fill('#nation-search', 'German');
 await page.click('.nation-row');
 await page.click('#btn-deploy');
 await page.waitForFunction(() => document.body.classList.contains('in-game'));
+// Computer nations stay idle here (tools/e2e/ai.test.mjs covers them), so no AI war alert interrupts the test.
+await page.evaluate(() => { window.ironMeridian.ai.enabled = false; });
 await page.waitForTimeout(1500);
 // The capital's panel opens on deploy; close it so the map is clear (it covers half a phone screen).
 await page.click('#province-panel [data-action="close"]');

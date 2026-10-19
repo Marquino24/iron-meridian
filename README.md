@@ -2,7 +2,7 @@
 
 A browser-based real-time grand strategy game. Vanilla JavaScript (ES modules) and HTML Canvas, with no frameworks and no build step.
 
-**Current scope (step 4B):** real-world maps in seven eras, sign-in and closed beta, armies, war and conquest, era resources, city buildings, research, and command windows for managing everything at once.
+**Current scope (step 5):** real-world maps in seven eras, sign-in and closed beta, armies, war and conquest, era resources, city buildings, research, command windows, and computer nations that build, research, recruit, go to war and make peace.
 
 ## Run
 
@@ -130,6 +130,27 @@ Full stats are in `js/units.js` (attack, defense, HP, speed in km/h, cost in era
 
 `npm test` includes `tools/check-war.mjs`, a headless run of the simulation: the German Reich conquering Czechoslovakia (9 provinces, about 20 game days = 8 real minutes at 1×), Italy landing in Albania by sea, recruitment timing, split/merge, capital loss, and spawning plus pathfinding in every era. `tools/e2e/war.test.mjs` plays the same war through the UI in a browser (desktop and phone), `tools/e2e/research.test.mjs` the research window, and `tools/e2e/windows.test.mjs` drives the other command windows (`ERA=modern NATION="United States"` to try another nation).
 
+## Computer nations (AI)
+
+Every nation you don't play runs `js/ai.js`. Each has a personality: **Aggressive**, **Balanced**, **Defensive** or **Expansionist**. Some are set by era (WWII Germany, Japan and Italy Aggressive, the USSR Expansionist; the Roman and Han empires Expansionist; the Mongols Aggressive…), the rest are drawn at random (seeded by name). The nation panel shows a nation's personality, army strength and current wars.
+
+- **Economy:** farms when food runs short, mines/factories for production, barracks in border cities, a port if coastal, forts on threatened borders (and more often for Defensive nations), roads in the capital. It keeps a reserve and spends the military share of its treasury on the army.
+- **Research:** the same trees and queue as yours, in personality order (Aggressive: military first; Expansionist: economy; Defensive: infrastructure).
+- **Army:** recruits a mix (half infantry, the rest ranged and mobile where barracks allow, a few ships for coastal major powers) in proportion to its economy, 1.5× when at war. New units top up the local garrison (capital 3, border cities 1–2), the rest form field armies that gather at a border city facing the likeliest target.
+- **War:** a nation declares war on a neighbour (or, for major powers, a nation across a shared sea zone) when its army is clearly stronger: 1.4× for Aggressive, 1.8× Balanced, 2.8× Defensive, 1.5× Expansionist, lower when the neighbour holds its former land. The chance is per month (Aggressive 30%, Expansionist 18%, Balanced 8%, Defensive 2%; minor nations 30% of that; the world wars 1.2×, the Cold War 0.6×, Modern 0.4×). At war it attacks enemy provinces next to its land (and its own lost provinces) with whole armies (3+ units, stronger than the defenders), scoring targets by value (capital 6, city 3, province 1, own former land ×2), defence and distance. Damaged armies (under 45%) fall back to a city to heal, threatened cities get the nearest army or new recruits, small armies walk to the biggest one to combine. Expansionist nations also march into unclaimed land.
+- **Peace:** a nation that is losing (provinces gone and a weaker army, or badly outmatched) or stuck in a long stalemate offers a **white peace**: provinces taken in that war return to their pre-war owner, armies withdraw home, and a 90-day truce follows. AI nations accept unless they're clearly winning; you get a popup to accept or decline. You can offer peace too (nation panel, **Offer white peace**).
+- **Healing:** armies resting on their own land recover 3% of their strength per hour in a city, 1% elsewhere.
+
+**Difficulty** (nation screen): **Easy** AIs think 1.6× less often, start half as many wars, need a bigger edge and produce 10% less; **Hard** AIs think more often, pick the weakest-defended high-value targets, attack only with a clear edge, and produce 15% more.
+
+**Feedback:** an AI declaring war on you pauses the game with a full alert; other nations' wars appear in the event feed and as dashed red lines between capitals when zoomed out (toggle with **⚔ Wars** next to the map styles).
+
+**Performance:** nations think on a staggered schedule (major powers every 12 game hours, nations of 25+ provinces daily, 6+ every two days, the smallest every three), each think is split into small steps, and every frame works through the due ones until a time budget runs out (3 ms, shrinking to 0.5 ms and every third frame on a struggling device). The economy updates incrementally (a conquered province moves its cached yield to the new owner) and path searches use A*.
+
+`npm run sim:ai` (`tools/sim-ai.mjs [months] [easy|normal|hard] [era…]`) runs every nation headless for six months and reports growth, wars, peace deals, conquests and the largest share of the map anyone reached.
+
+**Economic weight.** Provinces were cut roughly by land area, so counting them made colonial empires and Siberia huge and compact industrial powers small (WWII Germany earned 410 a day against France's 1,930). `js/development.js` now gives every province a development value: colonies and far frontiers (more than 1,500 km from the capital and not linked to it by land within 4,500 km) produce 0.35×, polar land 0.35×, other nations scale with the square root of their size, and each era's major powers are scaled to their real GDP and population (Maddison-style estimates). The value stays with the province when it's conquered. The 20th-century maps were also rebuilt with each major power's real cities (`majorCities` in `tools/era-config.mjs`; WWII Germany went from 2 cities to 15). `node tools/print-economies.mjs` lists the largest economies per era.
+
 ## Map styles and settings
 
 - **Political:** flat nation colours with terrain symbols. Roman and Medieval eras draw it as an old parchment map.
@@ -211,6 +232,9 @@ js/
   tech.js         Era tech trees (shared skeleton + era names, costs per tier)
   research.js     Research per nation: slots, progress, effect queries used by the other systems
   win-research.js Research window (tree view with requirement lines, details)
+  development.js  Province development: real economic weight per era, colonies, polar land
+  ai.js           Computer nations: personalities, difficulty, staggered thinking
+  diplomacy-ui.js War alerts and peace offers
 ```
 
 ## Data model (from `generateMap(seed)`)

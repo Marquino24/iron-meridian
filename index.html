@@ -58,6 +58,7 @@
       <button type="button" role="radio" data-style="political">Political</button>
       <button type="button" role="radio" data-style="satellite">Satellite</button>
       <button type="button" role="radio" data-style="terrain">Terrain</button>
+      <button type="button" id="btn-war-lines" class="war-lines-btn" aria-pressed="true" title="Show other nations' wars as dashed red lines when zoomed out">⚔ Wars</button>
     </div>
 
     <footer id="statusbar">
@@ -72,7 +73,7 @@
   <!-- Main menu: game-launcher style over the slowly panning map. -->
   <section id="main-menu" class="screen menu" hidden aria-label="Main menu">
     <div class="menu-panel screen-left">
-      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.4.2</div>
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.5.0</div>
       <h1 class="menu-title">IRON<span>MERIDIAN</span></h1>
       <nav class="menu-list" aria-label="Main menu">
         <button type="button" class="menu-item resume" data-menu="resume" hidden><span>Resume game</span><small id="resume-detail"></small></button>
@@ -131,6 +132,14 @@
       <input id="nation-search" class="nation-search" type="search" placeholder="Search nations…" autocomplete="off" spellcheck="false" aria-label="Search nations">
       <div id="nation-list" class="nation-list" role="listbox" aria-label="Nations"></div>
 
+      <div class="difficulty-row">
+        <span class="section-title">AI DIFFICULTY</span>
+        <div id="difficulty" class="seg-btns" role="radiogroup" aria-label="AI difficulty">
+          <button type="button" role="radio" data-difficulty="easy" title="Computer nations think more slowly, start fewer wars and produce 10% less">Easy</button>
+          <button type="button" role="radio" data-difficulty="normal">Normal</button>
+          <button type="button" role="radio" data-difficulty="hard" title="Smarter targeting, more wars, +15% production for computer nations">Hard</button>
+        </div>
+      </div>
       <button id="btn-deploy" type="button" class="btn primary" disabled>SELECT A NATION</button>
       <p class="hint">DRAG to pan · SCROLL / PINCH to zoom · ARROWS · ESC deselect · SPACE pause</p>
       <p id="data-source" class="data-source"></p>
@@ -187,7 +196,7 @@
   <!-- Sign-in and beta gate. Without Supabase settings (dev preview) it offers a demo sign-in. -->
   <section id="launcher" class="launcher" hidden aria-label="Sign in">
     <div class="launcher-hero">
-      <div class="eyebrow">CLOSED BETA · BUILD 0.4.2</div>
+      <div class="eyebrow">CLOSED BETA · BUILD 0.5.0</div>
       <h1 class="launcher-title">IRON<span>MERIDIAN</span></h1>
       <p class="launcher-sub">Real-time grand strategy across two thousand years of real borders.</p>
       <ul class="launcher-facts">
@@ -202,6 +211,7 @@
   </section>
 
   <section id="battle-report" class="report" hidden></section>
+  <section id="diplo-modal" class="report diplo" hidden></section>
 
   <button id="btn-admin-fab" type="button" class="btn admin-fab admin-btn" data-open-admin hidden>ADMIN</button>
   <section id="admin-panel" class="admin" hidden></section>

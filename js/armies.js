@@ -191,23 +191,29 @@ export class Armies {
       sources.push([s.to, s.hours - s.done, false], [s.from, s.done, true]);
     } else sources.push([army.node, 0, false]);
 
-    const dist = new Map(), prev = new Map(), viaReverse = new Map();
+    // A*: straight-line km at the best possible speed (roads III, research,
+    // transports) never overestimates, so the route is still the fastest.
+    const best = Math.max(this.speedOf(army, false) / 0.55, this.speedOf(army, true));
+    const h = (n) => this.distKm(n, target) / best;
+    const dist = new Map(), prev = new Map(), viaReverse = new Map(), closed = new Set();
     const heap = new MinHeap();
     for (const [n, d, rev] of sources) {
-      if (!dist.has(n) || d < dist.get(n)) { dist.set(n, d); viaReverse.set(n, rev); heap.push(n, d); }
+      if (!dist.has(n) || d < dist.get(n)) { dist.set(n, d); viaReverse.set(n, rev); heap.push(n, d + h(n)); }
     }
     let found = false;
     while (heap.size) {
-      const { value: n, priority: d } = heap.pop();
-      if (d > dist.get(n)) continue;
+      const { value: n } = heap.pop();
+      if (closed.has(n)) continue;
+      closed.add(n);
       if (n === target) { found = true; break; }
+      const d = dist.get(n);
       for (const m of this.neighbors(n, army.kind)) {
-        if (!this.canEnter(army.nation, m, army.kind)) continue;
+        if (closed.has(m) || !this.canEnter(army.nation, m, army.kind)) continue;
         const nd = d + this.hopHours(army, n, m);
         if (nd < (dist.get(m) ?? Infinity)) {
           dist.set(m, nd);
           prev.set(m, n);
-          heap.push(m, nd);
+          heap.push(m, nd + h(m));
         }
       }
     }
@@ -419,13 +425,25 @@ export class Armies {
       }
     }
 
-    // Player field armies: at the capital, then at border provinces far from each other.
-    const provs = owned[playerId];
+    // Field armies: the player always gets 1–3; AI nations with 10+ provinces
+    // get the same (they now play), smaller ones rely on their garrisons.
+    for (const n of map.nations) {
+      const provs = owned[n.id];
+      if (n.id !== playerId && provs.length < 10) continue;
+      if (!provs.length || map.provinces[n.capitalId]?.owner !== n.id) continue;
+      this.spawnField(n.id, provs);
+    }
+    this.changed();
+  }
+
+  /** 1–3 field armies at the capital, then at border provinces far from each other. */
+  spawnField(nation, provs) {
+    const map = this.state.map;
     const size = provs.length;
     const count = size < 10 ? 1 : size < 60 ? 2 : 3;
     const extra = size > 100 ? 1 : 0;
-    const cap = map.provinces[map.nations[playerId].capitalId];
-    const border = provs.filter((p) => p.neighbors.some((q) => map.provinces[q].owner !== playerId && map.provinces[q].owner >= 0));
+    const cap = map.provinces[map.nations[nation].capitalId];
+    const border = provs.filter((p) => p.neighbors.some((q) => map.provinces[q].owner !== nation && map.provinces[q].owner >= 0));
     const picks = [cap];
     while (picks.length < count && border.length) {
       let best = null, bd = -1;
@@ -438,10 +456,7 @@ export class Armies {
       if (!best) break;
       picks.push(best);
     }
-    for (const p of picks) {
-      this.create(playerId, 'land', p.id, this.makeUnits({ inf: 3 + extra, mob: 2 + extra, rng: 1 }));
-    }
-    this.changed();
+    for (const p of picks) this.create(nation, 'land', p.id, this.makeUnits({ inf: 3 + extra, mob: 2 + extra, rng: 1 }));
   }
 
   // --- Recruitment -----------------------------------------------------------
@@ -508,8 +523,8 @@ export class Armies {
     const unit = makeUnit(t, this.levelFor(p.owner, typeKey));
     if (host) host.units.push(unit);
     else this.create(p.owner, naval ? 'naval' : 'land', node, [unit], { fresh: true });
-    this.state.events.emit('feed', {
-      kind: 'unit', tone: p.owner === this.state.playerNationId ? 'good' : 'info',
+    if (p.owner === this.state.playerNationId) this.state.events.emit('feed', {
+      kind: 'unit', tone: 'good',
       text: `${t.name} ready in ${p.cityName ?? p.name}`, node, nation: p.owner,
     });
     this.changed();
@@ -534,7 +549,7 @@ export class Armies {
     // Refits: once per game hour, armies resting in a city with Barracks
     // (fleets: next to a city with a Port) take on researched unit levels.
     this.refitClock += hours;
-    if (this.refitClock >= 1) { this.refitClock = 0; this.refit(); }
+    if (this.refitClock >= 1) { this.heal(this.refitClock); this.refitClock = 0; this.refit(); }
 
     // Movement.
     for (const army of [...this.list.values()]) {
@@ -551,6 +566,50 @@ export class Armies {
         budget -= step;
         if (s.done >= s.hours - 1e-9) this.arrive(army);
         else break;
+      }
+    }
+  }
+
+  /** After peace: armies of `nation` standing in (or heading into) `other`'s land go back to the nearest own province. */
+  withdraw(nation, other) {
+    const owned = (id) => !this.isSea(id) && this.province(id).owner === nation;
+    for (const army of this.list.values()) {
+      if (army.nation !== nation || army.kind !== 'land') continue;
+      if (army.seg && !this.isSea(army.seg.to) && this.province(army.seg.to).owner === other) { army.seg = null; army.path = []; army.dest = null; }
+      if (this.isSea(army.node) || this.province(army.node).owner !== other) continue;
+      // Breadth-first over land to the closest own province.
+      const seen = new Set([army.node]);
+      let frontier = [army.node], home = -1;
+      while (frontier.length && home < 0) {
+        const next = [];
+        for (const id of frontier) for (const nb of this.state.map.provinces[id].neighbors) {
+          if (seen.has(nb)) continue;
+          seen.add(nb);
+          if (owned(nb)) { home = nb; break; }
+          next.push(nb);
+        }
+        frontier = next;
+      }
+      if (home < 0) home = this.state.getNation(nation)?.capitalId ?? -1;
+      if (home < 0 || !owned(home)) continue;
+      army.seg = null; army.path = []; army.dest = null; army.retreating = false;
+      this.setNode(army, home);
+    }
+  }
+
+  /**
+   * Healing: armies resting on their own land (not moving, not fighting)
+   * recover 3% of full strength per hour in a city, 1% elsewhere.
+   */
+  heal(hours) {
+    for (const army of this.list.values()) {
+      if (army.seg || army.kind !== 'land' || this.isSea(army.node) || this.combat?.inBattle(army)) continue;
+      const p = this.province(army.node);
+      if (p.owner !== army.nation) continue;
+      const rate = (p.isCity ? 0.03 : 0.01) * hours;
+      for (const u of army.units) {
+        const max = this.unitType(u).hp;
+        if (u.hp < max) u.hp = Math.min(max, u.hp + max * rate);
       }
     }
   }

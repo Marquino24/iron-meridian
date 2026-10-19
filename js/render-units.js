@@ -56,10 +56,51 @@ function strokeRoute(ctx, pts, px, color, width, dash) {
   ctx.stroke();
 }
 
+/**
+ * Wars as dashed lines between the two capitals, when zoomed out (they fade
+ * in below ~50 px per province). Red for other nations' wars, orange for yours.
+ */
+function drawWarLines(r, ctx, px) {
+  const C = r.sim.combat;
+  if (!r.showWarLines || !C.wars.size || r.state.phase !== 'playing') return;
+  const provincePx = r.state.map.provinceScale * r.camera.zoom;
+  const alpha = Math.max(0, Math.min(1, (55 - provincePx) / 20));
+  if (alpha <= 0) return;
+  const map = r.state.map, me = r.state.playerNationId;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (const k of C.wars) {
+    const [a, b] = k.split(':').map(Number);
+    const pa = map.provinces[map.nations[a]?.capitalId]?.center, pb = map.provinces[map.nations[b]?.capitalId]?.center;
+    if (!pa || !pb) continue;
+    const mine = a === me || b === me;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(5,8,10,0.6)';
+    ctx.lineWidth = 4.5 * px;
+    ctx.stroke();
+    ctx.setLineDash([8 * px, 6 * px]);
+    ctx.strokeStyle = mine ? '#ff9a3d' : '#ff4a3a';
+    ctx.lineWidth = 2.2 * px;
+    ctx.stroke();
+    for (const p of [pa, pb]) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3.5 * px, 0, Math.PI * 2);
+      ctx.fillStyle = mine ? '#ff9a3d' : '#ff4a3a';
+      ctx.fill();
+    }
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 /** World space: routes of the player's moving armies, the selected one bold, plus the hover preview. */
 export function drawRoutes(r, ctx, px) {
   const sim = r.sim;
   if (!sim) return;
+  drawWarLines(r, ctx, px);
   const A = sim.armies, st = r.state;
   const sel = A.list.get(st.selectedArmyId);
   for (const army of A.list.values()) {

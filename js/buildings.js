@@ -78,7 +78,7 @@ export class Buildings {
     this.reset();
     state.events.on('map:loaded', () => this.reset());
     state.events.on('province:owner', ({ provinceId }) => {
-      if (this.construction.delete(provinceId)) this.changed();
+      if (this.construction.delete(provinceId)) this.changed(provinceId, false);
     });
   }
 
@@ -89,9 +89,10 @@ export class Buildings {
     this.set = resourceSet(this.eraId);
   }
 
-  changed() {
-    this.economy.recount();
-    this.state.events.emit('buildings', null);
+  /** A building level changed (pid) or many did (no pid). Starting/cancelling doesn't change yields. */
+  changed(pid, yields = true) {
+    if (yields) { if (pid >= 0) this.economy.refreshProvince(pid); else this.economy.invalidate(); }
+    this.state.events.emit('buildings', pid ?? null);
   }
 
   name(type) { return buildingName(this.eraId, type); }
@@ -147,7 +148,7 @@ export class Buildings {
     const p = this.state.getProvince(pid);
     if (!this.economy.spend(p.owner, c.cost)) return { error: 'Not enough resources' };
     this.construction.set(pid, { type, level: c.level, done: 0, total: c.hours, cost: c.cost });
-    this.changed();
+    this.changed(pid, false);
     return { ok: true };
   }
 
@@ -157,7 +158,7 @@ export class Buildings {
     if (!job || !p) return;
     this.construction.delete(pid);
     this.economy.spend(p.owner, job.cost ?? this.costOf(job.type, job.level), -1);
-    this.changed();
+    this.changed(pid, false);
   }
 
   setLevel(pid, type, level) {
@@ -238,12 +239,13 @@ export class Buildings {
       if (job.done < job.total) continue;
       this.construction.delete(pid);
       this.setLevel(pid, job.type, job.level);
+      this.economy.refreshProvince(pid);
       const p = state.getProvince(pid);
       if (p.owner === state.playerNationId) state.events.emit('feed', {
         kind: 'building', tone: 'good', node: pid,
         text: `${this.name(job.type)} ${['', 'I', 'II', 'III'][job.level]} completed in ${p.cityName ?? p.name}`,
       });
-      this.changed();
+      this.changed(pid, false); // yields already refreshed above
     }
   }
 }
