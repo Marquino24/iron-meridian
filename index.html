@@ -6,7 +6,7 @@
   <title>Iron Meridian</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=IM+Fell+English:ital@0;1&family=Rajdhani:wght@500;600;700&family=Russo+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1l7 7-7 7-7-7z' fill='%23ffb547'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -54,11 +54,15 @@
     <div id="windows" class="windows"></div>
     <nav id="command-bar" class="command-bar" aria-label="Command windows"></nav>
 
+    <div id="group-bar" class="group-bar" hidden></div>
+
     <div id="style-toggle" class="style-toggle" role="radiogroup" aria-label="Map style">
-      <button type="button" role="radio" data-style="political">Political</button>
-      <button type="button" role="radio" data-style="satellite">Satellite</button>
-      <button type="button" role="radio" data-style="terrain">Terrain</button>
-      <button type="button" id="btn-war-lines" class="war-lines-btn" aria-pressed="true" title="Show other nations' wars as dashed red lines when zoomed out">⚔ Wars</button>
+      <button type="button" role="radio" data-style="political" title="Political map"><span data-icon="political"></span><b>Political</b></button>
+      <button type="button" role="radio" data-style="satellite" title="Satellite map"><span data-icon="satellite"></span><b>Satellite</b></button>
+      <button type="button" role="radio" data-style="terrain" title="Terrain map"><span data-icon="terrain"></span><b>Terrain</b></button>
+      <span class="st-sep"></span>
+      <button type="button" id="btn-clouds" class="toggle-btn" aria-pressed="true" title="Clouds over the satellite map"><span data-icon="clouds"></span><b>Clouds</b></button>
+      <button type="button" id="btn-war-lines" class="toggle-btn war-lines-btn" aria-pressed="true" title="Show other nations' wars as dashed red lines when zoomed out"><span data-icon="swords"></span><b>Wars</b></button>
     </div>
 
     <footer id="statusbar">
@@ -73,7 +77,7 @@
   <!-- Main menu: game-launcher style over the slowly panning map. -->
   <section id="main-menu" class="screen menu" hidden aria-label="Main menu">
     <div class="menu-panel screen-left">
-      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.5.0</div>
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.6.0</div>
       <h1 class="menu-title">IRON<span>MERIDIAN</span></h1>
       <nav class="menu-list" aria-label="Main menu">
         <button type="button" class="menu-item resume" data-menu="resume" hidden><span>Resume game</span><small id="resume-detail"></small></button>
@@ -196,7 +200,7 @@
   <!-- Sign-in and beta gate. Without Supabase settings (dev preview) it offers a demo sign-in. -->
   <section id="launcher" class="launcher" hidden aria-label="Sign in">
     <div class="launcher-hero">
-      <div class="eyebrow">CLOSED BETA · BUILD 0.5.0</div>
+      <div class="eyebrow">CLOSED BETA · BUILD 0.6.0</div>
       <h1 class="launcher-title">IRON<span>MERIDIAN</span></h1>
       <p class="launcher-sub">Real-time grand strategy across two thousand years of real borders.</p>
       <ul class="launcher-facts">

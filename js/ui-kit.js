@@ -2,6 +2,7 @@
  * ui-kit.js — Small helpers shared by the HUD panels and command windows.
  */
 
+import { roleIcon } from './icons.js';
 import { RESOURCES } from './resources.js';
 
 /** Game hours as "14h" or "2d 3h". */
@@ -25,7 +26,8 @@ export function fmtNum(v) {
 
 export const ROMAN = ['0', 'I', 'II', 'III'];
 export const ROLE_LABEL = { inf: 'Infantry', mob: 'Mobile', rng: 'Ranged', nav: 'Naval' };
-export const ROLE_GLYPH = { inf: '✕', mob: '⬭', rng: '●', nav: '⛴' };
+/** Unit-role pictures for the current era (inline SVG), read like a map: ROLE_GLYPH.inf. */
+export const ROLE_GLYPH = new Proxy({}, { get: (_, role) => roleIcon(role) });
 export const BEATS = { inf: 'mob', mob: 'rng', rng: 'inf' };
 
 /**

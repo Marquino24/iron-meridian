@@ -16,6 +16,7 @@
  *   'province:owner'  ({ provinceId, from, to })
  *   'clock:speed'     (speed)
  *   'select:army'     (armyId)             — army chosen on the map (-1 = none)
+ *   'select:group'    (Set|null)           — several armies picked together (box selection)
  *
  * Emitted by the simulation systems (economy.js, armies.js, combat.js):
  *   'economy', 'armies', 'war' ({a, b}), 'battle:end' (battle),
@@ -55,6 +56,7 @@ export class GameState {
     this.selectedProvinceId = -1;
     this.focusedNationId = -1;
     this.selectedArmyId = -1;
+    this.armyGroup = null;        // Set of army ids picked together (box selection), or null
     this.clock = { time: START_DATE, start: START_DATE, speed: 1 };
   }
 
@@ -88,6 +90,7 @@ export class GameState {
     this.selectedProvinceId = -1;
     this.focusedNationId = -1;
     this.selectedArmyId = -1;
+    this.armyGroup = null;
     // Real-world eras start on their own date; the fictional world on START_DATE.
     this.clock.start = this.clock.time = map.startDate ?? START_DATE;
     this.events.emit('map:loaded', map);
@@ -122,9 +125,25 @@ export class GameState {
 
   /** Select an army (the side panel shows it instead of the province). */
   setSelectedArmy(id) {
+    if (this.armyGroup) {
+      this.armyGroup = null;
+      this.events.emit('select:group', null);
+    }
     if (id === this.selectedArmyId) return;
     this.selectedArmyId = id;
     this.events.emit('select:army', id);
+  }
+
+  /** Select several armies at once; orders then go to all of them. The first one leads (panel, preview). */
+  setArmyGroup(ids) {
+    if (ids.length < 2) { this.setSelectedArmy(ids[0] ?? -1); return; }
+    this.setSelected(-1);
+    this.armyGroup = new Set(ids);
+    if (this.selectedArmyId !== ids[0]) {
+      this.selectedArmyId = ids[0];
+      this.events.emit('select:army', ids[0]);
+    }
+    this.events.emit('select:group', this.armyGroup);
   }
 
   setFocusedNation(id) {

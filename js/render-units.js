@@ -9,15 +9,19 @@
  */
 
 import { fmtHours } from './ui-kit.js';
+import { drawIcon, unitIcon } from './icons.js';
 
-const ICON_W = 30, ICON_H = 20, GAP = 4;
-/** Counters float this far above their spot (like a map pin) so city icons and names stay readable. */
-const LIFT = 22;
+/** Marker radius, gap between stacked markers, and how far markers float above their spot. */
+const R = 14, GAP = 5;
+const LIFT = 26;
+/** Below this on-screen province size, nearby armies of one nation merge into one badge. */
+const CLUSTER_PX = 34;
+const CELL = 70;
 
-/** Coarse occupancy grid so foreign counters don't pile on top of each other. */
+/** Coarse occupancy grid so foreign markers don't pile on top of each other. */
 class Occupancy {
   constructor() { this.cells = new Set(); }
-  key(x, y) { return `${Math.floor(x / 26)}:${Math.floor(y / 18)}`; }
+  key(x, y) { return `${Math.floor(x / 30)}:${Math.floor(y / 26)}`; }
   free(x, y) { return !this.cells.has(this.key(x, y)); }
   take(x, y) { this.cells.add(this.key(x, y)); }
 }
@@ -30,30 +34,60 @@ function routePoints(A, army, path) {
   return pts;
 }
 
-function strokeRoute(ctx, pts, px, color, width, dash) {
+/** Chevron arrows every `spacing` px along a polyline, sliding forward with `offset`. */
+function chevrons(ctx, pts, px, color, spacing, offset, size) {
+  const step = spacing * px, sz = size * px;
+  let carry = ((offset * px) % step + step) % step;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1e-6) continue;
+    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    for (let d = carry; d < len; d += step) {
+      const x = a.x + ux * d, y = a.y + uy * d;
+      // Chevron: tip ahead, two wings behind.
+      ctx.moveTo(x + ux * sz, y + uy * sz);
+      ctx.lineTo(x - ux * sz * 0.6 - uy * sz * 0.85, y - uy * sz * 0.6 + ux * sz * 0.85);
+      ctx.lineTo(x - ux * sz * 0.15, y - uy * sz * 0.15);
+      ctx.lineTo(x - ux * sz * 0.6 + uy * sz * 0.85, y - uy * sz * 0.6 - ux * sz * 0.85);
+      ctx.closePath();
+    }
+    carry = ((carry - len) % step + step) % step;
+  }
+  ctx.fill();
+}
+
+/** A route as a soft band with arrows running along it, ending in a target ring. */
+function strokeRoute(ctx, pts, px, color, width, t, arrows = true) {
   if (pts.length < 2) return;
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.setLineDash([]);
-  ctx.strokeStyle = 'rgba(5,8,10,0.75)';
-  ctx.lineWidth = (width + 3) * px;
+  ctx.strokeStyle = 'rgba(8,12,24,0.55)';
+  ctx.lineWidth = (width + 4) * px;
   ctx.stroke();
-  ctx.setLineDash(dash.map((d) => d * px));
+  ctx.globalAlpha = 0.45;
   ctx.strokeStyle = color;
   ctx.lineWidth = width * px;
   ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  if (arrows) chevrons(ctx, pts, px, color, 16 + width * 2, t * 26, 3 + width * 0.9);
   // Destination marker.
   const end = pts[pts.length - 1];
   ctx.beginPath();
-  ctx.arc(end.x, end.y, 6 * px, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(5,8,10,0.8)';
+  ctx.arc(end.x, end.y, 6.5 * px, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(8,12,24,0.8)';
   ctx.lineWidth = 4.5 * px;
   ctx.stroke();
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2 * px;
+  ctx.lineWidth = 2.2 * px;
   ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(end.x, end.y, 2.2 * px, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
 }
 
 /**
@@ -96,28 +130,37 @@ function drawWarLines(r, ctx, px) {
   ctx.restore();
 }
 
-/** World space: routes of the player's moving armies, the selected one bold, plus the hover preview. */
+/** World space: routes of the player's moving armies (arrow trails), the selected one bold, plus the hover preview. */
 export function drawRoutes(r, ctx, px) {
   const sim = r.sim;
   if (!sim) return;
   drawWarLines(r, ctx, px);
-  const A = sim.armies, st = r.state;
+  const A = sim.armies, C = sim.combat, st = r.state;
+  const t = r.animFps() ? performance.now() / 1000 : 0;
   const sel = A.list.get(st.selectedArmyId);
+  const group = st.armyGroup;
+  const provincePx = st.map.provinceScale * r.camera.zoom;
   for (const army of A.list.values()) {
-    if (army.nation !== st.playerNationId || army === sel || (!army.seg && !army.path.length)) continue;
-    strokeRoute(ctx, routePoints(A, army, army.path), px, 'rgba(255,214,140,0.55)', 1.6, [5, 5]);
+    if (army === sel || (!army.seg && !army.path.length)) continue;
+    if (army.nation === st.playerNationId) {
+      const picked = group?.has(army.id);
+      strokeRoute(ctx, routePoints(A, army, army.path), px, picked ? '#ffd54a' : 'rgba(255,226,150,0.85)', picked ? 2.6 : 1.8, t);
+    } else if (army.seg && provincePx >= 10 && C.atWar(st.playerNationId, army.nation)) {
+      // Enemy columns: a short red arrow to where they're heading next.
+      strokeRoute(ctx, [A.armyPos(army), A.pos[army.seg.to]], px, '#ff5a4a', 1.8, t);
+    }
   }
   const pv = A.preview;
   if (sel && pv && pv.armyId === sel.id && pv.path && pv.node !== sel.dest) {
     const pts = [A.armyPos(sel), ...(pv.reverse ? [A.pos[sel.seg.from]] : sel.seg ? [A.pos[sel.seg.to]] : []), ...pv.path.map((n) => A.pos[n])];
-    strokeRoute(ctx, pts, px, 'rgba(111,211,224,0.9)', 2, [7, 5]);
+    strokeRoute(ctx, pts, px, '#5ee6ff', 2, t);
   }
   if (sel && (sel.seg || sel.path.length)) {
-    strokeRoute(ctx, routePoints(A, sel, sel.path), px, sel.retreating ? '#ff8a7a' : '#ffc766', 3, [9, 6]);
+    strokeRoute(ctx, routePoints(A, sel, sel.path), px, sel.retreating ? '#ff8a7a' : '#ffd54a', 3.2, t);
   }
 }
 
-/** Screen space: counters, battle markers, occupation rings, ETA tags. */
+/** Screen space: army markers (or merged badges when zoomed out), battles, occupation rings, ETA tags, box selection. */
 export function drawForces(r) {
   const sim = r.sim;
   r.hits = [];
@@ -129,46 +172,78 @@ export function drawForces(r) {
   const W = cam.viewW, H = cam.viewH, M = 60;
   const onScreen = (s) => s.x > -M && s.y > -M && s.x < W + M && s.y < H + M;
   const occ = new Occupancy();
-  const time = performance.now() / 1000;
+  const anim = r.animFps() > 0;
+  const time = anim ? performance.now() / 1000 : 0;
+  const eraId = st.era?.id;
+  const group = st.armyGroup;
 
   const visible = (a) => {
-    if (a.id === st.selectedArmyId) return true;
+    if (a.id === st.selectedArmyId || group?.has(a.id)) return true;
     if (a.nation === player) return a.garrison && !C.inBattle(a) ? provincePx >= 10 : true;
     if (C.inBattle(a)) return true;
-    return provincePx >= (C.atWar(player, a.nation) ? 10 : 24);
+    // Other nations' garrisons only once you're zoomed in close (they'd bury the map otherwise).
+    if (C.atWar(player, a.nation)) return provincePx >= (a.garrison ? 24 : 10);
+    return provincePx >= (a.garrison ? 60 : 24);
   };
 
-  // Occupation rings (under the counters).
+  // Occupation rings (under the markers).
   for (const [pid, o] of C.occupations) {
     const s = cam.worldToScreen(A.pos[pid].x, A.pos[pid].y);
     if (!onScreen(s)) continue;
     s.y -= LIFT;
     const t = Math.min(1, o.done / o.total);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 22, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(5,8,10,0.45)';
+    ctx.arc(s.x, s.y, R + 9, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(8,12,24,0.4)';
     ctx.fill();
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = 'rgba(5,8,10,0.85)';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(8,12,24,0.8)';
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 22, -Math.PI / 2, -Math.PI / 2 + t * Math.PI * 2);
-    ctx.strokeStyle = o.nation === player ? '#ffc766' : '#ff6b5b';
-    ctx.lineWidth = 3.5;
+    ctx.arc(s.x, s.y, R + 9, -Math.PI / 2, -Math.PI / 2 + t * Math.PI * 2);
+    ctx.strokeStyle = o.nation === player ? '#ffd54a' : '#ff5a4a';
+    ctx.lineWidth = 4;
     ctx.stroke();
   }
+
+  // Zoomed out: merge each nation's armies per screen cell into one badge.
+  const clustering = provincePx < CLUSTER_PX;
+  const clusters = new Map();
 
   // Stationary armies stack side by side at their node; moving ones sit on their route.
   const stacks = new Map();
   const moving = [];
   for (const a of A.list.values()) {
     if (!visible(a)) continue;
+    if (clustering && !C.inBattle(a) && a.id !== st.selectedArmyId) {
+      const p = A.armyPos(a);
+      const s = cam.worldToScreen(p.x, p.y);
+      if (!onScreen(s)) continue;
+      const key = `${a.nation}:${Math.floor(s.x / CELL)}:${Math.floor(s.y / CELL)}`;
+      let c = clusters.get(key);
+      if (!c) clusters.set(key, (c = { nation: a.nation, armies: [], x: 0, y: 0, wx: 0, wy: 0 }));
+      c.armies.push(a);
+      c.x += s.x; c.y += s.y; c.wx += p.x; c.wy += p.y;
+      continue;
+    }
     if (a.seg) moving.push(a);
     else {
       if (!stacks.has(a.node)) stacks.set(a.node, []);
       stacks.get(a.node).push(a);
     }
   }
+  // A cell holding a single army just draws that army.
+  for (const [key, c] of clusters) {
+    if (c.armies.length > 1) continue;
+    clusters.delete(key);
+    const a = c.armies[0];
+    if (a.seg) moving.push(a);
+    else {
+      if (!stacks.has(a.node)) stacks.set(a.node, []);
+      stacks.get(a.node).push(a);
+    }
+  }
+
   const drawn = [];
   const pins = [];
   const place = (a, x, y, force) => {
@@ -183,7 +258,7 @@ export function drawForces(r) {
     if (!onScreen(s)) continue;
     list.sort((a, b) => (a.nation === player) - (b.nation === player) || a.id - b.id);
     const n = list.length;
-    const step = ICON_W + GAP;
+    const step = R * 2 + GAP;
     pins.push(s);
     list.forEach((a, i) => place(a, s.x + (i - (n - 1) / 2) * step, s.y - LIFT, a.nation === player || C.inBattle(a)));
   }
@@ -195,47 +270,64 @@ export function drawForces(r) {
     place(a, s.x, s.y - LIFT, a.nation === player);
   }
 
-  // Pin stems from each spot up to its counters.
+  // Pin stems from each spot up to its markers.
   ctx.lineCap = 'round';
   for (const s of pins) {
     ctx.beginPath();
     ctx.moveTo(s.x, s.y);
-    ctx.lineTo(s.x, s.y - LIFT + ICON_H / 2);
-    ctx.strokeStyle = 'rgba(5,8,10,0.85)';
-    ctx.lineWidth = 3;
+    ctx.lineTo(s.x, s.y - LIFT + R);
+    ctx.strokeStyle = 'rgba(8,12,24,0.8)';
+    ctx.lineWidth = 3.4;
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(244,239,224,0.9)';
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.lineWidth = 1.4;
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = '#0a0e10';
+    ctx.ellipse(s.x, s.y + 0.5, 4, 2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(8,12,24,0.55)';
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#f4efe0';
+    ctx.arc(s.x, s.y, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
     ctx.fill();
+  }
+
+  // Merged badges.
+  for (const c of clusters.values()) {
+    const n = c.armies.length;
+    const x = c.x / n, y = c.y / n - 8;
+    const units = c.armies.reduce((t, a) => t + a.units.length, 0);
+    const str = c.armies.reduce((t, a) => t + A.strength(a), 0) / n;
+    const roles = {};
+    for (const a of c.armies) { const role = a.kind === 'naval' ? 'nav' : A.mainRole(a); roles[role] = (roles[role] ?? 0) + a.units.length; }
+    const role = Object.entries(roles).sort((p, q) => q[1] - p[1])[0][0];
+    const picked = c.armies.some((a) => group?.has(a.id));
+    drawMarker(r, x, y, R + 3, {
+      icon: unitIcon(eraId, role), nation: st.map.nations[c.nation], own: c.nation === player,
+      hostile: C.atWar(player, c.nation), selected: picked, count: units, strength: str, stack: n,
+    });
+    r.hits.push({ kind: 'cluster', ids: c.armies.map((a) => a.id), nation: c.nation, wx: c.wx / n, wy: c.wy / n, x0: x - R - 6, y0: y - R - 6, x1: x + R + 10, y1: y + R + 10 });
   }
 
   const sel = st.selectedArmyId;
   for (const [a, x, y] of drawn) {
-    drawCounter(r, A, a, x, y, {
-      selected: a.id === sel,
-      own: a.nation === player,
-      hostile: C.atWar(player, a.nation),
+    const role = a.kind === 'naval' ? 'nav' : A.mainRole(a);
+    drawMarker(r, x, y, R, {
+      icon: unitIcon(eraId, role), nation: st.map.nations[a.nation], own: a.nation === player,
+      hostile: C.atWar(player, a.nation), selected: a.id === sel || !!group?.has(a.id),
+      count: a.units.length, strength: A.strength(a), retreating: a.retreating,
     });
-    r.hits.push({ kind: 'army', id: a.id, x0: x - ICON_W / 2 - 4, y0: y - ICON_H / 2 - 8, x1: x + ICON_W / 2 + 8, y1: y + ICON_H / 2 + 4 });
+    r.hits.push({ kind: 'army', id: a.id, x0: x - R - 3, y0: y - R - 6, x1: x + R + 8, y1: y + R + 5 });
   }
 
-  // Battles: crossed swords over the fight.
+  // Battles: an animated clash over the fight.
   for (const b of C.active.values()) {
     const p = A.pos[b.node];
     const s = cam.worldToScreen(p.x, p.y);
     if (!onScreen(s)) continue;
-    const y = s.y - LIFT - ICON_H / 2 - 18;
-    const pulse = 0.5 + 0.5 * Math.sin(time * 5);
-    drawSwords(ctx, s.x, y, pulse);
-    r.hits.push({ kind: 'battle', id: b.id, x0: s.x - 16, y0: y - 16, x1: s.x + 16, y1: y + 16 });
+    const y = s.y - LIFT - R - 20;
+    drawClash(ctx, s.x, y, s.x, s.y - LIFT, time, anim, b.id);
+    r.hits.push({ kind: 'battle', id: b.id, x0: s.x - 18, y0: y - 18, x1: s.x + 18, y1: y + 18 });
   }
 
   // ETA tag at the end of the selected army's route (and the hover preview).
@@ -244,127 +336,216 @@ export function drawForces(r) {
     const pv = A.preview;
     if (pv && pv.armyId === army.id && pv.node !== army.dest) {
       if (pv.error) tagAt(r, A.pos[pv.node], pv.peace != null ? 'AT PEACE' : 'NO ROUTE', '#ff8a7a');
-      else if (pv.path) tagAt(r, A.pos[pv.node], `ETA ${fmtHours(pv.hours)}`, '#6fd3e0');
+      else if (pv.path) tagAt(r, A.pos[pv.node], `ETA ${fmtHours(pv.hours)}`, '#5ee6ff');
     }
     if (army.dest != null && (army.seg || army.path.length)) {
-      tagAt(r, A.pos[army.dest], `ETA ${fmtHours(A.remainingHours(army))}`, '#ffc766');
+      tagAt(r, A.pos[army.dest], `ETA ${fmtHours(A.remainingHours(army))}`, '#ffd54a');
     }
+  }
+
+  // Box selection in progress.
+  const box = r.selectBox;
+  if (box) {
+    const x = Math.min(box.x0, box.x1), y = Math.min(box.y0, box.y1);
+    const w = Math.abs(box.x1 - box.x0), h = Math.abs(box.y1 - box.y0);
+    ctx.fillStyle = 'rgba(255,213,74,0.12)';
+    ctx.fillRect(x, y, w, h);
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#ffd54a';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+    ctx.setLineDash([]);
   }
 }
 
 function tagAt(r, p, text, color) {
   const { ctx, camera: cam } = r;
   const s = cam.worldToScreen(p.x, p.y);
-  ctx.font = '600 12px "Share Tech Mono", ui-monospace, monospace';
-  const w = ctx.measureText(text).width + 12;
+  ctx.font = '700 12px "Rajdhani", system-ui, sans-serif';
+  const w = ctx.measureText(text).width + 16;
   const x = s.x - w / 2, y = s.y + 12;
-  ctx.fillStyle = 'rgba(5,8,10,0.88)';
-  ctx.fillRect(x, y, w, 18);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, 20, 10);
+  ctx.fillStyle = 'rgba(12,18,34,0.9)';
+  ctx.fill();
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 17);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, s.x, y + 9.5);
+  ctx.fillText(text, s.x, y + 10.5);
 }
 
-/** NATO-style counter in the nation's colour with a unit-count badge. */
-function drawCounter(r, A, army, x, y, { selected, own, hostile }) {
+/**
+ * Army marker: a round badge with the main unit type's icon inside a
+ * nation-coloured ring, a unit-count pill and a small HP bar. The body is a
+ * cached sprite; the count and bar are drawn live.
+ */
+function drawMarker(r, x, y, rad, o) {
   const ctx = r.ctx;
-  const nation = r.state.map.nations[army.nation];
-  const x0 = Math.round(x - ICON_W / 2), y0 = Math.round(y - ICON_H / 2);
-  if (selected) {
-    ctx.fillStyle = 'rgba(255,199,102,0.35)';
-    ctx.fillRect(x0 - 5, y0 - 5, ICON_W + 10, ICON_H + 10);
-  }
-  ctx.fillStyle = selected ? '#ffc766' : hostile ? '#ff5a48' : own ? '#f4efe0' : '#0a0e10';
-  ctx.fillRect(x0 - 2, y0 - 2, ICON_W + 4, ICON_H + 4);
-  ctx.fillStyle = '#0a0e10';
-  ctx.fillRect(x0 - 1, y0 - 1, ICON_W + 2, ICON_H + 2);
-  ctx.fillStyle = nation.color;
-  ctx.fillRect(x0, y0, ICON_W, ICON_H);
-  // Symbol frame.
-  const fx = x0 + 4, fy = y0 + 4, fw = ICON_W - 8, fh = ICON_H - 8;
-  ctx.fillStyle = 'rgba(244,239,224,0.92)';
-  ctx.fillRect(fx, fy, fw, fh);
-  ctx.strokeStyle = '#11161a';
-  ctx.fillStyle = '#11161a';
-  ctx.lineWidth = 1.4;
-  const role = army.kind === 'naval' ? 'nav' : A.mainRole(army);
-  ctx.beginPath();
-  if (role === 'inf') {
-    ctx.moveTo(fx, fy); ctx.lineTo(fx + fw, fy + fh);
-    ctx.moveTo(fx + fw, fy); ctx.lineTo(fx, fy + fh);
-    ctx.stroke();
-  } else if (role === 'mob') {
-    ctx.ellipse(fx + fw / 2, fy + fh / 2, fw * 0.36, fh * 0.32, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  } else if (role === 'rng') {
-    ctx.arc(fx + fw / 2, fy + fh / 2, 2.4, 0, Math.PI * 2);
+  const color = o.nation?.color ?? '#888';
+  const state = o.selected ? 'sel' : o.hostile ? 'host' : o.own ? 'own' : 'other';
+  const pad = 7;
+  const S = (rad + pad) * 2;
+  const sprite = r.fx.sprite(`mk|${o.icon}|${color}|${state}|${rad}|${!!o.stack}`, S, S, (g) => {
+    const m = S / 2;
+    if (state === 'sel' || state === 'host' || state === 'own') {
+      const glow = state === 'sel' ? '255,213,74' : state === 'host' ? '255,70,50' : '255,255,255';
+      const grd = g.createRadialGradient(m, m, rad * 0.8, m, m, rad + pad);
+      grd.addColorStop(0, `rgba(${glow},${state === 'own' ? 0.35 : 0.75})`);
+      grd.addColorStop(1, `rgba(${glow},0)`);
+      g.fillStyle = grd;
+      g.fillRect(0, 0, S, S);
+    }
+    if (o.stack) {
+      // Merged badge: a second disc peeking out behind.
+      g.beginPath();
+      g.arc(m + 4, m - 4, rad, 0, Math.PI * 2);
+      g.fillStyle = color;
+      g.fill();
+      g.strokeStyle = 'rgba(8,12,24,0.8)';
+      g.lineWidth = 1.5;
+      g.stroke();
+    }
+    g.beginPath();
+    g.arc(m, m + 1.2, rad + 0.5, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(0,0,0,0.5)';
+    g.fill();
+    // Ring in the nation's colour.
+    g.beginPath();
+    g.arc(m, m, rad, 0, Math.PI * 2);
+    g.fillStyle = color;
+    g.fill();
+    g.lineWidth = 1.2;
+    g.strokeStyle = state === 'sel' ? '#ffd54a' : state === 'host' ? '#ff4a3a' : 'rgba(8,12,24,0.9)';
+    if (state === 'sel' || state === 'host') g.lineWidth = 2;
+    g.stroke();
+    // Glossy dark face.
+    const face = g.createLinearGradient(0, m - rad, 0, m + rad);
+    face.addColorStop(0, '#3a4866');
+    face.addColorStop(1, '#141b2c');
+    g.beginPath();
+    g.arc(m, m, rad - 3.2, 0, Math.PI * 2);
+    g.fillStyle = face;
+    g.fill();
+    g.beginPath();
+    g.ellipse(m, m - rad * 0.42, rad * 0.62, rad * 0.32, 0, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(255,255,255,0.12)';
+    g.fill();
+    drawIcon(g, o.icon, m, m, rad * 1.36, '#ffffff');
+  });
+  ctx.drawImage(sprite, x - S / 2, y - S / 2, S, S);
+  if (o.retreating) {
+    ctx.beginPath();
+    ctx.arc(x, y, rad - 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,70,50,0.35)';
     ctx.fill();
-  } else {
-    // Hull.
-    ctx.moveTo(fx + 2, fy + fh * 0.45);
-    ctx.lineTo(fx + fw - 2, fy + fh * 0.45);
-    ctx.lineTo(fx + fw - 5, fy + fh - 1);
-    ctx.lineTo(fx + 5, fy + fh - 1);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillRect(fx + fw / 2 - 1, fy + 1, 2, fh * 0.45);
   }
-  if (army.retreating) {
-    ctx.fillStyle = 'rgba(255,90,72,0.35)';
-    ctx.fillRect(x0, y0, ICON_W, ICON_H);
-  }
-  // Strength bar along the bottom.
-  const str = A.strength(army);
-  ctx.fillStyle = '#0a0e10';
-  ctx.fillRect(x0, y0 + ICON_H - 2, ICON_W, 3);
-  ctx.fillStyle = str > 0.6 ? '#7fdc8f' : str > 0.3 ? '#ffc766' : '#ff6b5b';
-  ctx.fillRect(x0, y0 + ICON_H - 2, ICON_W * str, 3);
-  // Unit-count badge.
-  const n = army.units.length;
-  const bx = x0 + ICON_W + 1, by = y0 - 1;
+  // HP bar under the marker.
+  const bw = rad * 1.9, bx = x - bw / 2, by = y + rad + 2;
   ctx.beginPath();
-  ctx.arc(bx, by, n > 9 ? 8 : 7, 0, Math.PI * 2);
-  ctx.fillStyle = '#0a0e10';
+  ctx.roundRect(bx - 1, by - 1, bw + 2, 5, 2.5);
+  ctx.fillStyle = 'rgba(8,12,24,0.85)';
   ctx.fill();
-  ctx.strokeStyle = nation.color;
-  ctx.lineWidth = 1.5;
+  const str = Math.max(0, Math.min(1, o.strength));
+  if (str > 0) {
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw * str, 3, 1.5);
+    ctx.fillStyle = str > 0.6 ? '#4be37a' : str > 0.3 ? '#ffc53d' : '#ff4f3d';
+    ctx.fill();
+  }
+  // Unit-count pill, top right.
+  const text = o.count > 999 ? `${Math.round(o.count / 100) / 10}k` : String(o.count);
+  ctx.font = '700 10.5px "Rajdhani", system-ui, sans-serif';
+  const tw = Math.max(14, ctx.measureText(text).width + 8);
+  const px0 = x + rad * 0.55, py0 = y - rad - 2;
+  ctx.beginPath();
+  ctx.roundRect(px0, py0, tw, 14, 7);
+  ctx.fillStyle = o.own ? '#ffd54a' : o.hostile ? '#ff4a3a' : '#f4f6fb';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(8,12,24,0.9)';
+  ctx.lineWidth = 1.2;
   ctx.stroke();
-  ctx.fillStyle = '#f4efe0';
-  ctx.font = '700 10px "Rajdhani", system-ui, sans-serif';
+  ctx.fillStyle = o.hostile ? '#ffffff' : '#141b2c';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(String(n), bx, by + 0.5);
+  ctx.fillText(text, px0 + tw / 2, py0 + 7.5);
 }
 
-function drawSwords(ctx, x, y, pulse) {
-  ctx.beginPath();
-  ctx.arc(x, y, 13 + pulse * 2, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(160,24,16,${0.75 + pulse * 0.2})`;
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#ffd1c8';
-  ctx.stroke();
-  ctx.lineCap = 'round';
-  for (const d of [1, -1]) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate((d * Math.PI) / 4);
-    ctx.strokeStyle = '#f4efe0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -8); ctx.lineTo(0, 6);          // blade
-    ctx.moveTo(-3.5, 4); ctx.lineTo(3.5, 4);       // guard
-    ctx.stroke();
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(0, 5); ctx.lineTo(0, 8.5);          // grip
-    ctx.stroke();
-    ctx.restore();
+/** Small deterministic hash → 0..1 (for spark directions). */
+function rnd(n) {
+  let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+  x ^= x >>> 13;
+  x = Math.imul(x, 0xc2b2ae35);
+  x ^= x >>> 16;
+  return (x >>> 0) / 4294967296;
+}
+
+/**
+ * Battle: crossed swords in a pulsing red badge, with sparks and small
+ * explosions bursting over the armies below (static on Low quality).
+ */
+function drawClash(ctx, x, y, gx, gy, t, anim, seed) {
+  if (anim) {
+    // Explosions: puffs over the armies, each flashing, growing and fading on its own cycle.
+    for (let i = 0; i < 3; i++) {
+      const cyc = t * 0.8 + i / 3;
+      const k = cyc % 1, id = Math.floor(cyc) * 7 + i + seed * 31;
+      const ex = gx + (rnd(id) - 0.5) * 44, ey = gy - 4 + (rnd(id + 1) - 0.5) * 18;
+      const rad = 7 + k * 22;
+      const a = 1 - k;
+      const grd = ctx.createRadialGradient(ex, ey, 0, ex, ey, rad);
+      grd.addColorStop(0, `rgba(255,252,220,${a})`);
+      grd.addColorStop(0.3, `rgba(255,190,60,${a * 0.95})`);
+      grd.addColorStop(0.65, `rgba(230,80,20,${a * 0.6})`);
+      grd.addColorStop(1, 'rgba(60,30,20,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(ex, ey, rad, 0, Math.PI * 2);
+      ctx.fill();
+      if (k < 0.5) {
+        ctx.beginPath();
+        ctx.arc(ex, ey, rad * 1.25, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,230,160,${(0.5 - k) * 1.2})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+    // Sparks flying out of the clash.
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 14; i++) {
+      const cyc = t * 1.6 + i / 14;
+      const k = cyc % 1, id = Math.floor(cyc) * 13 + i + seed * 17;
+      const ang = rnd(id) * Math.PI * 2, dist = 15 + k * (18 + rnd(id + 3) * 16);
+      const sx = x + Math.cos(ang) * dist, sy = y + Math.sin(ang) * dist + k * k * 10;
+      ctx.strokeStyle = `rgba(255,${210 + Math.round(rnd(id + 5) * 45)},110,${1 - k * 0.9})`;
+      ctx.lineWidth = 2.6 - k * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - Math.cos(ang) * 7, sy - Math.sin(ang) * 7);
+      ctx.stroke();
+    }
   }
+  const pulse = anim ? 0.5 + 0.5 * Math.sin(t * 6) : 0.5;
+  const glow = ctx.createRadialGradient(x, y, 8, x, y, 24 + pulse * 4);
+  glow.addColorStop(0, 'rgba(255,80,40,0.7)');
+  glow.addColorStop(1, 'rgba(255,80,40,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y, 28, 0, Math.PI * 2);
+  ctx.fill();
+  const body = ctx.createLinearGradient(0, y - 15, 0, y + 15);
+  body.addColorStop(0, '#ff6a4d');
+  body.addColorStop(1, '#a3140a');
+  ctx.beginPath();
+  ctx.arc(x, y, 14 + pulse * 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#ffe1a6';
+  ctx.stroke();
+  drawIcon(ctx, 'swords', x, y, 19, '#ffffff');
 }
 
 /** Topmost army or battle under a screen point. */

@@ -13,6 +13,7 @@
  * and upgrade it; tick rows to upgrade one building type in all of them.
  */
 
+import { buildingSvg } from './icons.js';
 import { esc, fmtHours, costHtml, ROLE_GLYPH, ROMAN, bar } from './ui-kit.js';
 import { BUILDINGS, MAX_LEVEL, UNIT_REQUIREMENT } from './buildings.js';
 
@@ -93,6 +94,15 @@ class CityWindowBase {
       const job = B.construction.get(Number(el.dataset.cLeft));
       if (job) el.textContent = fmtHours(job.total - job.done);
     }
+  }
+
+  /** The big "Select all cities" toggle at the top of the window. */
+  selectAllBig(sites) {
+    const all = sites.length > 0 && sites.every((p) => this.selected.has(p.id));
+    return `<button type="button" class="select-all-big${all ? ' on' : ''}" data-select="${all ? 'none' : 'every'}" ${sites.length ? '' : 'disabled'}>
+      <span class="sab-box" aria-hidden="true">${all ? '✓' : ''}</span>
+      <span><b>${all ? 'All cities selected' : 'Select all cities'}</b><small>${this.selected.size} of ${sites.length} selected${all ? ' · tap to clear' : ''}</small></span>
+    </button>`;
   }
 
   /** Select-all / clear / preset buttons. */
@@ -189,7 +199,7 @@ export class ProductionWindow extends CityWindowBase {
            <button type="button" class="icon-btn" data-qty="-1" aria-label="Fewer">−</button><b>${this.qty}</b><button type="button" class="icon-btn" data-qty="1" aria-label="More">+</button></div>
          ${this.selectButtons([['barracks', t.role === 'nav' ? `All with ${B.name('port')}` : `All with ${B.name('barracks')}`]])}`
       : `<div class="pick-row">${B.types.map((k) => `<button type="button" class="pick ${k === this.building ? 'on' : ''}" data-building="${k}">
-            <span class="unit-glyph">${BUILDINGS[k].glyph}</span><b>${esc(B.name(k))}</b><small>${esc(B.describe(k, 1))}</small></button>`).join('')}</div>
+            <span class="unit-glyph">${buildingSvg(k)}</span><b>${esc(B.name(k))}</b><small>${esc(B.describe(k, 1))}</small></button>`).join('')}</div>
          ${this.selectButtons([])}`;
 
     const rows = sites.map((p) => {
@@ -211,6 +221,7 @@ export class ProductionWindow extends CityWindowBase {
     const count = this.tab === 'recruit' ? ok.length * this.qty : ok.length;
     const what = this.tab === 'recruit' ? `${count} × ${esc(t.name)}` : `${count} × ${esc(B.name(this.building))}`;
     body.innerHTML = `
+      ${this.selectAllBig(sites)}
       <div class="tabs" role="tablist">
         <button type="button" role="tab" data-tab="recruit" aria-selected="${this.tab === 'recruit'}" class="${this.tab === 'recruit' ? 'on' : ''}">Bulk recruit</button>
         <button type="button" role="tab" data-tab="build" aria-selected="${this.tab === 'build'}" class="${this.tab === 'build' ? 'on' : ''}">Bulk build</button>
@@ -252,6 +263,8 @@ export class ProductionWindow extends CityWindowBase {
       // Presets replace the selection; cities that can't do the current action are skipped.
       this.selected.clear();
       if (d.select === 'none') return true;
+      // The big button takes every city; the order then counts the ones that can.
+      if (d.select === 'every') { for (const p of this.sites()) this.selected.add(p.id); return true; }
       const [bk] = UNIT_REQUIREMENT[this.roster.byKey[this.unit].role];
       for (const p of this.sites()) {
         if (!this.eligible(p).ok) continue;
@@ -369,8 +382,9 @@ export class BuildingsWindow extends CityWindowBase {
     const bulk = this.bulkOrder();
     const bulkCan = bulk.ok.length && this.sim.economy.canAfford(this.me, bulk.total);
     body.innerHTML = `
+      ${this.selectAllBig(sites)}
       ${sites.length ? `<div class="grid-wrap"><table class="win-table b-grid">
-        <thead><tr><th class="c-check"></th><th class="c-name">City</th>${types.map((k) => `<th><button type="button" data-col="${k}" class="${k === this.bulkType ? 'on' : ''}" title="${esc(B.name(k))}: ${esc(B.describe(k, 1))}"><span class="b-glyph">${BUILDINGS[k].glyph}</span><span class="b-name">${esc(B.name(k))}</span></button></th>`).join('')}</tr></thead>
+        <thead><tr><th class="c-check"></th><th class="c-name">City</th>${types.map((k) => `<th><button type="button" data-col="${k}" class="${k === this.bulkType ? 'on' : ''}" title="${esc(B.name(k))}: ${esc(B.describe(k, 1))}"><span class="b-glyph">${buildingSvg(k)}</span><span class="b-name">${esc(B.name(k))}</span></button></th>`).join('')}</tr></thead>
         <tbody>${sites.map((p) => `<tr class="${this.selected.has(p.id) ? 'sel' : ''}">
           <td class="c-check"><input type="checkbox" data-pick="${p.id}" ${this.selected.has(p.id) ? 'checked' : ''} aria-label="Select ${esc(this.cityName(p))}"></td>
           <td class="c-name"><button type="button" class="link-btn" data-city="${p.id}">${p.isCapital ? '★ ' : ''}${esc(this.cityName(p))}</button>${p.isCity ? '' : ' <em>oil</em>'}</td>

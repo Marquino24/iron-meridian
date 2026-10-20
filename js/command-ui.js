@@ -11,6 +11,7 @@
  * never get replaced under a finger mid-tap.
  */
 
+import { buildingSvg } from './icons.js';
 import { esc, fmtNum, fmtHours, costHtml, ROLE_LABEL, ROLE_GLYPH, BEATS, ROMAN, bar } from './ui-kit.js';
 import { RESOURCES } from './resources.js';
 import { BUILDINGS, MAX_LEVEL } from './buildings.js';
@@ -307,7 +308,7 @@ export class CommandUI {
       const afford = E.canAfford(me, c.cost);
       return `<li class="recruit-row build-row">
         <div class="recruit-main">
-          <span class="unit-glyph">${BUILDINGS[k].glyph}</span>
+          <span class="unit-glyph">${buildingSvg(k)}</span>
           <span class="unit-name">${esc(B.name(k))}</span>
           <span class="pips">${[1, 2, 3].map((i) => `<i class="${i <= lv ? 'on' : job?.type === k && i === job.level ? 'next' : ''}"></i>`).join('')}</span>
         </div>
@@ -318,7 +319,7 @@ export class CommandUI {
       </li>`;
     }).join('');
     const current = job ? `<div class="section-title">UNDER CONSTRUCTION</div>
-      <div class="queue-row build-job"><span class="unit-glyph">${BUILDINGS[job.type].glyph}</span>
+      <div class="queue-row build-job"><span class="unit-glyph">${buildingSvg(job.type)}</span>
         <span class="unit-name">${esc(B.name(job.type))} ${ROMAN[job.level]}</span>
         ${bar(job.done / job.total, `data-c="${p.id}"`)}<span class="q-left" data-c-left="${p.id}">${fmtHours(job.total - job.done)}</span>
         <button type="button" class="icon-btn" data-cmd="cancel-build" aria-label="Cancel and refund">✕</button></div>` : '';

@@ -12,6 +12,7 @@
  *   seas[i] = { p: polygon, c: [x, y], nb: neighbour sea ids, cp: coastal provinces }
  */
 
+import { vivid } from './palette.js';
 import { graticule, formatLatLon, unproject } from './projection.js';
 
 /**
@@ -153,7 +154,7 @@ export function buildWorldMap(data, era) {
     id,
     name: n.name,
     shortName: n.short,
-    color: n.color,
+    color: vivid(n.color),
     flag: n.flag,
     capitalId: n.capital,
     major: !!n.major,

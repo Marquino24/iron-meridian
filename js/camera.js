@@ -176,6 +176,8 @@ export class InputController {
     this.pointers = new Map();   // pointerId → { x, y }
     this.drag = null;            // { moved, pinched, vx, vy, lastT }
     this.pinch = null;           // { dist, mx, my }
+    this.box = null;             // box selection { x0, y0, x1, y1 } (Shift+drag, or two-finger long-press)
+    this.boxHold = null;         // pending two-finger long-press { timer, moved }
     this.keys = new Set();
     this.rect = canvas.getBoundingClientRect();
 
@@ -202,13 +204,35 @@ export class InputController {
     const p = this.local(e);
     this.pointers.set(e.pointerId, p);
     this.camera.stop();
+    // Desktop: Shift+drag draws a selection box instead of panning.
+    if (e.pointerType === 'mouse' && e.shiftKey && this.handlers.onBox && this.pointers.size === 1) {
+      this.box = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, mouse: true };
+      this.handlers.onBoxChange?.(this.box);
+      return;
+    }
     if (this.pointers.size === 1) {
       this.drag = { moved: 0, pinched: false, vx: 0, vy: 0, lastT: performance.now() };
     } else if (this.pointers.size === 2) {
       this.pinch = this.pinchMetrics();
       if (this.drag) this.drag.pinched = true;
+      // Phone/tablet: hold two fingers still to start a selection box between them.
+      if (this.handlers.onBox && e.pointerType === 'touch') {
+        clearTimeout(this.boxHold?.timer);
+        this.boxHold = { moved: 0, timer: setTimeout(() => this.startTouchBox(), 450) };
+      }
     }
     this.canvas.classList.add('dragging');
+  }
+
+  startTouchBox() {
+    const hold = this.boxHold;
+    this.boxHold = null;
+    if (!hold || hold.moved > 14 || this.pointers.size !== 2) return;
+    const [a, b] = [...this.pointers.values()];
+    this.box = { x0: a.x, y0: a.y, x1: b.x, y1: b.y };
+    this.pinch = null;
+    navigator.vibrate?.(15);
+    this.handlers.onBoxChange?.(this.box);
   }
 
   onPointerMove(e) {
@@ -218,6 +242,17 @@ export class InputController {
       if (e.pointerType === 'mouse') this.handlers.onHover?.(p.x, p.y);
       return;
     }
+    if (this.box) {
+      this.pointers.set(e.pointerId, p);
+      if (this.box.mouse) { this.box.x1 = p.x; this.box.y1 = p.y; }
+      else if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        Object.assign(this.box, { x0: a.x, y0: a.y, x1: b.x, y1: b.y });
+      }
+      this.handlers.onBoxChange?.(this.box);
+      return;
+    }
+    if (this.boxHold) this.boxHold.moved += Math.abs(p.x - prev.x) + Math.abs(p.y - prev.y);
 
     if (this.pointers.size === 1 && this.drag) {
       const dx = p.x - prev.x, dy = p.y - prev.y;
@@ -245,6 +280,17 @@ export class InputController {
     if (!this.pointers.has(e.pointerId)) return;
     const p = this.local(e);
     this.pointers.delete(e.pointerId);
+    if (this.boxHold) { clearTimeout(this.boxHold.timer); this.boxHold = null; }
+    if (this.box) {
+      // Lifting the mouse (or either finger) applies the box.
+      const box = this.box;
+      this.box = null;
+      if (!cancelled) this.handlers.onBox(box);
+      this.handlers.onBoxChange?.(null);
+      if (this.drag) this.drag.pinched = true; // the other finger's release is not a tap
+      if (!this.pointers.size) { this.drag = null; this.pinch = null; this.canvas.classList.remove('dragging'); }
+      return;
+    }
 
     if (this.pointers.size === 1) {
       // Pinch ended with one finger still down: continue as a plain drag.

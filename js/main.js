@@ -30,6 +30,7 @@ import { Combat } from './combat.js';
 import { CommandUI } from './command-ui.js';
 import { Feed } from './feed.js';
 import { hitTest } from './render-units.js';
+import { svgIcon, setIconEra } from './icons.js';
 import { Buildings } from './buildings.js';
 import { WindowManager } from './windows.js';
 import { ArmyWindow } from './win-army.js';
@@ -266,6 +267,27 @@ function orderMove(army, node) {
   renderer.requestRender();
 }
 
+/** Your armies picked together (box selection) that still exist. */
+function commandGroup() {
+  const g = state.armyGroup;
+  if (!g) return [];
+  return [...g].map((id) => armies.list.get(id)).filter((a) => a && a.nation === state.playerNationId);
+}
+
+/** Send every army of a group; `nodeFor(army)` picks each one's target (fleets need sea zones). */
+function orderGroup(group, nodeFor) {
+  let sent = 0, firstError = null;
+  for (const a of group) {
+    const node = nodeFor(a);
+    if (node < 0) { firstError ??= a.kind === 'naval' ? 'Fleets can only sail through sea zones.' : 'Pick a province or a sea zone.'; continue; }
+    const r = armies.order(a.id, node);
+    if (r.error) firstError ??= r.error; else sent++;
+  }
+  armies.preview = null;
+  notice(sent ? `${sent} of ${group.length} armies on the move.${firstError && sent < group.length ? ` Others: ${firstError}` : ''}` : firstError ?? 'No army could go there.');
+  renderer.requestRender();
+}
+
 /** Fly the camera to a province or sea zone without changing the selection. */
 function focusNode(node) {
   const p = armies.pos?.[node];
@@ -344,6 +366,41 @@ function renderWarLines() {
 }
 warLinesBtn.addEventListener('click', () => { settings.set('warLines', !renderer.showWarLines); renderWarLines(); });
 renderWarLines();
+const cloudsBtn = document.getElementById('btn-clouds');
+function renderClouds() {
+  const on = settings.values.clouds !== false;
+  renderer.setClouds(on);
+  cloudsBtn.classList.toggle('active', on);
+  cloudsBtn.setAttribute('aria-pressed', String(on));
+}
+cloudsBtn.addEventListener('click', () => { settings.set('clouds', settings.values.clouds === false); renderClouds(); });
+renderClouds();
+// Inline SVG icons wherever the markup asks for one.
+for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = svgIcon(el.dataset.icon);
+
+// Group bar: shown while several armies are picked together.
+const groupBar = document.getElementById('group-bar');
+function renderGroupBar() {
+  const group = commandGroup();
+  groupBar.hidden = group.length < 2;
+  if (groupBar.hidden) return;
+  const units = group.reduce((t, a) => t + a.units.length, 0);
+  const moving = group.filter((a) => a.seg || a.path.length).length;
+  groupBar.innerHTML = `${svgIcon('army')}<span><b>${group.length} armies</b> · ${units} units${moving ? ` · ${moving} moving` : ''}</span>
+    <small>Click a destination to move them all</small>
+    <button type="button" class="btn small" data-group="stop">Halt</button>
+    <button type="button" class="btn small ghost" data-group="clear">Clear</button>`;
+}
+groupBar.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-group]');
+  if (!b) return;
+  if (b.dataset.group === 'stop') for (const a of commandGroup()) armies.stop(a.id);
+  else state.setSelectedArmy(-1);
+  renderGroupBar();
+  renderer.requestRender();
+});
+state.events.on('select:group', renderGroupBar);
+state.events.on('armies', () => { if (state.armyGroup) renderGroupBar(); });
 
 const input = new InputController(canvas, camera, {
   onHover(sx, sy) {
@@ -361,6 +418,28 @@ const input = new InputController(canvas, camera, {
   onLeave() {
     state.setHovered(-1);
   },
+  onBoxChange(box) {
+    renderer.selectBox = box;
+    renderer.requestRender();
+  },
+  onBox(box) {
+    if (state.phase !== 'playing') return;
+    const x0 = Math.min(box.x0, box.x1), x1 = Math.max(box.x0, box.x1);
+    const y0 = Math.min(box.y0, box.y1), y1 = Math.max(box.y0, box.y1);
+    const ids = [];
+    for (const h of renderer.hits) {
+      const cx = (h.x0 + h.x1) / 2, cy = (h.y0 + h.y1) / 2;
+      if (cx < x0 || cx > x1 || cy < y0 || cy > y1) continue;
+      for (const id of h.kind === 'army' ? [h.id] : h.kind === 'cluster' ? h.ids : []) {
+        if (armies.list.get(id)?.nation === state.playerNationId) ids.push(id);
+      }
+    }
+    if (!ids.length) { notice('No armies of yours inside the box.'); return; }
+    // Field armies lead; garrisons only join when nothing else was boxed.
+    const field = ids.filter((id) => !armies.list.get(id).garrison);
+    state.setArmyGroup(field.length ? field : ids);
+    if (field.length > 1 || (!field.length && ids.length > 1)) notice(`${(field.length ? field : ids).length} armies selected. Click a destination to move them all.`);
+  },
   onPan() {
     renderer.requestRender();
   },
@@ -375,13 +454,28 @@ const input = new InputController(canvas, camera, {
     const hit = hitTest(renderer, sx, sy);
     const sel = armies.list.get(state.selectedArmyId);
     const commanding = sel && sel.nation === state.playerNationId;
+    const group = commandGroup();
     if (hit?.kind === 'battle') { feed.open(hit.id); return; }
+    if (hit?.kind === 'cluster') {
+      // Merged badge: your own ones are picked as a group; any badge zooms in to split it up.
+      if (hit.nation === state.playerNationId) state.setArmyGroup(hit.ids);
+      focusOn(hit.wx, hit.wy, Math.max(camera.zoom * 2.5, detailZoom(34)), 0.6);
+      return;
+    }
     if (hit?.kind === 'army') {
       const target = armies.list.get(hit.id);
-      // With one of your armies selected, clicking an enemy counter attacks it.
-      if (commanding && target && target.nation !== sel.nation) { orderMove(sel, target.seg ? target.seg.to : target.node); return; }
+      // With your armies selected, clicking an enemy marker attacks it.
+      if (commanding && target && target.nation !== sel.nation) {
+        const node = target.seg ? target.seg.to : target.node;
+        if (group.length > 1) orderGroup(group, () => node); else orderMove(sel, node);
+        return;
+      }
       state.setSelected(-1);
-      state.setSelectedArmy(hit.id === state.selectedArmyId ? -1 : hit.id);
+      state.setSelectedArmy(hit.id === state.selectedArmyId && group.length < 2 ? -1 : hit.id);
+      return;
+    }
+    if (commanding && group.length > 1) {
+      orderGroup(group, (a) => armies.targetAt(a, id, w.x, w.y));
       return;
     }
     if (commanding) {
@@ -415,24 +509,26 @@ loadEra(initialEra, params.get('seed'));
 
 // --- Settings applied to the renderer and page ---
 
-// When quality is on Auto, watch real frame times while the map moves and
-// drop to Low for this session if they stay under ~40 fps (older tablets).
+// When quality is on Auto, watch real frame times and step down one level
+// (High → Medium → Low) for this session if they stay under ~45 fps, while
+// the map moves or the game runs: heavy effects go first on slower machines.
 let autoLowered = false;
 const motion = { time: 0, frames: 0 };
 function adaptQuality(dt) {
-  if (!settings.qualityIsAuto || autoLowered || renderer.quality === 'low') return;
-  if (!renderer.cameraMoving()) return;
-  // Accumulate across gestures: ~2 s of panning/zooming is enough to judge.
+  if (!settings.qualityIsAuto || renderer.quality === 'low') return;
+  if (!renderer.cameraMoving() && !(state.phase === 'playing' && state.clock.speed > 0)) return;
+  // Accumulate across gestures: ~3 s is enough to judge.
   motion.time += dt;
   motion.frames++;
-  if (motion.time < 2) return;
+  if (motion.time < 3) return;
   const avg = motion.time / motion.frames;
   motion.time = 0;
   motion.frames = 0;
-  if (avg > 1 / 40) {
+  if (avg > 1 / 45) {
     autoLowered = true;
-    renderer.setQuality('low');
-    console.info(`[quality] ${(1 / avg).toFixed(0)} fps while moving: switched to Low for this session`);
+    const to = renderer.quality === 'high' ? 'medium' : 'low';
+    renderer.setQuality(to);
+    console.info(`[quality] ${(1 / avg).toFixed(0)} fps: switched to ${to} for this session`);
   }
 }
 
@@ -457,6 +553,7 @@ async function setMapStyle(style) {
     b.setAttribute('aria-checked', String(on));
   }
   renderer.setStyle(style);
+  document.body.classList.toggle('style-satellite', style === 'satellite');
   if (style !== 'political' && !renderer.images[style]) {
     try { renderer.setImage(style, await loadImagery(style)); } catch (err) { console.error(err); }
   }
@@ -466,6 +563,8 @@ document.getElementById('style-toggle').addEventListener('click', (e) => {
   if (b) setMapStyle(b.dataset.style);
 });
 setMapStyle(mapStyle);
+// The menus fly over the satellite map with clouds.
+loadImagery('satellite').then((img) => { if (!renderer.images.satellite) renderer.setImage('satellite', img); }).catch(() => {});
 
 // --- Screens: sign-in → beta gate → main menu → era → nation → game ---
 
@@ -507,6 +606,7 @@ state.events.on('select:army', (id) => {
   const a = armies.list.get(id);
   if (!a || state.phase !== 'playing') return;
   requestAnimationFrame(() => {
+    if (camera.flight) return; // already flying there (e.g. zooming into a merged badge)
     const p = armies.armyPos(a);
     const s = camera.worldToScreen(p.x, p.y);
     const i = hudInsets();
@@ -517,7 +617,9 @@ state.events.on('select:army', (id) => {
   });
 });
 state.events.on('phase', (phase) => document.body.classList.toggle('in-game', phase === 'playing'));
-state.events.on('map:loaded', () => {
+state.events.on('map:loaded', (map) => {
+  setIconEra(map.era?.id);
+  document.body.dataset.theme = map.era?.id ?? 'fictional';
   screens.gameInProgress = false; // a new map ends any game in progress
   if (screens.ambient) menuCamera();
 });
@@ -535,6 +637,7 @@ launcher.run().then(() => {
 
 let last = performance.now();
 let lastSimDraw = 0;
+let lastAnim = 0;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -549,6 +652,9 @@ function frame(now) {
   // Armies move and battles pulse: redraw for that at most 30 times a second
   // (camera moves still redraw every frame).
   if (gameHours > 0 && armies.list.size && now - lastSimDraw > 32) { lastSimDraw = now; renderer.requestRender(); }
+  // Waves, clouds and battle effects animate at the quality's rate (Low: frozen).
+  renderer.setAmbient(!!screens.ambient && !!renderer.images.satellite);
+  if (renderer.animating() && now - lastAnim > 1000 / renderer.animFps()) { lastAnim = now; renderer.requestRender(); }
   feed.update(dt);
   windows.update(dt);
   updateBadges(dt);

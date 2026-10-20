@@ -15,6 +15,7 @@
  *   onClick(e), onChange(e)      — delegated events inside the body
  */
 
+import { svgIcon } from './icons.js';
 import { isNarrow, esc } from './ui-kit.js';
 
 export class WindowManager {
@@ -48,7 +49,7 @@ export class WindowManager {
   renderBar() {
     this.bar.innerHTML = [...this.windows.values()].map((w) => `
       <button type="button" data-win="${w.id}" aria-pressed="false" title="${esc(w.title)} (${w.key.toUpperCase()})">
-        <span class="cb-ico" aria-hidden="true">${w.glyph}</span><span class="cb-label">${esc(w.title)}</span><kbd>${w.key.toUpperCase()}</kbd>
+        <span class="cb-ico" aria-hidden="true">${svgIcon(w.id)}</span><span class="cb-label">${esc(w.title)}</span><kbd>${w.key.toUpperCase()}</kbd>
       </button>`).join('');
   }
 
@@ -114,7 +115,7 @@ export class WindowManager {
     el.setAttribute('aria-label', w.title);
     el.innerHTML = `
       <header class="win-head">
-        <span class="win-glyph" aria-hidden="true">${w.glyph}</span>
+        <span class="win-glyph" aria-hidden="true">${svgIcon(w.id)}</span>
         <h2>${esc(w.title)}</h2>
         <span class="win-sub"></span>
         <button type="button" class="icon-btn win-close" aria-label="Close ${esc(w.title)}">✕</button>

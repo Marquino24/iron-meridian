@@ -19,19 +19,23 @@
  */
 
 import { drawRoutes, drawForces } from './render-units.js';
+import { MapFx } from './render-fx.js';
 
 const COLORS = {
   void: '#040709',
-  ocean: '#0a1820',
-  shallow: '#0d2129',
-  grid: 'rgba(90,165,185,0.07)',
-  gridMajor: 'rgba(90,165,185,0.15)',
-  coastGlow: 'rgba(110,190,210,0.10)',
-  coast: 'rgba(165,215,225,0.55)',
-  provinceBorder: 'rgba(6,10,12,0.42)',
-  nationBorderDark: 'rgba(4,6,8,0.92)',
-  nationBorderLight: 'rgba(235,228,205,0.5)',
-  playerOutline: 'rgba(255,214,120,0.85)',
+  ocean: '#0c4a7e',
+  oceanDeep: '#072c52',
+  shallow: 'rgba(80,200,240,0.1)',
+  grid: 'rgba(160,215,255,0.06)',
+  gridMajor: 'rgba(160,215,255,0.13)',
+  coastGlow: 'rgba(150,230,255,0.28)',
+  coast: 'rgba(220,245,255,0.75)',
+  provinceBorder: 'rgba(10,16,30,0.3)',
+  nationBorderDark: 'rgba(10,14,28,0.78)',
+  nationBorderLight: 'rgba(255,255,255,0.6)',
+  nationGlow: 'rgba(255,255,255,0.2)',
+  playerOutline: '#ffd54a',
+  playerGlow: 'rgba(255,205,60,0.38)',
   dimOthers: 'rgba(3,6,8,0.6)',
   hoverFill: 'rgba(255,255,255,0.12)',
   hoverStroke: 'rgba(255,255,255,0.7)',
@@ -41,7 +45,7 @@ const COLORS = {
   label: '#ece6d2',
   labelDim: 'rgba(214,208,190,0.7)',
   labelHalo: 'rgba(4,7,9,0.88)',
-  unclaimed: '#4d5048',
+  unclaimed: '#8b8f7d',
 };
 
 const FONT_UI = '"Rajdhani", "Segoe UI", system-ui, sans-serif';
@@ -54,7 +58,7 @@ const FONT_OLD = '"IM Fell English", "Iowan Old Style", Georgia, serif';
  */
 const LOOKS = {
   political: {
-    ocean: COLORS.ocean, landAlpha: 1, patterns: true, glow: true, shallow: true, grid: true,
+    ocean: COLORS.ocean, landAlpha: 1, patterns: true, glow: true, shallow: true, grid: true, waves: true, borderGlow: COLORS.nationGlow,
     provinceBorder: COLORS.provinceBorder, nationDark: COLORS.nationBorderDark, nationLight: COLORS.nationBorderLight, nationDash: true,
     coast: COLORS.coast, label: COLORS.label, labelDim: COLORS.labelDim, halo: COLORS.labelHalo, font: FONT_UI, nationWeight: 700, upper: true,
   },
@@ -65,12 +69,13 @@ const LOOKS = {
     font: FONT_OLD, nationWeight: 400, italic: true, upper: true,
   },
   satellite: {
-    image: 'satellite', overlayAlpha: 0.3, patterns: false, glow: false, shallow: false, grid: true, gridColor: 'rgba(255,255,255,0.06)',
-    provinceBorder: 'rgba(255,255,255,0.2)', nationDark: 'rgba(0,0,0,0.55)', nationLight: 'rgba(255,255,255,0.85)', nationDash: false,
+    image: 'satellite', overlayAlpha: 0.16, patterns: false, glow: false, shallow: false, grid: true, gridColor: 'rgba(255,255,255,0.05)',
+    imageFilter: 'contrast(1.14) saturate(1.3) brightness(1.04)', clouds: true,
+    provinceBorder: 'rgba(255,255,255,0.18)', nationDark: 'rgba(0,0,0,0.6)', nationLight: 'rgba(255,255,255,0.95)', nationDash: false,
     coast: 'rgba(255,255,255,0.28)', label: '#ffffff', labelDim: 'rgba(235,240,240,0.8)', halo: 'rgba(0,0,0,0.75)', font: FONT_UI, nationWeight: 700, upper: true,
   },
   terrain: {
-    image: 'terrain', overlayAlpha: 0.1, patterns: false, glow: false, shallow: false, grid: false,
+    image: 'terrain', overlayAlpha: 0.12, imageFilter: 'saturate(1.2) contrast(1.06)', patterns: false, glow: false, shallow: false, grid: false,
     provinceBorder: 'rgba(70,55,40,0.22)', nationDark: 'rgba(72,44,72,0.85)', nationLight: null, nationDash: false, thinNation: true,
     coast: null, label: '#2a2622', labelDim: 'rgba(50,46,40,0.75)', halo: 'rgba(255,255,255,0.8)', font: FONT_UI, nationWeight: 700, upper: true,
   },
@@ -78,9 +83,9 @@ const LOOKS = {
 
 /** Device-pixel caps and effects per graphics quality. */
 const QUALITY = {
-  low: { dpr: 1, pad: 0.2, effects: false },
-  medium: { dpr: 1.5, pad: 0.3, effects: true },
-  high: { dpr: 2, pad: 0.3, effects: true },
+  low: { dpr: 1, pad: 0.2, effects: false, animFps: 0 },
+  medium: { dpr: 1.5, pad: 0.3, effects: true, animFps: 12 },
+  high: { dpr: 2, pad: 0.3, effects: true, animFps: 30 },
 };
 
 const PARCHMENT = [233, 220, 184];
@@ -125,7 +130,7 @@ function traceRings(path, rings) {
   }
 }
 
-const baseColor = (nation) => (nation ? mix(hexToRgb(nation.color), [20, 26, 30], 0.15) : hexToRgb(COLORS.unclaimed));
+const baseColor = (nation) => (nation ? mix(hexToRgb(nation.color), [20, 26, 30], 0.04) : hexToRgb(COLORS.unclaimed));
 
 function provinceFill(province, nation) {
   const shade = TERRAIN_SHADE[province.terrain];
@@ -333,12 +338,15 @@ export class Renderer {
     this.lastFrameMs = 0;
     this.sim = null;               // { armies, combat }, set by main.js
     this.hits = [];                // clickable counters/battles from the last frame
+    this.fx = new MapFx(this);
+    this.showClouds = true;        // satellite clouds layer (toggle on the style bar)
+    this.ambient = false;          // menus: satellite with clouds behind the screens
 
     const redraw = () => this.requestRender();
     const relayer = () => this.invalidateLayer();
     state.events.on('map:loaded', () => this.buildGeometry());
     state.events.on('province:owner', () => this.rebuildOwnership());
-    for (const evt of ['hover', 'select', 'select:army', 'armies', 'war']) state.events.on(evt, redraw);
+    for (const evt of ['hover', 'select', 'select:army', 'select:group', 'armies', 'war']) state.events.on(evt, redraw);
     for (const evt of ['focus:nation', 'player', 'phase']) state.events.on(evt, relayer);
     document.fonts?.ready.then(redraw);
   }
@@ -363,8 +371,42 @@ export class Renderer {
     this.invalidateLayer();
   }
 
+  /** Menus show the satellite map with clouds, whatever the in-game style. */
+  setAmbient(on) {
+    if (on === this.ambient) return;
+    this.ambient = on;
+    this.invalidateLayer();
+  }
+
+  setClouds(on) {
+    this.showClouds = on;
+    this.invalidateLayer();
+  }
+
+  /** Clouds drift live on High; on Low and Medium they are baked into the map layer. */
+  liveClouds() {
+    return this.animFps() >= 20;
+  }
+
+  /** Frames per second the live effects (waves, clouds, battles) want; 0 = static. */
+  animFps() {
+    return QUALITY[this.quality].animFps;
+  }
+
+  /** True when this frame shows something that moves on its own. */
+  animating() {
+    if (!this.animFps() || !this.cache) return false;
+    const L = this.look();
+    return !!(L.waves || (this.cloudsOn(L) && this.liveClouds()) || this.sim?.combat.active.size);
+  }
+
+  cloudsOn(L) {
+    return this.ambient ? !!this.images.satellite : !!(L.clouds && this.showClouds && this.images[L.image]);
+  }
+
   /** The effective look: the chosen style, with parchment for old eras' political map. */
   look() {
+    if (this.ambient && this.images.satellite) return LOOKS.satellite;
     if (this.style === 'political') return this.state.map?.era?.oldMap ? LOOKS.parchment : LOOKS.political;
     return LOOKS[this.style];
   }
@@ -522,9 +564,11 @@ export class Renderer {
 
     // Blit the static layer.
     const L = this.layerFrame;
+    const look = this.look();
+    const effects = QUALITY[this.quality].effects;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (use === 'scaled') {
-      ctx.fillStyle = COLORS.void;
+      ctx.fillStyle = look.waves ? COLORS.oceanDeep : COLORS.void;
       ctx.fillRect(0, 0, cam.viewW, cam.viewH);
     }
     // Copy only the visible part of the layer (much cheaper than the whole bitmap).
@@ -540,6 +584,9 @@ export class Renderer {
       ctx.drawImage(this.layer, (ix0 - lx0) * s, (iy0 - ly0) * s, (ix1 - ix0) * s, (iy1 - iy0) * s, d.x, d.y, (ix1 - ix0) * z, (iy1 - iy0) * z);
       ctx.imageSmoothingEnabled = true;
     }
+
+    // Moving wave crests on the open sea (Medium and High).
+    if (look.waves && this.animFps()) this.fx.drawCrests(ctx, this.animFps());
 
     // Dynamic world-space layer.
     const ox = cam.viewW / 2 - cam.x * z, oy = cam.viewH / 2 - cam.y * z;
@@ -571,6 +618,7 @@ export class Renderer {
 
     // Screen-space overlay: icons and labels stay a constant pixel size.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this.cloudsOn(look) && this.liveClouds()) this.fx.drawClouds(ctx, this.animFps(), effects, this.ambient ? 0.7 : 1);
     this.drawOverlay(state.map.provinceScale * z);
     drawForces(this);
 
@@ -644,7 +692,7 @@ export class Renderer {
     const image = L.image ? this.images[L.image] : null;
 
     ctx.setTransform(F.dpr, 0, 0, F.dpr, 0, 0);
-    ctx.fillStyle = COLORS.void;
+    ctx.fillStyle = L.waves ? COLORS.oceanDeep : COLORS.void; // beyond the map's edge
     ctx.fillRect(0, 0, F.w, F.h);
     const ox = F.w / 2 - F.x * z, oy = F.h / 2 - F.y * z;
     ctx.setTransform(F.dpr * z, 0, 0, F.dpr * z, F.dpr * ox, F.dpr * oy);
@@ -653,7 +701,9 @@ export class Renderer {
 
     // 1. Base: imagery, or ocean + grid.
     if (image) {
-      this.drawImagery(ctx, image, view, map);
+      this.drawImagery(ctx, image, view, map, fx ? L.imageFilter : null);
+    } else if (L.waves) {
+      this.fx.bakeOcean(ctx, map, COLORS, fx, z);
     } else {
       ctx.fillStyle = L.ocean ?? COLORS.ocean;
       ctx.fillRect(0, 0, map.width, map.height);
@@ -732,6 +782,9 @@ export class Renderer {
       ctx.restore();
     }
 
+    // Clouds, still, on Low and Medium (High draws them live, drifting).
+    if (this.cloudsOn(L) && !this.liveClouds() && !F.fast) this.fx.bakeClouds(ctx, F, fx, this.ambient ? 0.7 : 1);
+
     // Start screen: dim every nation except the one being previewed.
     const focus = state.phase === 'setup' ? state.focusedNationId : -1;
     if (focus >= 0) {
@@ -750,6 +803,11 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     const thick = L.thinNation ? 1.3 : clamp(provincePx / 12, 1.6, 3.2);
+    if (L.borderGlow && fx) {
+      ctx.strokeStyle = L.borderGlow;
+      ctx.lineWidth = (thick + 5) * px;
+      cache.nationBorders.stroke(ctx, view);
+    }
     ctx.strokeStyle = L.nationDark;
     ctx.lineWidth = thick * px;
     cache.nationBorders.stroke(ctx, view);
@@ -769,14 +827,22 @@ export class Renderer {
     // Highlight outline: player's nation in game, previewed nation in setup.
     const outlined = state.phase === 'playing' ? state.playerNationId : focus;
     if (outlined >= 0) {
+      // Your nation glows gold.
+      if (fx) {
+        ctx.strokeStyle = COLORS.playerGlow;
+        ctx.lineWidth = 10 * px;
+        ctx.stroke(cache.nationOutlines[outlined]);
+        ctx.lineWidth = 5 * px;
+        ctx.stroke(cache.nationOutlines[outlined]);
+      }
       ctx.strokeStyle = COLORS.playerOutline;
-      ctx.lineWidth = 1.8 * px;
+      ctx.lineWidth = 2.4 * px;
       ctx.stroke(cache.nationOutlines[outlined]);
     }
   }
 
   /** Draw the visible part of a world image (it covers the map exactly). */
-  drawImagery(ctx, img, view, map) {
+  drawImagery(ctx, img, view, map, filter) {
     const x0 = Math.max(0, view.x0), y0 = Math.max(0, view.y0);
     const x1 = Math.min(map.width, view.x1), y1 = Math.min(map.height, view.y1);
     ctx.fillStyle = '#0b1622';
@@ -785,7 +851,9 @@ export class Renderer {
     const kx = img.width / map.width, ky = img.height / map.height;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = this.quality === 'low' ? 'low' : 'high';
+    if (filter) ctx.filter = filter;
     ctx.drawImage(img, x0 * kx, y0 * ky, (x1 - x0) * kx, (y1 - y0) * ky, x0, y0, x1 - x0, y1 - y0);
+    ctx.filter = 'none';
   }
 
   /** Lat/lon graticule on real maps, tactical grid on generated ones. */
@@ -875,7 +943,8 @@ export class Renderer {
     }
 
     // 2. Cities: capitals and big provinces first; names once there's room.
-    const iconScale = clamp(0.8 + (provincePx - 30) / 200, 0.8, 1.3);
+    const iconScale = clamp(0.85 + (provincePx - 30) / 160, 0.85, 1.4);
+    const me = state.phase === 'playing' ? state.playerNationId : -1;
     ctx.font = `${italic}600 ${Math.round(12 * iconScale)}px ${L.font}`;
     for (const p of cache.cities) {
       const ps = Math.sqrt(p.area) * z; // this province's size on screen
@@ -885,14 +954,17 @@ export class Renderer {
       const pos = p.cityPos ?? p.center;
       const s = cam.worldToScreen(pos.x, pos.y);
       if (!onScreen(s)) continue;
-      const r = p.isCapital ? 6 * iconScale : 3.6 * iconScale;
+      // Sized by importance: capitals of majors, other capitals, then cities by province size.
+      const imp = clamp(Math.sqrt(p.area) / map.provinceScale, 0.6, 2);
+      const r = (p.isCapital ? (major ? 10.5 : 8.5) : 4.6 + imp * 1.6) * iconScale;
       // Major powers' capitals always show; everything else yields to what's already placed.
       if (!space.claim(s.x, s.y, r * 2 + 2, r * 2 + 2) && !major) continue;
-      if (p.isCapital) this.drawCapitalIcon(s.x, s.y, r);
-      else this.drawCityIcon(s.x, s.y, r);
+      const color = nation?.color ?? COLORS.unclaimed;
+      if (p.isCapital) this.fx.drawCapital(ctx, s.x, s.y, r, color, p.owner === me && QUALITY[this.quality].effects);
+      else this.fx.drawCity(ctx, s.x, s.y, r, color, imp > 1.25);
       if (ps < (p.isCapital ? 30 : 42)) continue;
       const name = p.cityName ?? p.name;
-      const y = s.y + r + 9;
+      const y = s.y + r + 10;
       const w = ctx.measureText(name).width;
       if (space.claim(s.x, y, w + 4, 14)) this.haloText(name, s.x, y, 3);
     }
@@ -922,37 +994,5 @@ export class Renderer {
     ctx.strokeText(text, x, y);
     ctx.fillStyle = color;
     ctx.fillText(text, x, y);
-  }
-
-  /** NATO-style square city marker. */
-  drawCityIcon(x, y, r) {
-    const ctx = this.ctx;
-    ctx.fillStyle = '#0a0e10';
-    ctx.fillRect(x - r - 1.5, y - r - 1.5, 2 * r + 3, 2 * r + 3);
-    ctx.fillStyle = '#e8e2cc';
-    ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
-    ctx.fillStyle = '#0a0e10';
-    ctx.fillRect(x - r * 0.35, y - r * 0.35, r * 0.7, r * 0.7);
-  }
-
-  /** Capital: gold star in a dark ring. */
-  drawCapitalIcon(x, y, r) {
-    const ctx = this.ctx;
-    ctx.beginPath();
-    ctx.arc(x, y, r + 3, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(8,10,12,0.9)';
-    ctx.fill();
-    ctx.strokeStyle = '#ffd25a';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const a = -Math.PI / 2 + (i * Math.PI) / 5;
-      const rr = i % 2 === 0 ? r : r * 0.45;
-      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#ffd25a';
-    ctx.fill();
   }
 }

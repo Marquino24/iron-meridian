@@ -153,11 +153,24 @@ Every nation you don't play runs `js/ai.js`. Each has a personality: **Aggressiv
 
 ## Map styles and settings
 
-- **Political:** flat nation colours with terrain symbols. Roman and Medieval eras draw it as an old parchment map.
+- **Political:** vivid nation colours with terrain symbols, a soft glow along borders, your nation outlined in glowing gold, and a blue ocean with wave crests. Roman and Medieval eras draw it as an old parchment map.
 - **Satellite:** NASA Blue Marble (topography and bathymetry, August 2004) reprojected to the game's Miller projection, with extra relief shading, semi-transparent nation colours and crisp borders on top.
 - **Terrain:** Natural Earth II land cover with shaded relief and thin nation borders.
+- **Clouds** (satellite only, toggle on the style bar): soft clouds with ground shadows that thin out as you zoom in. The menus fly over the satellite map with clouds.
 
-Switch styles in game (bottom right); the default is in **Settings**, along with graphics quality (Low / Medium / High; Low on phones and Medium on tablets by default, and on Auto the game drops to Low by itself if panning gets choppy), UI scale and sound volume (saved for later; there's no sound yet). Rebuild the imagery with `python3 tools/build-imagery.py` (needs Pillow and NumPy; downloads are described in the script).
+Switch styles with the big Political / Satellite / Terrain buttons (top right, always on screen); the default is in **Settings**, along with graphics quality, UI scale and sound volume.
+
+Graphics quality sets the effects (everything is drawn in code; there are no image files besides the two map rasters):
+
+| | Low (phones) | Medium (tablets) | High (desktop) |
+|---|---|---|---|
+| Wave crests on the ocean | — | moving, ~12 fps | moving, ~30 fps |
+| Clouds | still (baked into the map) | still, with shadows | drifting, with shadows |
+| Battle sparks and explosions | still badge | animated | animated |
+| Border glow, gold glow on your nation, terrain symbols | — | yes | yes |
+| Resolution cap | 1× | 1.5× | 2× |
+
+On Auto the game steps down one level (High → Medium → Low) for the session if frames stay under ~45 fps while you pan or the clock runs. UI scale and sound volume (saved for later; there's no sound yet). Rebuild the imagery with `python3 tools/build-imagery.py` (needs Pillow and NumPy; downloads are described in the script).
 
 ## Controls
 
@@ -167,7 +180,9 @@ Switch styles in game (bottom right); the default is in **Settings**, along with
 | Scroll wheel / pinch / trackpad pinch | Zoom toward the cursor |
 | Arrow keys, `+` / `-` | Pan / zoom |
 | Click a province | Inspect it (on the start screen, clicking picks that nation) |
-| Click an army counter | Select it; then click a province or sea zone to move, or an enemy counter to attack it |
+| Click an army marker | Select it; then click a province or sea zone to move, or an enemy marker to attack it |
+| Shift + drag (desktop) / hold two fingers still, then spread them (phone, tablet) | Box selection: picks every army of yours inside; the next click moves them all (bar at the bottom: Halt / Clear) |
+| Click a merged badge (zoomed out) | Zooms in to split it; your own badge also selects those armies |
 | Click crossed swords / a feed entry | Battle report |
 | A / P / B / R | Army / Production / Buildings / Research window |
 | Esc | Close the top window, else deselect (army first, then province) |
@@ -177,7 +192,7 @@ Switch styles in game (bottom right); the default is in **Settings**, along with
 
 ```
 index.html        Page shell: canvas + HUD markup (top bar, panel, status bar, start screen)
-styles.css        Tactical HUD theme, responsive layout
+styles.css        HUD theme with era palettes (body[data-theme]), responsive layout
 package.json      npm start / npm test
 data/eras/        Prebuilt era maps (one JSON per era, ~0.6–1.4 MB each; gzip ~0.2–0.4 MB)
 assets/           satellite.webp, terrain.webp (4096×2051, Miller projection)
@@ -220,7 +235,11 @@ js/
   armies.js       Armies and fleets: spawning, land+sea movement graph, pathfinding,
                   marching, split/merge, recruitment queues
   combat.js       Wars, hourly battles, retreats, occupation, capture, conquest
-  render-units.js Army counters, routes with ETA, battle and occupation markers, hit testing
+  render-units.js Army markers (era unit icon, nation ring, count, HP bar), merged badges when zoomed out,
+                  route arrows with ETA, animated battle clash, occupation rings, box selection, hit testing
+  render-fx.js    Ocean, wave crests, clouds, city and capital badges (cached sprites)
+  icons.js        Every icon as SVG paths: resources, units per era, buildings, HUD (inline SVG + canvas)
+  palette.js      Vivid nation colours from the era data's muted ones
   command-ui.js   Money/manpower bar, army panel, recruit/war sections of the province panel
   feed.js         Event feed and battle report popup
   resources.js    Era resource sets, province yields, oil deposits

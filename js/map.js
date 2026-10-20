@@ -48,7 +48,7 @@ export const TERRAIN = {
   urban:     { id: 'urban',     label: 'Urban',     moveCost: 1.0,  defense: 1.4 },
 };
 
-const NATION_COLORS = ['#4f7cac', '#b5523b', '#6f9442', '#c79b3b', '#8061ad', '#3c9c94'];
+const NATION_COLORS = ['#2f7fe0', '#e0452f', '#3fbf4a', '#f2b51d', '#9b4fe0', '#16b8b0'];
 const FLAG_TINTS = ['#ece6d6', '#16191c', '#c9a63c', '#8e2323', '#1f3f6b', '#2e5b34'];
 const FLAG_PATTERNS = ['h3', 'v3', 'h2', 'v2', 'cross', 'canton', 'diag'];
 const NATION_FORMS = [

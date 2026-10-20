@@ -1,6 +1,6 @@
 // Browser test of step 5: AI nations, diplomacy alerts, war lines, frame rate.
 //   python3 -m http.server 3000   (in the project root), then:
-//   node tools/e2e/ai.test.mjs [screenshot-dir] [--cpu=4] [--seconds=40]
+//   node tools/e2e/ai.test.mjs [screenshot-dir] [--cpu=4] [--seconds=40] [--quality=low|medium|high]
 // --cpu=4 throttles the CPU 4× (a rough stand-in for an older iPad).
 import { chromium } from 'playwright-core';
 
@@ -9,6 +9,7 @@ const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.arg
 const CPU = Number(process.argv.find((a) => a.startsWith('--cpu='))?.slice(6) ?? 1);
 const SECONDS = Number(process.argv.find((a) => a.startsWith('--seconds='))?.slice(10) ?? 40);
 const NOAI = process.argv.includes('--noai');
+const QUALITY = process.argv.find((a) => a.startsWith('--quality='))?.slice(10) ?? null;
 const DAYS = Number(process.argv.find((a) => a.startsWith('--days='))?.slice(7) ?? 60);
 const ERA = process.env.ERA ?? 'ww2';
 const NATION = process.env.NATION ?? 'Poland';
@@ -108,6 +109,7 @@ if (CPU > 1) {
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
 }
 if (NOAI) await IM(() => { window.ironMeridian.ai.enabled = false; });
+if (QUALITY) await IM((q) => window.ironMeridian.settings.set('quality', q), QUALITY);
 await IM(() => { const { camera, state } = window.ironMeridian; camera.flyTo(state.map.width * 0.53, state.map.height * 0.33, camera.refZoom * 1.6, 0.01); state.setSpeed(4); });
 const perf = await IM(async (seconds) => {
   const { ai, renderer, camera } = window.ironMeridian;
@@ -130,7 +132,7 @@ const perf = await IM(async (seconds) => {
   const q = (f) => times[Math.floor(times.length * f)];
   return { frames: times.length, fps: Math.round(1000 / q(0.5)), p95: q(0.95).toFixed(1), p99: q(0.99).toFixed(1), aiMaxFrame: ai.stats.maxFrameMs.toFixed(1), aiAvg: (ai.stats.ms / Math.max(1, ai.stats.frames)).toFixed(2), thinks: ai.stats.thinks, wars: window.ironMeridian.sim.combat.wars.size };
 }, SECONDS);
-console.log(`     ${SECONDS}s at 4× (${SECONDS * 4} game hours), CPU ×${CPU}${NOAI ? ', AI OFF' : ''}: median ${perf.fps} fps, p95 ${perf.p95} ms, p99 ${perf.p99} ms; AI ${perf.thinks} thinks, avg ${perf.aiAvg} ms/frame, worst ${perf.aiMaxFrame} ms; ${perf.wars} wars active`);
+console.log(`     ${SECONDS}s at 4× (${SECONDS * 4} game hours), CPU ×${CPU}${NOAI ? ', AI OFF' : ''}, quality ${await IM(() => window.ironMeridian.renderer.quality)}: median ${perf.fps} fps, p95 ${perf.p95} ms, p99 ${perf.p99} ms; AI ${perf.thinks} thinks, avg ${perf.aiAvg} ms/frame, worst ${perf.aiMaxFrame} ms; ${perf.wars} wars active`);
 check(perf.fps >= (CPU > 1 ? 30 : 55), `frame rate with all AI active: ${perf.fps} fps`);
 await IM(() => window.ironMeridian.state.setSpeed(0));
 await page.waitForTimeout(300);

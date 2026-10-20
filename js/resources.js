@@ -19,15 +19,16 @@
  */
 
 import { project } from './projection.js';
+import { resourceSvg } from './icons.js';
 import { hashSeed } from './map.js';
 
 export const RESOURCES = {
-  money: { key: 'money', icon: '◉', color: '#ffb547' },
-  food: { key: 'food', icon: '❦', color: '#9fd36a' },
-  steel: { key: 'steel', icon: '▣', color: '#b8c4cc' },
-  oil: { key: 'oil', icon: '⬮', color: '#c58cff' },
-  electronics: { key: 'electronics', icon: '⌁', color: '#6fd3e0' },
-  manpower: { key: 'manpower', icon: '♟', color: '#e8e2cc' },
+  money: { key: 'money', icon: resourceSvg('money'), color: '#ffc83d' },
+  food: { key: 'food', icon: resourceSvg('food'), color: '#a6e05a' },
+  steel: { key: 'steel', icon: resourceSvg('steel'), color: '#c9d6e2' },
+  oil: { key: 'oil', icon: resourceSvg('oil'), color: '#ff7a59' },
+  electronics: { key: 'electronics', icon: resourceSvg('electronics'), color: '#3fe0f0' },
+  manpower: { key: 'manpower', icon: resourceSvg('manpower'), color: '#8fb8ff' },
 };
 
 const ANCIENT = { keys: ['money', 'food', 'steel', 'manpower'], labels: { money: 'Gold', food: 'Grain', steel: 'Iron', manpower: 'Manpower' }, industrial: false };
