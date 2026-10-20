@@ -36,7 +36,7 @@ export const FLAG_SOURCES = {
   medieval: {
     'Kingdom of France': 'own:france-ancien',
     'Angevin Empire': 'wc:Royal banner of England.svg',
-    'Holy Roman Empire': 'wc:Flag of the Holy Roman Empire (1200-1350).svg',
+    'Holy Roman Empire': 'wc:Heiliges Römisches Reich - Reichssturmfahne vor 1433.svg',
     'Castilla': 'own:castile',
     'León': 'wc:Banner of arms kingdom of Leon.svg',
     'Aragón': 'own:aragon',
