@@ -30,6 +30,12 @@ const CASTLE = `<g fill="#f4c430" stroke="#6b4a08" stroke-width="2">
 <path d="M112 100h6v-10h-6zM147 90h6v-12h-6zM182 100h6v-10h-6zM110 135h8v-12h-8zM182 135h8v-12h-8z" fill="#2a4fa0"/>`;
 
 export const CUSTOM_FLAGS = {
+  // Mali Federation (1959–60, Senegal and French Sudan): green-yellow-red with a black kanaga figure.
+  'mali-federation': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
+    <rect width="100" height="200" fill="#14b53a"/><rect x="100" width="100" height="200" fill="#fcd116"/><rect x="200" width="100" height="200" fill="#ce1126"/>
+    <g fill="#000"><rect x="146" y="40" width="8" height="120"/><rect x="115" y="70" width="70" height="8"/><rect x="115" y="122" width="70" height="8"/>
+      <rect x="115" y="48" width="8" height="30"/><rect x="177" y="48" width="8" height="30"/><rect x="115" y="122" width="8" height="30"/><rect x="177" y="122" width="8" height="30"/>
+      <circle cx="150" cy="36" r="9"/></g></svg>`,
   // Roman vexillum: red cloth on a crossbar, gold fringe, SPQR in gold.
   spqr: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
     <rect width="300" height="200" fill="#1b0d0a"/>

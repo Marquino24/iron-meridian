@@ -51,7 +51,7 @@ function load(spec) {
   if (src.startsWith('wc:')) {
     const m = wcMeta[src.slice(3)];
     if (!m || !existsSync(join(wcDir, m.file))) return null;
-    return { key: src, svg: readFileSync(join(wcDir, m.file), 'utf8'), stretch: 'auto', credit: { source: `Wikimedia Commons: ${m.canonical}`, url: m.page, license: m.licenses.join(', ') || 'see page', author: m.author } };
+    return { key: src, svg: readFileSync(join(wcDir, m.file), 'utf8'), stretch: 'auto', credit: { source: `Wikimedia Commons: ${m.canonical}`, url: m.page, license: m.licenses.join(', ') || 'see page', licenseUrl: (m.licenseLinks ?? [])[0], author: m.author } };
   }
   if (src.startsWith('own:')) {
     const svg = CUSTOM_FLAGS[src.slice(4)];
@@ -181,12 +181,13 @@ const missing = ERAS.flatMap((e) => counts[e].missing.map((m) => `- ${e}: ${m}`)
 if (missing.length) lines.push('### Wanted but not available (generated instead)', '', ...missing, '');
 lines.push('## Sources', '');
 lines.push('- **flag-icons** by Panayiotis Lipiridis, https://github.com/lipis/flag-icons — MIT licence (below).');
-lines.push('- **Wikimedia Commons** files, each with the licence stated on its page (listed below). Most national flags are in the public domain.');
+lines.push('- **Wikimedia Commons** files, each with the licence stated on its page (listed below). Most are in the public domain; the few under CC BY-SA or similar keep that licence in the rendered sprite sheets (the tile is an adaptation), with the author and link given below.');
 lines.push('- **Drawn for this game**: Roman vexillum, Han banner, and simple medieval banners of arms (tools/flag-custom.mjs).', '');
 lines.push('| Flag | Licence | Author | Used for |', '|---|---|---|---|');
 for (const cr of [...credits.values()].sort((a, b) => a.source.localeCompare(b.source))) {
   const name = cr.url ? `[${cr.source}](${cr.url})` : cr.source;
-  lines.push(`| ${name} | ${cr.license} | ${(cr.author ?? '').replace(/\|/g, '/').replace(/\s+/g, ' ')} | ${cr.used.join('; ')} |`);
+  const lic = cr.licenseUrl ? `[${cr.license}](${cr.licenseUrl})` : cr.license;
+  lines.push(`| ${name} | ${lic} | ${(cr.author ?? '').replace(/\|/g, '/').replace(/\s+/g, ' ')} | ${cr.used.join('; ')} |`);
 }
 lines.push('', '## flag-icons licence', '', '```', fiLicense, '```', '');
 mkdirSync(join(root, 'docs'), { recursive: true });
