@@ -47,8 +47,12 @@ missing = []
 for t in titles:
     k = key(t)
     svg = os.path.join(CACHE, k + '.svg')
-    have_svg = os.path.exists(svg) and os.path.getsize(svg) > 100
-    if t in meta and have_svg and meta[t].get('licenses'):
+    have_svg = os.path.exists(svg) and os.path.getsize(svg) > 100 and '<svg' in open(svg, errors='replace').read(4000)
+    if os.path.exists(svg) and not have_svg:
+        os.remove(svg)  # an error page saved in place of the file
+    m = meta.get(t, {})
+    # Done unless the licence is missing, or a non-public-domain file lacks its author.
+    if have_svg and m.get('licenses') and (m.get('author') or all('public domain' in l.lower() or l.startswith('PD') for l in m['licenses'])):
         continue
     page_url = 'https://commons.wikimedia.org/wiki/File:' + urllib.parse.quote(t.replace(' ', '_'))
     code, page = get(page_url)
@@ -58,12 +62,14 @@ for t in titles:
     canon = urllib.parse.unquote(canon.group(1)).replace('_', ' ') if canon else t
     lic = sorted({html.unescape(x).strip() for x in re.findall(r'licensetpl&#95;short"[^>]*>([^<]*)<', page) if x.strip()})
     links = sorted({html.unescape(x).strip() for x in re.findall(r'licensetpl&#95;link"[^>]*>([^<]*)<', page) if x.strip()})
-    author = re.search(r'id="fileinfotpl_aut"[^>]*>.*?</td>\s*<td[^>]*>(.*?)</td>', page, re.S)
+    author = re.search(r'id="fileinfotpl(?:_|&#95;)aut"[^>]*>.*?</td>\s*<td[^>]*>(.*?)</td>', page, re.S)
     author = re.sub(r'<[^>]+>', '', html.unescape(author.group(1))).strip()[:160] if author else ''
     file_url = re.search(r'href="((?:https:)?//upload\.wikimedia\.org/wikipedia/commons/[0-9a-f]/[0-9a-f]{2}/[^"?]+\.svg)(?:\?[^"]*)?"', page)
     if not file_url:
         missing.append(t); print('NOFILE', t); continue
     code = 200 if have_svg else get('https:' + html.unescape(file_url.group(1)).removeprefix('https:'), svg)[0]
+    if code == 200 and '<svg' not in open(svg, errors='replace').read(4000):
+        os.remove(svg); code = 'not-svg'
     if code != 200:
         missing.append(t); print('DOWNLOAD', code, t); continue
     meta[t] = {'file': k + '.svg', 'canonical': canon, 'licenses': lic, 'licenseLinks': links, 'author': author, 'page': 'https://commons.wikimedia.org/wiki/File:' + urllib.parse.quote(canon.replace(' ', '_'))}

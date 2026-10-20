@@ -51,6 +51,7 @@ function load(spec) {
   if (src.startsWith('wc:')) {
     const m = wcMeta[src.slice(3)];
     if (!m || !existsSync(join(wcDir, m.file))) return null;
+    if (!readFileSync(join(wcDir, m.file), 'utf8').slice(0, 4000).includes('<svg')) return null; // an error page, not the file
     return { key: src, svg: readFileSync(join(wcDir, m.file), 'utf8'), stretch: 'auto', credit: { source: `Wikimedia Commons: ${m.canonical}`, url: m.page, license: m.licenses.join(', ') || 'see page', licenseUrl: (m.licenseLinks ?? [])[0], author: m.author } };
   }
   if (src.startsWith('own:')) {
