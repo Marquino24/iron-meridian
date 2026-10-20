@@ -52,7 +52,8 @@ for t in titles:
         os.remove(svg)  # an error page saved in place of the file
     m = meta.get(t, {})
     # Done unless the licence is missing, or a non-public-domain file lacks its author.
-    if have_svg and m.get('licenses') and (m.get('author') or all('public domain' in l.lower() or l.startswith('PD') for l in m['licenses'])):
+    have_any = have_svg or (os.path.exists(os.path.join(CACHE, k + '.png')))
+    if have_any and m.get('licenses') and (m.get('author') or all('public domain' in l.lower() or l.startswith('PD') for l in m['licenses'])):
         continue
     page_url = 'https://commons.wikimedia.org/wiki/File:' + urllib.parse.quote(t.replace(' ', '_'))
     code, page = get(page_url)
@@ -67,12 +68,26 @@ for t in titles:
     file_url = re.search(r'href="((?:https:)?//upload\.wikimedia\.org/wikipedia/commons/[0-9a-f]/[0-9a-f]{2}/[^"?]+\.svg)(?:\?[^"]*)?"', page)
     if not file_url:
         missing.append(t); print('NOFILE', t); continue
-    code = 200 if have_svg else get('https:' + html.unescape(file_url.group(1)).removeprefix('https:'), svg)[0]
-    if code == 200 and '<svg' not in open(svg, errors='replace').read(4000):
+    png = os.path.join(CACHE, k + '.png')
+    have_png = os.path.exists(png) and open(png, 'rb').read(4) == b'\x89PNG'
+    orig = 'https:' + html.unescape(file_url.group(1)).removeprefix('https:')
+    code = 200 if have_svg or have_png else get(orig, svg)[0]
+    if code == 200 and not have_png and '<svg' not in open(svg, errors='replace').read(4000):
         os.remove(svg); code = 'not-svg'
+    raster = have_png
+    if code != 200 and not have_png:
+        # The originals server sometimes refuses (429) and asks for thumbnails:
+        # take the 500 px PNG rendering instead (tiles are 180 px wide).
+        name = orig.rsplit('/', 1)[1]
+        thumb = orig.replace('/wikipedia/commons/', '/wikipedia/commons/thumb/') + f'/500px-{name}.png'
+        tcode, _ = get(thumb, png)
+        if tcode == 200 and open(png, 'rb').read(4) == b'\x89PNG':
+            code, raster = 200, True
+        elif os.path.exists(png):
+            os.remove(png)
     if code != 200:
         missing.append(t); print('DOWNLOAD', code, t); continue
-    meta[t] = {'file': k + '.svg', 'canonical': canon, 'licenses': lic, 'licenseLinks': links, 'author': author, 'page': 'https://commons.wikimedia.org/wiki/File:' + urllib.parse.quote(canon.replace(' ', '_'))}
+    meta[t] = {'file': k + ('.png' if raster else '.svg'), 'canonical': canon, 'licenses': lic, 'licenseLinks': links, 'author': author, 'page': 'https://commons.wikimedia.org/wiki/File:' + urllib.parse.quote(canon.replace(' ', '_'))}
     json.dump(meta, open(meta_path, 'w'), indent=1, ensure_ascii=False)
     print('ok', t, '|', ', '.join(lic), '|', author[:50])
 print(len(meta), 'cached;', len(missing), 'missing')

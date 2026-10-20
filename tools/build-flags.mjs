@@ -51,6 +51,12 @@ function load(spec) {
   if (src.startsWith('wc:')) {
     const m = wcMeta[src.slice(3)];
     if (!m || !existsSync(join(wcDir, m.file))) return null;
+    if (m.file.endsWith('.png')) {
+      // Commons' own PNG rendering (used when the SVG original was refused).
+      const buf = readFileSync(join(wcDir, m.file));
+      const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
+      return { key: src, png: `data:image/png;base64,${buf.toString('base64')}`, w, h, aspect: w / h, stretch: 'auto', credit: { source: `Wikimedia Commons: ${m.canonical} (PNG rendering)`, url: m.page, license: m.licenses.join(', ') || 'see page', licenseUrl: (m.licenseLinks ?? [])[0], author: m.author } };
+    }
     if (!readFileSync(join(wcDir, m.file), 'utf8').slice(0, 4000).includes('<svg')) return null; // an error page, not the file
     return { key: src, svg: readFileSync(join(wcDir, m.file), 'utf8'), stretch: 'auto', credit: { source: `Wikimedia Commons: ${m.canonical}`, url: m.page, license: m.licenses.join(', ') || 'see page', licenseUrl: (m.licenseLinks ?? [])[0], author: m.author } };
   }
@@ -108,7 +114,7 @@ for (const era of ERAS) {
     }
     const colonial = spec.startsWith('col:');
     if (!tileOf.has(got.key)) {
-      const { aspect, w, h } = aspectOf(got.svg);
+      const { aspect, w, h } = got.png ? got : aspectOf(got.svg);
       tileOf.set(got.key, tiles.length);
       tiles.push({ ...got, aspect, w, h });
     }
@@ -128,7 +134,7 @@ for (const era of ERAS) {
     // redraws); flags far from it (Nepal, Switzerland, Vatican…) keep their shape.
     const fill = t.stretch === true ? (t.aspect > 1.2) : (t.aspect >= 1.3 && t.aspect <= 2.05);
     const scale = 4;
-    const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sized(t.svg, Math.round(t.aspect * 120 * scale), 120 * scale, t.w, t.h))}`;
+    const src = t.png ?? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sized(t.svg, Math.round(t.aspect * 120 * scale), 120 * scale, t.w, t.h))}`;
     return { src, fill, aspect: t.aspect };
   });
   const webp = await page.evaluate(async ({ payload, TILE_W, TILE_H, COLS, rows }) => {
