@@ -62,6 +62,7 @@ export class AI {
     this.difficulty = 'normal';
     this.budgetMs = 3;           // per frame; headless runs set Infinity
     this.enabled = true;
+    this.disabled = new Set();   // nations whose AI is switched off (sandbox)
     this.reset();
     state.events.on('map:loaded', () => this.reset());
     state.events.on('province:owner', ({ from, to }) => { this.dirtyNeighbors.add(from); this.dirtyNeighbors.add(to); });
@@ -101,21 +102,38 @@ export class AI {
     const eraTable = ERA_PERSONALITY[map.era?.id] ?? {};
     const sizes = map.nations.map(() => 0);
     for (const p of map.provinces) if (p.owner >= 0) sizes[p.owner]++;
+    this.disabled.clear();
     for (const n of map.nations) {
       if (n.id === playerId || !sizes[n.id]) continue;
-      const personality = eraTable[n.name] ?? this.randomPersonality(n.name);
-      const size = sizes[n.id];
-      const every = (n.major ? 12 : size >= 25 ? 24 : size >= 6 ? 48 : 72) * this.D.think;
-      this.brains.set(n.id, {
-        id: n.id, personality, every,
-        next: (hashSeed(n.name) % 100) / 100 * every, // stagger first thinks
-        lastPeaceOffer: -Infinity, staging: -1, home: new Set(),
-      });
+      this.addBrain(n.id, sizes[n.id]);
     }
     // Remember original owners (to retake lost land) and refresh research bonuses.
     for (const p of map.provinces) p.homeOf = p.owner;
     this.sim.economy.recount();
   }
+
+  /** A brain for one nation (also used when the sandbox hands a nation back to the computer). */
+  addBrain(id, size = null) {
+    if (this.brains.has(id) || id === this.state.playerNationId) return;
+    const n = this.state.getNation(id);
+    size ??= this.state.provinces.filter((p) => p.owner === id).length;
+    if (!n || !size) return;
+    const personality = (ERA_PERSONALITY[this.state.map.era?.id] ?? {})[n.name] ?? this.randomPersonality(n.name);
+    const every = (n.major ? 12 : size >= 25 ? 24 : size >= 6 ? 48 : 72) * this.D.think;
+    this.brains.set(id, {
+      id, personality, every,
+      next: this.clockHours + (hashSeed(n.name) % 100) / 100 * every, // stagger first thinks
+      lastPeaceOffer: -Infinity, staging: -1, home: new Set(),
+    });
+  }
+
+  removeBrain(id) {
+    if (this.current && this.currentBrain === id) this.current = null;
+    this.brains.delete(id);
+  }
+
+  /** Is the computer running this nation right now? */
+  controls(id) { return this.enabled && this.brains.has(id) && !this.disabled.has(id); }
 
   randomPersonality(name) {
     let r = (hashSeed(`personality:${name}`) % 1000) / 1000;
@@ -135,7 +153,7 @@ export class AI {
     const t0 = performance.now();
     // Due brains, most overdue first.
     const due = [];
-    for (const b of this.brains.values()) if (b.next <= this.clockHours) due.push(b);
+    for (const b of this.brains.values()) if (b.next <= this.clockHours && !this.disabled.has(b.id)) due.push(b);
     if (!due.length && !this.current) return;
     due.sort((a, b) => a.next - b.next);
     this.refreshStrength();
@@ -149,6 +167,7 @@ export class AI {
         b.next = this.clockHours + b.every * (0.85 + Math.random() * 0.3);
         if (!this.state.provinces.some((p) => p.owner === b.id)) { this.brains.delete(b.id); continue; }
         this.current = this.think(b);
+        this.currentBrain = b.id;
         this.stats.thinks++;
       }
       const ts = performance.now();

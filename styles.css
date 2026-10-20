@@ -1926,3 +1926,138 @@ body:not(.style-satellite) #btn-clouds { display: none; }
 .win, .panel { background: linear-gradient(180deg, color-mix(in srgb, var(--panel-solid) 90%, #fff), var(--panel-solid) 120px); }
 .win-table th { background: var(--panel-solid); }
 .menu-title { font-size: clamp(42px, 6vw, 72px); letter-spacing: 0.05em; }
+
+/* =========================================================================
+   Step 6B: Sandbox — toolbar, panels, and an unmistakable label.
+   ========================================================================= */
+
+.menu-item.sandbox-item span { color: #d9b8ff; }
+.menu-item.sandbox-item { border-color: rgba(190, 140, 255, 0.45); }
+body[data-mode="sandbox"] .mode-label { color: #d9b8ff; }
+
+/* Top bar: a purple/amber hazard stripe and a SANDBOX tag next to the clock. */
+.sandbox-tag {
+  display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  font-family: var(--font-display); font-size: 15px; letter-spacing: 0.12em; color: #fff;
+  background: linear-gradient(180deg, #b779ff, #6a2bd1); border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 16px rgba(170, 100, 255, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  animation: sb-pulse 2.4s ease-in-out infinite;
+}
+@keyframes sb-pulse { 50% { box-shadow: 0 0 26px rgba(170, 100, 255, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.4); } }
+@media (prefers-reduced-motion: reduce) { .sandbox-tag { animation: none; } }
+body.sandbox.in-game #topbar { border-bottom: 0; }
+body.sandbox.in-game #topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -5px; height: 5px; pointer-events: none;
+  background: repeating-linear-gradient(135deg, #a35cff 0 14px, #ffcc3d 14px 28px);
+}
+body.sandbox.in-game .player-badge .eyebrow { color: #d9b8ff; }
+
+/* Tool rail (left) and its options panel. */
+.sandbox-bar { position: absolute; left: 12px; top: calc(var(--topbar-h) + var(--safe-top) + 16px); bottom: calc(var(--status-h) + 16px); display: flex; gap: 10px; align-items: flex-start; z-index: 18; pointer-events: none; }
+.sandbox-bar > * { pointer-events: auto; }
+.sb-tools {
+  display: flex; flex-direction: column; gap: 5px; padding: 6px; border-radius: 16px;
+  background: var(--panel); border: 2px solid #a35cff; box-shadow: 0 0 18px rgba(163, 92, 255, 0.45), 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.sb-badge { text-align: center; font-family: var(--font-display); font-size: 9px; letter-spacing: 0.14em; color: #fff; padding: 4px 2px; border-radius: 8px; background: linear-gradient(180deg, #b779ff, #6a2bd1); }
+.sb-tools button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 64px; padding: 7px 2px 5px; border-radius: 12px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12); color: #fff; font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 0 rgba(0, 0, 0, 0.4);
+  transition: transform 0.08s ease, background 0.15s;
+}
+.sb-tools button .ico { width: 26px; height: 26px; }
+.sb-tools button:hover { transform: translateY(-1px); background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05)); }
+.sb-tools button.active { background: linear-gradient(180deg, #c99bff, #7a35e0); box-shadow: 0 0 16px rgba(170, 100, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+
+.sb-panel {
+  width: 320px; max-height: 100%; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-solid) 90%, #fff), var(--panel-solid) 120px);
+  border: 1px solid var(--line-strong); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.sb-panel header { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: linear-gradient(180deg, #8f4ff0, #4b1a9a); border-bottom: 2px solid #ffcc3d; }
+.sb-panel header h2 { flex: 1; margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 17px; color: #fff; letter-spacing: 0.03em; }
+.sb-panel.min .sb-body { display: none; }
+.sb-min { display: none; }
+.sb-panel header .icon-btn { color: #fff; background: rgba(0, 0, 0, 0.25); border-color: rgba(255, 255, 255, 0.3); }
+.sb-ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255, 255, 255, 0.92); }
+.sb-ico .ico { width: 24px; height: 24px; color: #4b1a9a; }
+.sb-body { overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; overscroll-behavior: contain; }
+.sb-field { display: flex; flex-direction: column; gap: 6px; }
+.sb-field > span { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); }
+.sb-nation { display: flex; align-items: center; gap: 8px; }
+.sb-nation select { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.35); color: #fff; font-family: var(--font-ui); font-size: 14px; font-weight: 600; }
+.swatch { display: inline-block; flex: none; width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(0, 0, 0, 0.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); vertical-align: -3px; margin-right: 4px; }
+.sb-nation .swatch { width: 22px; height: 22px; border-radius: 7px; }
+.sb-pick { width: 38px; height: 38px; display: grid; place-items: center; }
+.sb-pick .ico { width: 22px; height: 22px; }
+.sb-pick.on { color: var(--ink); background: linear-gradient(180deg, var(--btn-top), var(--btn-bot)); }
+.sb-hint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-dim); }
+.sb-hint.pick { color: #ffcc3d; font-weight: 700; }
+.sb-stat { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--card); font-size: 13px; }
+.sb-stat .ico { width: 20px; height: 20px; }
+.sb-units { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sb-units .pick { grid-template-columns: auto 1fr; }
+.sb-stepper { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sb-stepper input { width: 92px; padding: 7px 8px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.35); color: #fff; font-family: var(--font-mono); font-size: 14px; }
+.chip { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-family: var(--font-ui); font-weight: 700; font-size: 12px; cursor: pointer; }
+.chip.on { color: var(--ink); border-color: transparent; background: linear-gradient(180deg, var(--btn-top), var(--btn-bot)); }
+.sb-res { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sb-res td { padding: 4px 3px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); white-space: nowrap; }
+.sb-res td.num { font-family: var(--font-mono); text-align: right; color: #fff; }
+.sb-res .res-i .ico { width: 18px; height: 18px; vertical-align: -4px; margin-right: 6px; }
+.sb-res .btn { padding: 5px 7px; font-size: 11px; letter-spacing: 0.02em; }
+.sb-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.sb-status { padding: 9px 12px; border-radius: 10px; background: var(--card); font-size: 14px; }
+.sb-status .war { color: #ff6a50; }
+.sb-status .peace { color: var(--green); }
+.sb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow: auto; }
+.sb-list li { display: flex; align-items: center; gap: 4px; padding: 5px 6px 5px 8px; border-radius: 8px; background: var(--card); font-size: 13px; }
+.sb-list li em { font-style: normal; color: var(--text-dim); margin: 0 4px; }
+.sb-list li .btn { margin-left: auto; padding: 4px 8px; font-size: 11px; }
+.sb-list li.dim { color: var(--text-dim); }
+/* Toggle switches. */
+.sb-switch { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 10px; padding: 10px; border-radius: 12px; background: var(--card); cursor: pointer; }
+.sb-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.sb-switch > span { grid-row: span 2; position: relative; width: 44px; height: 26px; border-radius: 999px; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--line-strong); transition: background 0.15s; }
+.sb-switch > span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #dfe4ee; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); transition: transform 0.15s; }
+.sb-switch input:checked + span { background: linear-gradient(180deg, #4be37a, #1fae5a); }
+.sb-switch input:checked + span::after { transform: translateX(18px); }
+.sb-switch input:disabled + span { opacity: 0.4; }
+.sb-switch input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.sb-switch b { font-size: 15px; }
+.sb-switch small { font-size: 12px; color: var(--text-dim); }
+body.sb-brush #map-canvas { cursor: cell; }
+body.sb-spawn #map-canvas { cursor: copy; }
+/* The province panel and windows sit to the right of the tools. */
+body.sandbox.in-game .win { margin-left: 0; }
+
+@media (max-width: 760px) {
+  .sandbox-tag { padding: 4px 9px; font-size: 11px; letter-spacing: 0.08em; }
+  /* Phone: the tools become a strip above the command bar; the panel opens above it. */
+  .sandbox-bar { left: 6px; right: 6px; top: auto; bottom: calc(var(--status-h) + var(--cmdbar-h) + 16px + var(--safe-bottom)); flex-direction: column-reverse; align-items: stretch; gap: 6px; }
+  .sb-tools { flex-direction: row; overflow-x: auto; padding: 4px; border-radius: 14px; }
+  .sb-badge { writing-mode: vertical-rl; transform: rotate(180deg); padding: 4px 3px; }
+  .sb-tools { gap: 3px; }
+  .sb-tools button { width: auto; min-width: 0; flex: 1 1 0; padding: 5px 1px 4px; font-size: 9px; letter-spacing: 0; overflow: hidden; }
+  .sb-tools button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-tools button .ico { width: 22px; height: 22px; }
+  .sb-panel { width: auto; max-height: 38vh; }
+  .sb-min { display: grid; }
+  .sb-body { padding: 10px; gap: 10px; }
+  body.window-open .sandbox-bar, .panel.open ~ .sandbox-bar { display: none; }
+  body.sandbox.in-game .group-bar { bottom: calc(var(--status-h) + var(--cmdbar-h) + 96px + var(--safe-bottom)); }
+}
+/* The sandbox tag and two extra speeds need room in the top bar: keep the
+   nation's name readable and drop the small resource captions on narrower screens. */
+.player-badge { flex: 0 1 auto; min-width: 140px; }
+.player-badge > div { min-width: 0; }
+#player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1600px) { body.sandbox.in-game .res-body .eyebrow { display: none; } body.sandbox.in-game .res small { font-size: 9px; } }
+@media (max-width: 1600px) {
+  body.sandbox.in-game .clock-day { display: none; }
+  body.sandbox.in-game .sandbox-tag { padding: 5px 10px; font-size: 13px; letter-spacing: 0.08em; }
+}
+/* Whatever happens, the clock, speeds and MENU stay on screen: resources give way first. */
+#topbar > .resources { min-width: 0; flex: 0 1 auto; overflow-x: clip; overflow-y: visible; }
+#topbar > :not(.resources):not(.player-badge) { flex-shrink: 0; }

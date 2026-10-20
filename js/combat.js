@@ -72,15 +72,15 @@ export class Combat {
   /**
    * White peace: the war ends, provinces taken in it go back to their
    * pre-war owner, armies on the other side's land withdraw home, and a
-   * 90-day truce follows.
+   * 90-day truce follows. The sandbox passes { revert: false, truce: false }.
    */
-  makePeace(a, b) {
+  makePeace(a, b, { revert = true, truce = true } = {}) {
     const k = warKey(a, b);
     if (!this.wars.has(k)) return false;
     const info = this.warInfo.get(k);
     this.wars.delete(k);
     this.warInfo.delete(k);
-    this.truces.set(k, this.state.clock.time + TRUCE_DAYS * 864e5);
+    if (truce) this.truces.set(k, this.state.clock.time + TRUCE_DAYS * 864e5);
     // Battles between the two stop.
     for (const bt of [...this.active.values()]) {
       const ns = bt.sides.map((s) => s.nation);
@@ -91,8 +91,8 @@ export class Combat {
       }
     }
     for (const [pid, o] of [...this.occupations]) if (o.nation === a || o.nation === b) this.occupations.delete(pid);
-    // Status quo ante.
-    for (const c of [...(info?.captured ?? [])].reverse()) {
+    // Status quo ante (the sandbox can end a war keeping today's borders).
+    if (revert) for (const c of [...(info?.captured ?? [])].reverse()) {
       const p = this.state.getProvince(c.pid);
       if (p && p.owner === c.to) this.state.setOwner(c.pid, c.from);
     }

@@ -151,6 +151,22 @@ Every nation you don't play runs `js/ai.js`. Each has a personality: **Aggressiv
 
 **Economic weight.** Provinces were cut roughly by land area, so counting them made colonial empires and Siberia huge and compact industrial powers small (WWII Germany earned 410 a day against France's 1,930). `js/development.js` now gives every province a development value: colonies and far frontiers (more than 1,500 km from the capital and not linked to it by land within 4,500 km) produce 0.35×, polar land 0.35×, other nations scale with the square root of their size, and each era's major powers are scaled to their real GDP and population (Maddison-style estimates). The value stays with the province when it's conquered. The 20th-century maps were also rebuilt with each major power's real cities (`majorCities` in `tools/era-config.mjs`; WWII Germany went from 2 cities to 15). `node tools/print-economies.mjs` lists the largest economies per era.
 
+## Sandbox
+
+**Sandbox** on the main menu starts the same way (era → nation), then adds a toolbar on the left (a strip above the command bar on phones). The top bar shows a purple **SANDBOX** tag and a striped edge throughout, so it is never mistaken for a normal game. Tools:
+
+| Tool | What it does |
+|---|---|
+| Paint | Pick a nation, then tap or drag over provinces to give them to it (pinch or scroll still moves the map) |
+| Armies | Pick a nation, unit type and amount (1–50), then tap a province — ships go on the sea or a coast |
+| Resources | Give or take any amount of any resource for any nation; "+ everything" and "Empty all" |
+| Diplomacy | War or peace between any two nations; sandbox peace keeps today's borders, leaves no truce, and war ignores truces |
+| AI | All computer players on/off, or one nation at a time |
+| Instant | Instant build, recruit and research for the nation you play (costs still paid; works while paused) |
+| Play as | Switch to any nation at any time; the computer takes over the one you leave |
+
+Every nation picker has a target button to pick a nation by tapping the map (on phones the panel folds out of the way; the ▾ button folds it by hand too). Time goes up to 16×. Starting a normal game afterwards clears all of it.
+
 ## Map styles and settings
 
 - **Political:** vivid nation colours with terrain symbols, a soft glow along borders, your nation outlined in glowing gold, and a blue ocean with wave crests. Roman and Medieval eras draw it as an old parchment map.
@@ -240,6 +256,8 @@ js/
   render-fx.js    Ocean, wave crests, clouds, city and capital badges (cached sprites)
   icons.js        Every icon as SVG paths: resources, units per era, buildings, HUD (inline SVG + canvas)
   palette.js      Vivid nation colours from the era data's muted ones
+  sandbox.js      Sandbox rules: paint, spawn, resources, war/peace, AI switches, instant modes, play as
+  sandbox-ui.js   Sandbox toolbar and panels, nation pickers with pick-on-map
   command-ui.js   Money/manpower bar, army panel, recruit/war sections of the province panel
   feed.js         Event feed and battle report popup
   resources.js    Era resource sets, province yields, oil deposits

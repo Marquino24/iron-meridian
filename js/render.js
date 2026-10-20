@@ -345,7 +345,8 @@ export class Renderer {
     const redraw = () => this.requestRender();
     const relayer = () => this.invalidateLayer();
     state.events.on('map:loaded', () => this.buildGeometry());
-    state.events.on('province:owner', () => this.rebuildOwnership());
+    // Borders are rebuilt once per frame however many provinces changed (sandbox painting).
+    state.events.on('province:owner', () => { this.ownershipDirty = true; this.requestRender(); });
     for (const evt of ['hover', 'select', 'select:army', 'select:group', 'armies', 'war']) state.events.on(evt, redraw);
     for (const evt of ['focus:nation', 'player', 'phase']) state.events.on(evt, relayer);
     document.fonts?.ready.then(redraw);
@@ -547,6 +548,7 @@ export class Renderer {
   render() {
     if (!this.dirty || !this.cache) return false;
     this.dirty = false;
+    if (this.ownershipDirty) { this.ownershipDirty = false; this.rebuildOwnership(); }
     const t0 = performance.now();
 
     const { ctx, camera: cam, dpr, cache, state } = this;

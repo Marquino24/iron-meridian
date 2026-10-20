@@ -14,7 +14,6 @@
 
 import { TERRAIN, AREA_KM2_PER_UNIT, gridRef } from './map.js';
 import { drawFlag } from './render.js';
-import { SPEEDS } from './state.js';
 import { ERAS } from './eras.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -268,7 +267,8 @@ export class UI {
   renderDeployButton() {
     const n = this.state.getNation(this.pendingNation);
     this.el.deploy.disabled = !n;
-    this.el.deploy.textContent = n ? `ASSUME COMMAND — ${n.shortName.toUpperCase()}` : 'SELECT A NATION';
+    const verb = document.body.dataset.mode === 'sandbox' ? 'START SANDBOX' : 'ASSUME COMMAND';
+    this.el.deploy.textContent = n ? `${verb} — ${n.shortName.toUpperCase()}` : 'SELECT A NATION';
   }
 
   onPhase(phase) {
@@ -282,7 +282,8 @@ export class UI {
 
   bindTopBar() {
     const group = this.el.speedGroup;
-    group.innerHTML = SPEEDS.map((s) => `<button type="button" data-speed="${s}" title="${s ? `${s}× speed` : 'Pause (Space)'}">${s ? `${s}×` : '❚❚'}</button>`).join('');
+    this.renderSpeedButtons();
+    this.state.events.on('mode', () => { this.renderSpeedButtons(); this.renderSpeed(); });
     group.addEventListener('click', (e) => {
       const b = e.target.closest('[data-speed]');
       if (b) this.state.setSpeed(Number(b.dataset.speed));
@@ -300,6 +301,10 @@ export class UI {
       }
     });
     this.renderSpeed();
+  }
+
+  renderSpeedButtons() {
+    this.el.speedGroup.innerHTML = this.state.speeds.map((s) => `<button type="button" data-speed="${s}" title="${s ? `${s}× speed` : 'Pause (Space)'}">${s ? `${s}×` : '❚❚'}</button>`).join('');
   }
 
   renderPlayer() {

@@ -17,6 +17,7 @@
  *   'clock:speed'     (speed)
  *   'select:army'     (armyId)             — army chosen on the map (-1 = none)
  *   'select:group'    (Set|null)           — several armies picked together (box selection)
+ *   'mode'            (sandbox: boolean)   — a sandbox game started, or a normal one
  *
  * Emitted by the simulation systems (economy.js, armies.js, combat.js):
  *   'economy', 'armies', 'war' ({a, b}), 'battle:end' (battle),
@@ -45,6 +46,8 @@ export const START_DATE = Date.UTC(2031, 2, 14, 6, 0, 0);
 export const GAME_HOURS_PER_SECOND = 1;
 /** Selectable speeds; 0 = paused. */
 export const SPEEDS = [0, 1, 2, 4];
+/** Sandbox games go faster. */
+export const SANDBOX_SPEEDS = [0, 1, 2, 4, 8, 16];
 
 export class GameState {
   constructor() {
@@ -57,6 +60,7 @@ export class GameState {
     this.focusedNationId = -1;
     this.selectedArmyId = -1;
     this.armyGroup = null;        // Set of army ids picked together (box selection), or null
+    this.sandbox = false;         // sandbox game: free tools, faster clock
     this.clock = { time: START_DATE, start: START_DATE, speed: 1 };
   }
 
@@ -164,6 +168,17 @@ export class GameState {
   }
 
   // --- Clock ---------------------------------------------------------------
+
+  /** Speeds offered in the top bar. */
+  get speeds() { return this.sandbox ? SANDBOX_SPEEDS : SPEEDS; }
+
+  /** Sandbox or normal game (set when a game starts). */
+  setSandbox(on) {
+    if (this.sandbox === !!on) return;
+    this.sandbox = !!on;
+    if (!this.speeds.includes(this.clock.speed)) this.setSpeed(1);
+    this.events.emit('mode', this.sandbox);
+  }
 
   setSpeed(speed) {
     this.clock.speed = speed;

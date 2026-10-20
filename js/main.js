@@ -39,6 +39,8 @@ import { Research } from './research.js';
 import { ResearchWindow } from './win-research.js';
 import { AI } from './ai.js';
 import { DiplomacyUI } from './diplomacy-ui.js';
+import { Sandbox } from './sandbox.js';
+import { SandboxUI } from './sandbox-ui.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
@@ -59,10 +61,12 @@ buildings.research = research;
 const sim = { economy, buildings, armies, combat, research };
 const ai = new AI(state, sim);
 sim.ai = ai;
+const sandbox = new Sandbox(state, sim);
+sim.sandbox = sandbox;
 renderer.sim = sim;
 
 /** Simulation systems, run in order each frame with the game hours elapsed. */
-const systems = [economy, research, buildings, armies, combat, ai];
+const systems = [economy, research, buildings, armies, combat, ai, sandbox];
 
 // --- Camera framing ---------------------------------------------------------
 
@@ -217,6 +221,7 @@ const ui = new UI(state, {
     if (f) camera.flyTo(f.x, f.y, f.zoom, 0.8);
   },
   deploy(id) {
+    state.setSandbox(screens.mode === 'sandbox');
     state.setPlayerNation(id);
     buildings.start();
     economy.start();
@@ -344,6 +349,16 @@ state.events.on('feed', (e) => { if (e.toast) notice(e.toast); });
 
 new DiplomacyUI(state, sim, { focusNode, notice });
 
+// Sandbox toolbar (only shown in sandbox games).
+const sandboxUI = new SandboxUI(state, sim, {
+  notice,
+  pickProvince: (x, y) => pickProvince(state.map, x, y),
+  focusNation(id) {
+    const cap = state.getProvince(state.getNation(id)?.capitalId);
+    if (cap) focusOn(cap.center.x, cap.center.y, Math.max(camera.zoom, camera.refZoom * 1.5), 0.8);
+  },
+});
+
 // Difficulty (nation screen) and the war-lines toggle (map style bar).
 function renderDifficulty() {
   for (const b of document.querySelectorAll('#difficulty [data-difficulty]')) {
@@ -403,6 +418,10 @@ state.events.on('select:group', renderGroupBar);
 state.events.on('armies', () => { if (state.armyGroup) renderGroupBar(); });
 
 const input = new InputController(canvas, camera, {
+  captureDrag: () => sandboxUI.wantsDrag(),
+  onPaint(sx, sy) {
+    sandboxUI.paintAt(camera.screenToWorld(sx, sy));
+  },
   onHover(sx, sy) {
     const w = camera.screenToWorld(sx, sy);
     const id = pickProvince(state.map, w.x, w.y);
@@ -451,6 +470,7 @@ const input = new InputController(canvas, camera, {
       if (owner >= 0) ui.choosePendingNation(owner);
       return;
     }
+    if (sandboxUI.onMapClick(w, id)) return;
     const hit = hitTest(renderer, sx, sy);
     const sel = armies.list.get(state.selectedArmyId);
     const commanding = sel && sel.nation === state.playerNationId;
@@ -667,4 +687,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI };

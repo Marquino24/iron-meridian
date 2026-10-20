@@ -32,6 +32,8 @@
         <div id="res-tip" class="res-tip" role="tooltip" hidden></div>
       </div>
 
+      <div id="sandbox-tag" class="sandbox-tag" hidden title="Sandbox game: free tools, not a normal campaign">SANDBOX</div>
+
       <div class="clock">
         <div class="clock-readout">
           <span id="clock-day" class="clock-day">DAY 001</span>
@@ -77,13 +79,13 @@
   <!-- Main menu: game-launcher style over the slowly panning map. -->
   <section id="main-menu" class="screen menu" hidden aria-label="Main menu">
     <div class="menu-panel screen-left">
-      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.6.0</div>
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.6.1</div>
       <h1 class="menu-title">IRON<span>MERIDIAN</span></h1>
       <nav class="menu-list" aria-label="Main menu">
         <button type="button" class="menu-item resume" data-menu="resume" hidden><span>Resume game</span><small id="resume-detail"></small></button>
         <button type="button" class="menu-item primary" data-menu="single"><span>Single Player</span><small>Seven eras, any nation</small></button>
         <button type="button" class="menu-item" data-menu="multi" disabled><span>Multiplayer</span><em>Coming soon</em></button>
-        <button type="button" class="menu-item" data-menu="sandbox" disabled><span>Sandbox</span><em>Coming soon</em></button>
+        <button type="button" class="menu-item sandbox-item" data-menu="sandbox"><span>Sandbox</span><small>Paint borders, spawn armies, bend the rules</small></button>
         <button type="button" class="menu-item" data-menu="settings"><span>Settings</span></button>
         <button type="button" class="menu-item admin-item" data-open-admin hidden><span>Admin</span><small>Beta testers</small></button>
         <button type="button" class="menu-item quiet" data-menu="signout" hidden><span>Sign out</span></button>
@@ -100,7 +102,7 @@
     <div class="side-panel screen-left">
       <div class="screen-head">
         <button type="button" class="back-btn" data-back>‹ Back</button>
-        <div class="eyebrow">SINGLE PLAYER · STEP 1 OF 2</div>
+        <div class="eyebrow"><span class="mode-label">SINGLE PLAYER</span> · STEP 1 OF 2</div>
       </div>
       <h2 class="screen-title">Choose an era</h2>
       <div id="era-grid" class="era-list" role="list" aria-label="Eras"></div>
@@ -112,7 +114,7 @@
     <div class="start-card side-panel screen-left">
       <div class="screen-head">
         <button type="button" class="back-btn" data-back>‹ Eras</button>
-        <div class="eyebrow">SINGLE PLAYER · STEP 2 OF 2</div>
+        <div class="eyebrow"><span class="mode-label">SINGLE PLAYER</span> · STEP 2 OF 2</div>
       </div>
       <h2 class="screen-title" id="nation-screen-title">Choose a nation</h2>
       <p class="tagline">Click a name or any territory on the map.</p>
@@ -200,7 +202,7 @@
   <!-- Sign-in and beta gate. Without Supabase settings (dev preview) it offers a demo sign-in. -->
   <section id="launcher" class="launcher" hidden aria-label="Sign in">
     <div class="launcher-hero">
-      <div class="eyebrow">CLOSED BETA · BUILD 0.6.0</div>
+      <div class="eyebrow">CLOSED BETA · BUILD 0.6.1</div>
       <h1 class="launcher-title">IRON<span>MERIDIAN</span></h1>
       <p class="launcher-sub">Real-time grand strategy across two thousand years of real borders.</p>
       <ul class="launcher-facts">

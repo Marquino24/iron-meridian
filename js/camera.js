@@ -204,6 +204,13 @@ export class InputController {
     const p = this.local(e);
     this.pointers.set(e.pointerId, p);
     this.camera.stop();
+    // Sandbox brush: one finger / the mouse paints instead of panning.
+    if (this.pointers.size === 1 && this.handlers.captureDrag?.(p.x, p.y)) {
+      this.paint = { id: e.pointerId, x: p.x, y: p.y };
+      this.handlers.onPaint(p.x, p.y);
+      return;
+    }
+    if (this.paint && this.pointers.size === 2) this.paint = null; // second finger: pinch instead
     // Desktop: Shift+drag draws a selection box instead of panning.
     if (e.pointerType === 'mouse' && e.shiftKey && this.handlers.onBox && this.pointers.size === 1) {
       this.box = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, mouse: true };
@@ -240,6 +247,14 @@ export class InputController {
     const prev = this.pointers.get(e.pointerId);
     if (!prev) {
       if (e.pointerType === 'mouse') this.handlers.onHover?.(p.x, p.y);
+      return;
+    }
+    if (this.paint && this.paint.id === e.pointerId) {
+      this.pointers.set(e.pointerId, p);
+      // Fill in fast strokes: a sample every ~6 px along the segment.
+      const steps = Math.max(1, Math.ceil(Math.hypot(p.x - this.paint.x, p.y - this.paint.y) / 6));
+      for (let i = 1; i <= steps; i++) this.handlers.onPaint(this.paint.x + ((p.x - this.paint.x) * i) / steps, this.paint.y + ((p.y - this.paint.y) * i) / steps);
+      this.paint.x = p.x; this.paint.y = p.y;
       return;
     }
     if (this.box) {
@@ -281,6 +296,11 @@ export class InputController {
     const p = this.local(e);
     this.pointers.delete(e.pointerId);
     if (this.boxHold) { clearTimeout(this.boxHold.timer); this.boxHold = null; }
+    if (this.paint) {
+      this.paint = null;
+      if (!this.pointers.size) { this.drag = null; this.pinch = null; this.canvas.classList.remove('dragging'); }
+      return;
+    }
     if (this.box) {
       // Lifting the mouse (or either finger) applies the box.
       const box = this.box;

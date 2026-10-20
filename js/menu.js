@@ -2,6 +2,7 @@
  * menu.js — Screen flow after sign-in.
  *
  *   MAIN MENU → Single Player → ERA → NATION → game
+ *             → Sandbox       → ERA → NATION → sandbox game (free tools)
  *             → Settings
  *
  * Exactly one screen is visible at a time; Back always goes one step up.
@@ -25,13 +26,15 @@ export class Screens {
     this.current = null;
     this.returnTo = 'menu';
     this.gameInProgress = false;
+    this.mode = 'single';
     this.el = Object.fromEntries(Object.entries(SCREENS).map(([k, sel]) => [k, document.querySelector(sel)]));
 
     document.querySelector('#main-menu .menu-list').addEventListener('click', (e) => {
       const b = e.target.closest('[data-menu]');
       if (!b || b.disabled) return;
       const a = b.dataset.menu;
-      if (a === 'single') this.show('era');
+      if (a === 'single' || a === 'sandbox') this.setMode(a);
+      if (a === 'single' || a === 'sandbox') this.show('era');
       if (a === 'settings') this.show('settings');
       if (a === 'resume') this.actions.resume();
       if (a === 'signout') this.actions.signOut();
@@ -43,6 +46,13 @@ export class Screens {
       if (this.current && this.current !== 'menu' && this.current !== 'game') { e.preventDefault(); this.back(); }
     });
     this.bindSettings();
+  }
+
+  /** 'single' or 'sandbox': which kind of game the era → nation screens start. */
+  setMode(mode) {
+    this.mode = mode;
+    document.body.dataset.mode = mode;
+    for (const el of document.querySelectorAll('.mode-label')) el.textContent = mode === 'sandbox' ? 'SANDBOX' : 'SINGLE PLAYER';
   }
 
   /** Show a screen: 'menu' | 'era' | 'nation' | 'settings' | 'game' | null (launcher). */
