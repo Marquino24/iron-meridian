@@ -261,58 +261,6 @@ function createTerrainPatterns(ctx) {
   };
 }
 
-/** Draw a nation flag into any 2D context. Shared with the UI. */
-export function drawFlag(ctx, flag, x, y, w, h) {
-  const [c0, c1, c2] = flag.colors;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  ctx.fillStyle = c0;
-  ctx.fillRect(x, y, w, h);
-  switch (flag.pattern) {
-    case 'h3':
-      ctx.fillStyle = c1; ctx.fillRect(x, y + h / 3, w, h / 3);
-      ctx.fillStyle = c2; ctx.fillRect(x, y + (2 * h) / 3, w, h / 3 + 1);
-      break;
-    case 'v3':
-      ctx.fillStyle = c1; ctx.fillRect(x + w / 3, y, w / 3, h);
-      ctx.fillStyle = c2; ctx.fillRect(x + (2 * w) / 3, y, w / 3 + 1, h);
-      break;
-    case 'h2':
-      ctx.fillStyle = c1; ctx.fillRect(x, y + h / 2, w, h / 2 + 1);
-      ctx.fillStyle = c2; ctx.fillRect(x, y + h / 2 - h * 0.06, w, h * 0.12);
-      break;
-    case 'v2':
-      ctx.fillStyle = c1; ctx.fillRect(x + w * 0.38, y, w * 0.62 + 1, h);
-      break;
-    case 'cross':
-      ctx.fillStyle = c1;
-      ctx.fillRect(x + w * 0.28, y, w * 0.2, h); ctx.fillRect(x, y + h * 0.38, w, h * 0.24);
-      ctx.fillStyle = c2;
-      ctx.fillRect(x + w * 0.335, y, w * 0.09, h); ctx.fillRect(x, y + h * 0.455, w, h * 0.09);
-      break;
-    case 'canton':
-      ctx.fillStyle = c1; ctx.fillRect(x, y + h / 2, w, h / 2 + 1);
-      ctx.fillStyle = c2; ctx.fillRect(x, y, w * 0.42, h * 0.56);
-      ctx.fillStyle = c0;
-      ctx.beginPath();
-      ctx.arc(x + w * 0.21, y + h * 0.28, h * 0.12, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case 'diag':
-      ctx.fillStyle = c1;
-      ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = c2; ctx.lineWidth = h * 0.16;
-      ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x + w, y); ctx.stroke();
-      break;
-  }
-  ctx.restore();
-  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-}
-
 // --- Renderer ------------------------------------------------------------------
 
 export class Renderer {

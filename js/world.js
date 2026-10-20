@@ -12,6 +12,7 @@
  *   seas[i] = { p: polygon, c: [x, y], nb: neighbour sea ids, cp: coastal provinces }
  */
 
+import { FLAG_INDEX } from './flag-index.js';
 import { vivid } from './palette.js';
 import { graticule, formatLatLon, unproject } from './projection.js';
 
@@ -150,12 +151,16 @@ export function buildWorldMap(data, era) {
     coastalProvinces: s.cp,
   }));
 
+  /** Tile of a nation's real flag in assets/flags-<era>.webp, or null. */
+  const realFlag = (eraId, name) => { const t = FLAG_INDEX[eraId]?.nations[name]; return t == null ? null : Array.isArray(t) ? t[0] : t; };
+
   const nations = data.nations.map((n, id) => ({
     id,
     name: n.name,
     shortName: n.short,
     color: vivid(n.color),
-    flag: n.flag,
+    // Real flag for this era when there is one (flag-index.js); else heraldry.
+    flag: { ...n.flag, era: era.id, real: realFlag(era.id, n.name) },
     capitalId: n.capital,
     major: !!n.major,
   }));

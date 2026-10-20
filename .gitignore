@@ -2,3 +2,4 @@ node_modules/
 dist/
 data/raw/
 .DS_Store
+.cache/

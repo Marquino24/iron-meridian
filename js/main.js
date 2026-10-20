@@ -31,6 +31,7 @@ import { CommandUI } from './command-ui.js';
 import { Feed } from './feed.js';
 import { hitTest } from './render-units.js';
 import { svgIcon, setIconEra } from './icons.js';
+import { preloadFlags, onFlagsLoaded } from './flags.js';
 import { Buildings } from './buildings.js';
 import { WindowManager } from './windows.js';
 import { ArmyWindow } from './win-army.js';
@@ -390,6 +391,8 @@ function renderClouds() {
 }
 cloudsBtn.addEventListener('click', () => { settings.set('clouds', settings.values.clouds === false); renderClouds(); });
 renderClouds();
+// Army markers carry flags: redraw once an era's flag sheet arrives.
+onFlagsLoaded(() => renderer.requestRender());
 // Inline SVG icons wherever the markup asks for one.
 for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = svgIcon(el.dataset.icon);
 
@@ -639,6 +642,7 @@ state.events.on('select:army', (id) => {
 state.events.on('phase', (phase) => document.body.classList.toggle('in-game', phase === 'playing'));
 state.events.on('map:loaded', (map) => {
   setIconEra(map.era?.id);
+  preloadFlags(map.era?.id);
   document.body.dataset.theme = map.era?.id ?? 'fictional';
   screens.gameInProgress = false; // a new map ends any game in progress
   if (screens.ambient) menuCamera();

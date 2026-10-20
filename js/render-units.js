@@ -10,6 +10,7 @@
 
 import { fmtHours } from './ui-kit.js';
 import { drawIcon, unitIcon } from './icons.js';
+import { drawFlag, flagsVersion } from './flags.js';
 
 /** Marker radius, gap between stacked markers, and how far markers float above their spot. */
 const R = 14, GAP = 5;
@@ -388,7 +389,7 @@ function drawMarker(r, x, y, rad, o) {
   const state = o.selected ? 'sel' : o.hostile ? 'host' : o.own ? 'own' : 'other';
   const pad = 7;
   const S = (rad + pad) * 2;
-  const sprite = r.fx.sprite(`mk|${o.icon}|${color}|${state}|${rad}|${!!o.stack}`, S, S, (g) => {
+  const sprite = r.fx.sprite(`mk|${o.icon}|${o.nation?.id}|${state}|${rad}|${!!o.stack}|${flagsVersion()}`, S, S, (g) => {
     const m = S / 2;
     if (state === 'sel' || state === 'host' || state === 'own') {
       const glow = state === 'sel' ? '255,213,74' : state === 'host' ? '255,70,50' : '255,255,255';
@@ -434,6 +435,11 @@ function drawMarker(r, x, y, rad, o) {
     g.fillStyle = 'rgba(255,255,255,0.12)';
     g.fill();
     drawIcon(g, o.icon, m, m, rad * 1.36, '#ffffff');
+    // The nation's flag, small, on the upper left of the ring.
+    if (o.nation) {
+      const fw = rad * 0.95, fh = fw * 2 / 3;
+      drawFlag(g, o.nation.flag, m - rad - 1, m - rad - 1, fw, fh);
+    }
   });
   ctx.drawImage(sprite, x - S / 2, y - S / 2, S, S);
   if (o.retreating) {

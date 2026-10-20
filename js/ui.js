@@ -13,7 +13,7 @@
  */
 
 import { TERRAIN, AREA_KM2_PER_UNIT, gridRef } from './map.js';
-import { drawFlag } from './render.js';
+import { drawFlag } from './flags.js';
 import { ERAS } from './eras.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -238,7 +238,7 @@ export class UI {
           <span class="nation-capital">${capital?.isCapital ? `★ ${escapeHtml(capital.name.toUpperCase())}` : '&nbsp;'}</span>
         </span>
         <span class="nation-stats"><b>${s.provinces}</b> PROV<br><b>${s.cities}</b> CITIES</span>`;
-      row.querySelector('.flag-slot').replaceWith(flagCanvas(n.flag, 30, 20));
+      row.querySelector('.flag-slot').replaceWith(flagCanvas(n.flag, 36, 24));
       frag.appendChild(row);
     }
     el.nationList.appendChild(frag);

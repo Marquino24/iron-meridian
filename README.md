@@ -151,6 +151,18 @@ Every nation you don't play runs `js/ai.js`. Each has a personality: **Aggressiv
 
 **Economic weight.** Provinces were cut roughly by land area, so counting them made colonial empires and Siberia huge and compact industrial powers small (WWII Germany earned 410 a day against France's 1,930). `js/development.js` now gives every province a development value: colonies and far frontiers (more than 1,500 km from the capital and not linked to it by land within 4,500 km) produce 0.35×, polar land 0.35×, other nations scale with the square root of their size, and each era's major powers are scaled to their real GDP and population (Maddison-style estimates). The value stays with the province when it's conquered. The 20th-century maps were also rebuilt with each major power's real cities (`majorCities` in `tools/era-config.mjs`; WWII Germany went from 2 cities to 15). `node tools/print-economies.mjs` lists the largest economies per era.
 
+## Flags
+
+Every nation shows its real flag for the era's date wherever one exists — nation select, top bar, nation panel, war and peace alerts, battle reports, and a small flag on each army marker:
+
+- **Modern:** [flag-icons](https://github.com/lipis/flag-icons) 7.6.0 by Panayiotis Lipiridis, MIT licence.
+- **WWI (1914), WWII (1939), Cold War (1960):** the flags in use that year from Wikimedia Commons (USSR hammer and sickle, East and West Germany, Kingdom of Italy, Austria-Hungary, Ottoman Empire, Qing-era five-colour flag of the Republic of China, 48/49-star US flags, Red Ensigns of Canada…), or today's flag from flag-icons where the design was the same then. Colonies and protectorates fly their sovereign's flag. Licences per file: [docs/FLAGS.md](docs/FLAGS.md).
+- **WWII Germany** flies the black-white-red tricolour (the national flag 1933–35) instead of the swastika flag, which is illegal to display in Germany and avoided by commercial WWII games.
+- **Roman and Medieval:** no national flags existed, so major powers carry banners: a Roman vexillum with SPQR, a Han banner, and medieval banners of arms (France's fleurs-de-lis, England's three lions, the imperial eagle, Castile, León, Aragon, Portugal, Scotland, Hungary, Venice, Burgundy, the Papal keys; Denmark's Dannebrog).
+- **Everyone else** (no known flag or banner for the date) gets a generated coat of arms on a heater shield over a dark ground, following the heralds' rule of tincture — clearly arms, not a flag.
+
+Flags are rendered into one small WebP sheet per era (`assets/flags-<era>.webp`, 180×120 tiles). Rebuild with `python3 tools/fetch-commons-flags.py && node tools/build-flags.mjs`; sources per nation are in `tools/flag-sources.mjs`, and the counts per era in docs/FLAGS.md.
+
 ## Sandbox
 
 **Sandbox** on the main menu starts the same way (era → nation), then adds a toolbar on the left (a strip above the command bar on phones). The top bar shows a purple **SANDBOX** tag and a striped edge throughout, so it is never mistaken for a normal game. Tools:
@@ -256,6 +268,8 @@ js/
   render-fx.js    Ocean, wave crests, clouds, city and capital badges (cached sprites)
   icons.js        Every icon as SVG paths: resources, units per era, buildings, HUD (inline SVG + canvas)
   palette.js      Vivid nation colours from the era data's muted ones
+  flags.js        Real flags from the era sheet, heraldic shields otherwise (repaints when a sheet arrives)
+  flag-index.js   GENERATED: nation → tile per era (tools/build-flags.mjs)
   sandbox.js      Sandbox rules: paint, spawn, resources, war/peace, AI switches, instant modes, play as
   sandbox-ui.js   Sandbox toolbar and panels, nation pickers with pick-on-map
   command-ui.js   Money/manpower bar, army panel, recruit/war sections of the province panel

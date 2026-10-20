@@ -6,7 +6,7 @@
  * a battle open its report; others with a place fly the camera there.
  */
 
-import { drawFlag } from './render.js';
+import { drawFlag } from './flags.js';
 import { fmtHours } from './ui-kit.js';
 
 const MAX_ITEMS = 6;

@@ -6,7 +6,7 @@
  */
 
 import { esc } from './ui-kit.js';
-import { drawFlag } from './render.js';
+import { drawFlag } from './flags.js';
 import { PERSONALITIES } from './ai.js';
 import { TRUCE_DAYS } from './combat.js';
 

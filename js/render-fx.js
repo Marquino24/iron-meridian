@@ -257,7 +257,7 @@ export class MapFx {
     const k = `${key}|${dpr}`;
     let c = this.sprites.get(k);
     if (!c) {
-      if (this.sprites.size > 600) this.sprites.clear();
+      if (this.sprites.size > 1500) this.sprites.clear();
       c = document.createElement('canvas');
       c.width = Math.ceil(w * dpr);
       c.height = Math.ceil(h * dpr);
