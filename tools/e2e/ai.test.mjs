@@ -40,6 +40,8 @@ await page.click('.nation-row');
 await shot(page, '0-nation-screen');
 await page.click('#btn-deploy');
 await page.waitForFunction(() => document.body.classList.contains('in-game'));
+// AI proposals pause the game until answered; this test leaves the world to run.
+await page.evaluate(() => { window.ironMeridian.sim.diplomacy.propose = () => null; });
 await page.waitForTimeout(1200);
 await page.click('#province-panel [data-action="close"]');
 
