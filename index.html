@@ -32,6 +32,8 @@
         <div id="res-tip" class="res-tip" role="tooltip" hidden></div>
       </div>
 
+      <button id="score-widget" type="button" class="score-widget" hidden aria-label="Score and leaderboard"></button>
+
       <div id="sandbox-tag" class="sandbox-tag" hidden title="Sandbox game: free tools, not a normal campaign">SANDBOX</div>
 
       <div class="clock">
@@ -146,6 +148,18 @@
           <button type="button" role="radio" data-difficulty="hard" title="Smarter targeting, more wars, +15% production for computer nations">Hard</button>
         </div>
       </div>
+      <div class="victory-row">
+        <span class="section-title">VICTORY</span>
+        <div id="victory-mode" class="seg-btns" role="radiogroup" aria-label="Win condition">
+          <button type="button" role="radio" data-victory="points" title="Cities and capitals are worth points; first to the target wins">Victory Points</button>
+          <button type="button" role="radio" data-victory="domination" title="Control 40% of the world's provinces">Domination</button>
+          <button type="button" role="radio" data-victory="none" title="Play without a win condition">Off</button>
+        </div>
+        <label class="time-limit">Time limit <select id="time-limit" aria-label="Time limit">
+          <option value="0">None</option><option value="5">5 years</option><option value="10">10 years</option><option value="20">20 years</option><option value="50">50 years</option>
+        </select></label>
+        <p id="victory-note" class="victory-note"></p>
+      </div>
       <button id="btn-deploy" type="button" class="btn primary" disabled>SELECT A NATION</button>
       <p class="hint">DRAG to pan · SCROLL / PINCH to zoom · ARROWS · ESC deselect · SPACE pause</p>
       <p id="data-source" class="data-source"></p>
@@ -218,6 +232,8 @@
   </section>
 
   <section id="battle-report" class="report" hidden></section>
+  <section id="leaderboard" class="report" hidden aria-label="Leaderboard"></section>
+  <section id="end-screen" class="report end-screen" hidden aria-label="Game over"></section>
   <section id="diplo-modal" class="report diplo" hidden></section>
 
   <button id="btn-admin-fab" type="button" class="btn admin-fab admin-btn" data-open-admin hidden>ADMIN</button>

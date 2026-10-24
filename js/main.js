@@ -41,6 +41,10 @@ import { ResearchWindow } from './win-research.js';
 import { AI } from './ai.js';
 import { DiplomacyUI } from './diplomacy-ui.js';
 import { Sandbox } from './sandbox.js';
+import { Diplomacy } from './diplomacy.js';
+import { Victory } from './victory.js';
+import { VictoryUI } from './victory-ui.js';
+import { DiplomacyWindow } from './win-diplomacy.js';
 import { SandboxUI } from './sandbox-ui.js';
 
 const canvas = document.getElementById('map-canvas');
@@ -62,12 +66,17 @@ buildings.research = research;
 const sim = { economy, buildings, armies, combat, research };
 const ai = new AI(state, sim);
 sim.ai = ai;
+const diplomacy = new Diplomacy(state, sim);
+sim.diplomacy = diplomacy;
+armies.diplomacy = diplomacy;
+const victory = new Victory(state, sim);
+sim.victory = victory;
 const sandbox = new Sandbox(state, sim);
 sim.sandbox = sandbox;
 renderer.sim = sim;
 
 /** Simulation systems, run in order each frame with the game hours elapsed. */
-const systems = [economy, research, buildings, armies, combat, ai, sandbox];
+const systems = [economy, research, buildings, armies, combat, ai, sandbox, victory];
 
 // --- Camera framing ---------------------------------------------------------
 
@@ -232,6 +241,7 @@ const ui = new UI(state, {
     screens.gameInProgress = true;
     screens.show('game');
     state.setPhase('playing');
+    victory.start(victoryUI.config());
     const cap = state.getProvince(state.getNation(id).capitalId);
     state.setSelected(cap.id);
     focusOn(cap.center.x, cap.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.2);
@@ -330,6 +340,13 @@ const windows = new WindowManager(state, [
   new ProductionWindow(state, sim, { notice, openCity }),
   new BuildingsWindow(state, sim, { notice, openCity }),
   new ResearchWindow(state, sim, { notice }),
+  new DiplomacyWindow(state, sim, {
+    notice,
+    focusNation(id) {
+      const cap = state.getProvince(state.getNation(id)?.capitalId);
+      if (cap) focusOn(cap.center.x, cap.center.y, Math.max(camera.zoom, camera.refZoom * 1.5), 0.8);
+    },
+  }),
 ]);
 
 // Research button badge: idle slots while there's something you could research.
@@ -349,6 +366,16 @@ function updateBadges(dt) {
 state.events.on('feed', (e) => { if (e.toast) notice(e.toast); });
 
 new DiplomacyUI(state, sim, { focusNode, notice });
+
+// Win conditions: setup choice, score widget, leaderboard, end screen.
+const victoryUI = new VictoryUI(state, sim, {
+  settings,
+  toMenu: () => ui.actions.returnToMenu(),
+  focusNation(id) {
+    const cap = state.getProvince(state.getNation(id)?.capitalId);
+    if (cap) focusOn(cap.center.x, cap.center.y, Math.max(camera.zoom, camera.refZoom * 1.5), 0.8);
+  },
+});
 
 // Sandbox toolbar (only shown in sandbox games).
 const sandboxUI = new SandboxUI(state, sim, {
@@ -682,6 +709,7 @@ function frame(now) {
   feed.update(dt);
   windows.update(dt);
   updateBadges(dt);
+  victoryUI.update(dt);
 
   renderer.render();
   adaptQuality(dt);
@@ -691,4 +719,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI };

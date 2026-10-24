@@ -24,7 +24,7 @@ export function autoQuality() {
 }
 
 export const DIFFICULTIES = ['easy', 'normal', 'hard'];
-export const DEFAULTS = () => ({ mapStyle: 'political', quality: null, uiScale: 100, volume: 70, difficulty: 'normal', warLines: true, clouds: true });
+export const DEFAULTS = () => ({ mapStyle: 'political', quality: null, uiScale: 100, volume: 70, difficulty: 'normal', warLines: true, clouds: true, victory: 'points', timeLimit: 0 });
 
 export class Settings {
   constructor() {

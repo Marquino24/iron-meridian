@@ -13,6 +13,7 @@ import { Combat } from '../js/combat.js';
 import { Buildings } from '../js/buildings.js';
 import { Research } from '../js/research.js';
 import { AI } from '../js/ai.js';
+import { Diplomacy } from '../js/diplomacy.js';
 
 const args = process.argv.slice(2);
 const months = Number(args.find((a) => /^\d+$/.test(a)) ?? 6);
@@ -30,7 +31,12 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   const research = new Research(state, economy);
   research.armies = armies; research.buildings = buildings;
   armies.research = research; buildings.research = research;
-  const ai = new AI(state, { economy, buildings, armies, combat, research });
+  const sim = { economy, buildings, armies, combat, research };
+  const ai = new AI(state, sim);
+  sim.ai = ai;
+  const diplomacy = new Diplomacy(state, sim);
+  sim.diplomacy = diplomacy;
+  armies.diplomacy = diplomacy;
   ai.budgetMs = Infinity;
   const map = era.fictional ? Object.assign(generateMap('SIM-0001'), { era }) : buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era);
   state.loadMap(map);
@@ -41,11 +47,12 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   ai.start(-1, difficulty);
   state.setPhase('playing');
   const start = map.nations.map((n) => state.provincesOf(n.id).length);
-  const events = { wars: [], peace: [], conquered: [] };
+  const events = { wars: [], peace: [], conquered: [], diplomacy: [] };
   state.events.on('feed', (e) => {
     if (e.kind === 'war') events.wars.push(e.text);
     if (e.kind === 'peace') events.peace.push(e.text);
     if (e.kind === 'annexed') events.conquered.push(e.text);
+    if (e.kind === 'diplomacy') events.diplomacy.push(e.text);
   });
   const hours = months * 730;
   let maxShare = 0, maxShareNation = '';
@@ -77,6 +84,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`   shrank: ${shrank.slice(0, 8).map((x) => `${x.n.shortName} ${x.start}→${x.end}`).join(', ') || '—'}`);
     console.log(`   largest share of the map at any time: ${(r.maxShare * 100).toFixed(1)}% (${r.maxShareNation})`);
     console.log(`   first wars: ${r.events.wars.slice(0, 6).join('; ')}`);
+    const D = r.ai.sim.diplomacy;
+    const kinds = (re) => r.events.diplomacy.filter((t) => re.test(t)).length;
+    console.log(`   diplomacy: ${kinds(/formed an alliance/)} alliances, ${kinds(/non-aggression/)} pacts, ${kinds(/joins the war/)} allies called in, ${kinds(/broke/)} treaties broken, ${kinds(/ended the/)} cancelled; blocs now: ${new Set(D.blocs().values()).size}`);
+    console.log(`   e.g. ${r.events.diplomacy.slice(0, 5).join('; ')}`);
+    // How neighbours feel about each other (sample).
+    const ops = [];
+    for (const n of r.state.map.nations) for (const o of r.ai.neighborsOf(n.id)) ops.push(D.opinion(n.id, o).value);
+    ops.sort((a, b) => a - b);
+    if (ops.length) console.log(`   neighbour opinions: min ${ops[0]}, median ${ops[ops.length >> 1]}, 90th pct ${ops[Math.floor(ops.length * 0.9)]}, max ${ops[ops.length - 1]}`);
     if (r.events.conquered.length) console.log(`   conquered: ${r.events.conquered.slice(0, 6).join('; ')}`);
   }
 }

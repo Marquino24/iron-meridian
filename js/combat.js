@@ -354,7 +354,7 @@ export class Combat {
     if (loser && !st.provinces.some((q) => q.owner === from)) {
       for (const a of [...this.armies.list.values()]) if (a.nation === from) this.armies.remove(a);
       for (const k of [...this.wars]) if (k.split(':').map(Number).includes(from)) { this.wars.delete(k); this.warInfo.delete(k); }
-      st.events.emit('feed', { kind: 'annexed', tone: nation === player ? 'good' : 'bad', node: p.id, text: `${loser.name} has been conquered` });
+      st.events.emit('feed', { kind: 'annexed', tone: nation === player ? 'good' : 'bad', node: p.id, by: nation, loser: from, text: `${loser.name} has been conquered` });
       st.events.emit('war', { a: from, b: nation });
     }
   }

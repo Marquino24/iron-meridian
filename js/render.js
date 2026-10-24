@@ -48,6 +48,9 @@ const COLORS = {
   unclaimed: '#8b8f7d',
 };
 
+/** Alliance bloc outlines (one colour per bloc). */
+const BLOC_COLORS = ['#3df5a0', '#ff6ad5', '#45c8ff', '#ffb03b', '#c49bff', '#ff5f5f', '#d8ff4a'];
+
 const FONT_UI = '"Rajdhani", "Segoe UI", system-ui, sans-serif';
 const FONT_OLD = '"IM Fell English", "Iowan Old Style", Georgia, serif';
 
@@ -296,7 +299,7 @@ export class Renderer {
     // Borders are rebuilt once per frame however many provinces changed (sandbox painting).
     state.events.on('province:owner', () => { this.ownershipDirty = true; this.requestRender(); });
     for (const evt of ['hover', 'select', 'select:army', 'select:group', 'armies', 'war']) state.events.on(evt, redraw);
-    for (const evt of ['focus:nation', 'player', 'phase']) state.events.on(evt, relayer);
+    for (const evt of ['focus:nation', 'player', 'phase', 'diplomacy']) state.events.on(evt, relayer);
     document.fonts?.ready.then(redraw);
   }
 
@@ -772,6 +775,21 @@ export class Renderer {
       ctx.strokeStyle = L.coast;
       ctx.lineWidth = (old ? 1.2 : 1.1) * px;
       cache.coast.stroke(ctx, view);
+    }
+
+    // Alliance blocs: every member outlined in its bloc's colour.
+    const blocs = state.phase === 'playing' ? this.sim?.diplomacy?.blocs() : null;
+    if (blocs?.size) {
+      for (const [nation, bloc] of blocs) {
+        const path = cache.nationOutlines[nation];
+        if (!path) continue;
+        ctx.strokeStyle = 'rgba(6,10,20,0.75)';
+        ctx.lineWidth = 4.2 * px;
+        ctx.stroke(path);
+        ctx.strokeStyle = BLOC_COLORS[bloc % BLOC_COLORS.length];
+        ctx.lineWidth = 2.2 * px;
+        ctx.stroke(path);
+      }
     }
 
     // Highlight outline: player's nation in game, previewed nation in setup.

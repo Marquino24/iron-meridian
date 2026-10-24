@@ -85,7 +85,8 @@ export class Sandbox {
     if (!this.on || a < 0 || b < 0 || a === b) return false;
     if (war) {
       C.truces.delete(a < b ? `${a}:${b}` : `${b}:${a}`);
-      return C.declareWar(a, b);
+      this.sim.diplomacy?.treaties.delete(a < b ? `${a}:${b}` : `${b}:${a}`); // the sandbox overrides pacts without a penalty
+      return (this.sim.diplomacy ?? C).declareWar(a, b);
     }
     return C.makePeace(a, b, { revert: false, truce: false });
   }

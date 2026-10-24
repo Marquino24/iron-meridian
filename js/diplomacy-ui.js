@@ -1,7 +1,9 @@
 /**
- * diplomacy-ui.js — Big alerts and peace popups.
+ * diplomacy-ui.js — Big alerts and diplomatic popups.
  *   - An AI declaring war on you: a full alert that pauses the game.
  *   - An AI offering white peace: Accept / Decline.
+ *   - AI proposals (step 7A): a treaty, a trade, or joining its war — Accept / Decline.
+ *   - Your alliance calling you into a defensive war: an alert.
  * Alerts queue up if several arrive at once.
  */
 
@@ -9,6 +11,8 @@ import { esc } from './ui-kit.js';
 import { drawFlag } from './flags.js';
 import { PERSONALITIES } from './ai.js';
 import { TRUCE_DAYS } from './combat.js';
+import { TREATIES } from './diplomacy.js';
+import { RESOURCES } from './resources.js';
 
 export class DiplomacyUI {
   constructor(state, sim, actions) {
@@ -22,6 +26,8 @@ export class DiplomacyUI {
 
     state.events.on('war:declared', ({ a, b }) => { if (b === state.playerNationId) this.push({ kind: 'war', from: a }); });
     state.events.on('peace:offer', ({ from, to }) => { if (to === state.playerNationId) this.push({ kind: 'peace', from }); });
+    state.events.on('diplomacy:proposal', (p) => { if (p.to === state.playerNationId) this.push({ kind: 'proposal', from: p.from, p }); });
+    state.events.on('diplomacy:called', ({ leader, enemy }) => this.push({ kind: 'called', from: leader, enemy }));
     state.events.on('map:loaded', () => { this.queue = []; this.close(); });
     this.el.addEventListener('click', (e) => this.onClick(e));
     document.addEventListener('keydown', (e) => {
@@ -55,6 +61,43 @@ export class DiplomacyUI {
     const n = st.getNation(from), me = st.playerNation;
     const pers = PERSONALITIES[ai.personalityOf(from)]?.label ?? '—';
     const theirs = Math.round(ai.powerOf(from)), ours = Math.round(ai.powerOf(st.playerNationId));
+    const Dp = this.sim.diplomacy;
+    const op = Dp ? Dp.opinion(from, st.playerNationId) : null;
+    const opLine = op ? `<dt>Their opinion of you</dt><dd class="${op.value >= 0 ? 'pos' : 'neg'}">${op.value > 0 ? '+' : ''}${op.value}</dd>` : '';
+    const bundle = (b) => Object.entries(b ?? {}).map(([k, v]) => `<span class="cost-chip"><i>${RESOURCES[k].icon}</i>${Math.round(v)} ${esc(this.sim.economy.set.labels[k])}</span>`).join(' ');
+    if (kind === 'proposal' || kind === 'called') {
+      const p = this.open.p;
+      let title, text;
+      if (kind === 'called') {
+        const enemy = st.getNation(this.open.enemy);
+        title = `${esc(n.name)} calls on the alliance`;
+        text = `${esc(enemy.name)} attacked your ally. Under your alliance you are now at war with ${esc(enemy.shortName)}.`;
+      } else if (p.kind === 'treaty') {
+        title = `${esc(n.name)} proposes ${p.type === 'alliance' ? 'an alliance' : `a ${esc(TREATIES[p.type].label.toLowerCase())}`}`;
+        text = p.type === 'alliance' ? 'Allies are called into each other\'s defensive wars and may ask each other to join offensive ones. Their armies may cross your land.'
+          : p.type === 'nap' ? 'Neither side may attack the other. Breaking it later angers every nation.' : 'Their armies may cross your land in peace.';
+      } else if (p.kind === 'trade') {
+        title = `${esc(n.name)} offers a trade`;
+        text = `<span class="trade-line"><b>You get</b> ${bundle(p.give)}</span><span class="trade-line"><b>You give</b> ${bundle(p.take)}</span>`;
+      } else {
+        const target = st.getNation(p.target);
+        title = `${esc(n.name)} asks you to join its war`;
+        text = `Your ally is fighting ${esc(target.name)} and wants you at its side. Declining will cost you their goodwill.`;
+      }
+      const buttons = kind === 'called'
+        ? '<button type="button" class="btn primary" data-diplo="ok">Understood</button>'
+        : `<button type="button" class="btn primary" data-diplo="accept">Accept</button><button type="button" class="btn ghost" data-diplo="decline">Decline</button>`;
+      this.el.innerHTML = `<div class="report-card diplo-card proposal" role="alertdialog" aria-modal="true">
+        <canvas class="diplo-flag" width="96" height="64"></canvas>
+        <div class="alert-kicker ${kind === 'called' ? '' : 'peace'}">${kind === 'called' ? '⚔ CALL TO ARMS' : '✉ PROPOSAL'}</div>
+        <h2>${title}</h2><p>${text}</p>
+        <dl class="diplo-stats"><dt>Their army strength</dt><dd>${theirs}</dd><dt>Yours</dt><dd>${ours}</dd>${opLine}</dl>
+        <div class="btn-row">${buttons}</div></div>`;
+      drawFlag(this.el.querySelector('canvas').getContext('2d'), n.flag, 0, 0, 96, 64);
+      this.el.hidden = false;
+      this.el.querySelector('[data-diplo]')?.focus({ preventScroll: true });
+      return;
+    }
     const body = kind === 'war'
       ? `<div class="alert-kicker">⚔ WAR</div>
          <h2>${esc(n.name)} has declared war on you</h2>
@@ -91,6 +134,10 @@ export class DiplomacyUI {
   answer(yes) {
     const item = this.open;
     if (!item) return;
+    if (item.kind === 'proposal') {
+      const r = this.sim.diplomacy.answer(item.p, yes);
+      if (yes && !r.ok) this.actions.notice(r.reason ?? 'That is no longer possible.');
+    }
     if (item.kind === 'peace') {
       if (yes) this.sim.combat.makePeace(item.from, this.state.playerNationId);
       else this.state.events.emit('feed', { kind: 'peace', tone: 'war', text: `You declined ${this.state.getNation(item.from).shortName}'s peace offer` });

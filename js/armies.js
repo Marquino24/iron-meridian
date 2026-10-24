@@ -136,7 +136,7 @@ export class Armies {
     if (this.isSea(node)) return true;
     if (kind === 'naval') return false;
     const owner = this.state.map.provinces[node].owner;
-    return owner === nation || owner < 0 || !!this.combat?.atWar(nation, owner);
+    return owner === nation || owner < 0 || !!this.combat?.atWar(nation, owner) || !!this.diplomacy?.hasAccess(nation, owner);
   }
 
   /** A unit's stats at its level (cached per type and level). */

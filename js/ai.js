@@ -495,27 +495,78 @@ export class AI {
         C.makePeace(n, e);
       }
     }
+    this.doTreaties({ n, P, b });
     // New wars.
     if (enemies.length >= P.maxWars) return;
     // warChance is per month; minor nations start wars far less often.
     const major = this.state.getNation(n).major;
     const perHour = (P.warChance * D.chance * (major ? 1 : 0.3) * (ERA_WAR_RATE[this.state.map.era?.id] ?? 1)) / 730;
     if (Math.random() > perHour * b.every) return;
+    const Dp = this.sim.diplomacy;
     let best = -1, bs = 0;
     for (const o of this.neighborsOf(n)) {
-      if (C.atWar(n, o) || C.truceUntil(n, o) != null) continue;
+      if (C.atWar(n, o)) continue;
+      const op = Dp?.opinion(n, o).value ?? 0;
+      // Friends are safe; pacts and truces hold, except for a furious aggressor (rarely).
+      if (op >= 25 || Dp?.has(n, o, 'alliance')) continue;
+      const bound = C.truceUntil(n, o) != null || Dp?.has(n, o, 'nap') || Dp?.has(n, o, 'passage');
+      if (bound && !(b.personality === 'aggressive' && op < -60 && Math.random() < 0.15)) continue;
       const theirs = this.powerOf(o) + 0.5 * C.enemiesOf(o).length; // allies don't exist yet
       const ratio = me / Math.max(1, theirs);
       const lost = this.state.provinces.some((p) => p.homeOf === n && p.owner === o);
       const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1);
       if (ratio < need) continue;
       // Value: their cities and capital near us; prefer smaller wars.
-      const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1);
+      const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1) * (1 + Math.max(0, -op) / 50);
       if (score > bs) { bs = score; best = o; }
     }
-    if (best >= 0 && C.declareWar(n, best)) {
+    if (best >= 0 && (Dp ? Dp.declareWar(n, best) : C.declareWar(n, best))) {
       this.state.events.emit('war:declared', { a: n, b: best, ai: true });
+      // Call the allies: AI allies decide at once, the player gets asked.
+      for (const ally of Dp?.allies(n) ?? []) {
+        if (C.atWar(ally, best)) continue;
+        if (ally === this.state.playerNationId) Dp.propose(n, ally, { kind: 'join', target: best });
+        else Dp.askToJoin(n, ally, best);
+      }
     }
+  }
+
+  /**
+   * Treaties: alliances with friends who share an enemy or a threat, pacts with
+   * strong neighbours, trade offers to the player when short of something.
+   * AI–AI deals are signed at once (and reported in the feed); deals with the
+   * player become proposals (popups).
+   */
+  doTreaties({ n, b }) {
+    const Dp = this.sim.diplomacy;
+    if (!Dp || Math.random() > 0.35) return;
+    const C = this.sim.combat, me = this.state.playerNationId;
+    const pool = [...new Set([...this.neighborsOf(n), ...Dp.met(n)])].filter((o) => o !== n && !C.atWar(n, o) && this.state.provinces.some((p) => p.owner === o));
+    if (!pool.length) return;
+    // Court the nations it likes best (a random one of its top three).
+    const ranked = pool.map((x) => [x, Dp.opinion(n, x).value]).sort((p, q) => q[1] - p[1]);
+    const [o, op] = ranked[Math.floor(Math.random() * Math.min(3, ranked.length))];
+    const ally = Dp.allies(n).length < 3 && op >= 30 && (Dp.sharedEnemies(n, o).length || Dp.sharedThreat(n, o));
+    const ratio = this.powerOf(o) / Math.max(1, this.powerOf(n));
+    let type = null;
+    if (ally && !Dp.has(n, o, 'alliance')) type = 'alliance';
+    else if (!Dp.has(n, o, 'nap') && !Dp.has(n, o, 'alliance') && this.neighborsOf(n).has(o) && ratio > 1.5 && op >= -5) type = 'nap';
+    if (type) {
+      if (o === me) Dp.propose(n, o, { kind: 'treaty', type });
+      else if (Dp.accepts(o, n, type).ok) Dp.sign(n, o, type);
+      return;
+    }
+    // Ask the player for help in a war, or offer a trade.
+    if (Dp.has(n, me, 'alliance')) {
+      const target = C.enemiesOf(n).find((e) => !C.atWar(me, e) && !Dp.has(me, e, 'alliance'));
+      if (target != null) { Dp.propose(n, me, { kind: 'join', target }); return; }
+    }
+    if (Dp.met(n).has(me) && Dp.opinion(n, me).value >= 0) {
+      const offer = Dp.tradeIdea(n, me);
+      if (offer) Dp.propose(n, me, { kind: 'trade', ...offer });
+    }
+    // Ditch an ally it has come to dislike.
+    for (const a of Dp.allies(n)) if (Dp.opinion(n, a).value < -10 && Math.random() < 0.3) { Dp.cancel(n, a, 'alliance'); break; }
   }
 
   /** Would AI nation `n` accept a white peace from `other`? */

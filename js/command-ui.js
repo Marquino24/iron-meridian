@@ -406,7 +406,7 @@ export class CommandUI {
       case 'cancel-build': this.sim.buildings.cancel(st.selectedProvinceId); break;
       case 'war': this.confirmWar = Number(b.dataset.nation); break;
       case 'war-cancel': this.confirmWar = -1; break;
-      case 'war-confirm': C.declareWar(st.playerNationId, Number(b.dataset.nation)); this.confirmWar = -1; break;
+      case 'war-confirm': (this.sim.diplomacy ?? C).declareWar(st.playerNationId, Number(b.dataset.nation)); this.confirmWar = -1; break;
       case 'offer-peace': {
         const other = Number(b.dataset.nation);
         if (this.sim.ai?.acceptsPeace(other, st.playerNationId) ?? true) {
