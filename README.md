@@ -167,11 +167,13 @@ Chosen on the nation screen, after difficulty:
 
 - **Victory Points** (default): every city is worth 1 point and every capital 3 (yours or one you took). The first nation to **10% of all the points on the map** wins (WWII: 53 of 524; the target scales with each era's map).
 - **Domination:** control 40% of the world's provinces.
-- **Off:** play without one (handy in the sandbox).
+- **Off:** play without one (no score widget). The sandbox always plays without one.
 - **Time limit** (optional, 5–50 years): when it runs out, the leader in points wins.
 - **Defeat:** you hold no city at all, or another nation reaches the goal first.
 
-The top bar shows your points against the top three (tap for the full leaderboard). The end screen shows victory or defeat, your provinces over time, battles won and lost, units built, nations conquered, game time and time played, with **Main Menu** and **Keep Playing**.
+The top bar shows your points against the top three (tap for the full leaderboard). How long a win takes: in headless runs at Normal, with one computer nation set to an all-out conquest personality as a stand-in for an aggressive player, someone reached the Victory Points target after 7–9 game years (Modern: the stand-in China after 6.9 years; WWII: the Soviet Union, an ordinary computer nation, after 8.8 years, with the stand-in Germany stalled at 46 of 53). That is 17–21 hours at 1×, since one game year is about 2.4 real hours. In WWI and the Cold War nobody reached it within 10 years, because defensive alliances stop runaway conquest. Most games will be played at 4–8× or with a time limit.
+
+The end screen shows victory or defeat, your provinces over time, battles won and lost, units built, nations conquered, game time and time played, with **Main Menu** and **Keep Playing**.
 
 ## Flags
 

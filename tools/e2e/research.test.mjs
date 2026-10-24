@@ -42,7 +42,7 @@ await page.click('#province-panel [data-action="close"]');
 await IM(() => window.ironMeridian.state.setSpeed(0));
 
 const bar = await page.$$eval('#command-bar [data-win]', (b) => b.map((x) => x.dataset.win));
-check(bar.join() === 'army,production,buildings,research', `command bar: ${bar.join(', ')}`);
+check(bar.join() === 'army,production,buildings,research,diplomacy', `command bar: ${bar.join(', ')}`);
 await page.waitForTimeout(700);
 check((await page.textContent('#command-bar [data-win="research"] .cb-badge').catch(() => '')) === '1', 'badge on Research: 1 idle slot');
 if (MOBILE) await click('#command-bar [data-win="research"]'); else await page.keyboard.press('r');

@@ -2171,3 +2171,6 @@ body.sandbox.in-game .win { margin-left: 0; }
   .end-banner h1 { font-size: 38px; }
   .end-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* The sandbox has no win condition. */
+body[data-mode="sandbox"] .victory-row { display: none; }

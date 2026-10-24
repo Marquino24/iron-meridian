@@ -153,7 +153,7 @@ await click('#group-bar [data-group="clear"]');
 check(await IM(() => window.ironMeridian.state.armyGroup) === null, 'group cleared');
 
 // Windows: icons in the headers and command bar, big "Select all cities".
-check(await page.locator('#command-bar [data-win] .cb-ico svg').count() === 4, 'command bar icons');
+check(await page.locator('#command-bar [data-win] .cb-ico svg').count() === 5, 'command bar icons');
 await click('#command-bar [data-win="production"]');
 await page.waitForSelector('.win-production:not([hidden])');
 check(await page.locator('.win-production .win-glyph svg').count() === 1, 'window header icon');

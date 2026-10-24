@@ -58,6 +58,7 @@ export class VictoryUI {
 
   /** Current choice from the settings (the sandbox defaults to Off). */
   config() {
+    if (document.body.dataset.mode === 'sandbox') return { mode: 'none', timeLimit: 0 };
     const mode = this.settings.values.victory ?? 'points';
     return { mode: VICTORY_MODES[mode] ? mode : 'points', timeLimit: Number(this.settings.values.timeLimit ?? 0) };
   }
@@ -98,7 +99,7 @@ export class VictoryUI {
 
   renderWidget(force = false) {
     const V = this.victory, st = this.state;
-    const show = st.phase === 'playing' && V.started;
+    const show = st.phase === 'playing' && V.started && V.config.mode !== 'none';
     this.widget.hidden = !show;
     if (!show) return;
     const me = st.playerNationId;

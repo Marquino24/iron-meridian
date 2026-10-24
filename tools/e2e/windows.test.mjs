@@ -55,7 +55,7 @@ if (MOBILE) await page.tap('#res-chips .res'); else await page.mouse.move(700, 6
 
 // Command bar shows exactly the three working windows.
 const bar = await page.$$eval('#command-bar [data-win]', (b) => b.map((x) => x.dataset.win));
-check(bar.join() === 'army,production,buildings,research', `command bar: ${bar.join(', ')}`);
+check(bar.join() === 'army,production,buildings,research,diplomacy', `command bar: ${bar.join(', ')}`);
 const menuBox = await page.locator('#btn-menu').boundingBox();
 check(menuBox && menuBox.x + menuBox.width <= (MOBILE ? 390 : 1440), 'top bar fits (MENU visible)');
 

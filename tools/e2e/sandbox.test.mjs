@@ -48,6 +48,8 @@ await page.click('.nation-row');
 check(/START SANDBOX/.test(await page.textContent('#btn-deploy')), `deploy button: ${await page.textContent('#btn-deploy')}`);
 await page.click('#btn-deploy');
 await page.waitForFunction(() => document.body.classList.contains('in-game'));
+// AI proposals pop up modals at random; this test is about the sandbox tools.
+await IM(() => { window.ironMeridian.sim.diplomacy.propose = () => null; });
 await page.waitForTimeout(1200);
 await page.click('#province-panel [data-action="close"]').catch(() => {});
 await IM(() => window.ironMeridian.state.setSpeed(0));
