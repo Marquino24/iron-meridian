@@ -27,6 +27,8 @@ export const PERSONALITIES = {
   aggressive: { label: 'Aggressive', warRatio: 1.4, warChance: 0.3, military: 0.65, maxWars: 2, branches: ['mil', 'eco', 'inf'], fort: 0.1, expand: 0.4 },
   balanced: { label: 'Balanced', warRatio: 1.8, warChance: 0.08, military: 0.5, maxWars: 1, branches: ['eco', 'mil', 'inf'], fort: 0.2, expand: 0.2 },
   defensive: { label: 'Defensive', warRatio: 2.8, warChance: 0.02, military: 0.45, maxWars: 1, branches: ['inf', 'eco', 'mil'], fort: 0.5, expand: 0 },
+  // Only for the headless "player bot" (tools/sim-ai.mjs): plays like a determined human.
+  conqueror: { label: 'Conqueror', warRatio: 1.1, warChance: 1.2, military: 0.75, maxWars: 3, branches: ['mil', 'eco', 'inf'], fort: 0.05, expand: 1 },
   expansionist: { label: 'Expansionist', warRatio: 1.5, warChance: 0.18, military: 0.55, maxWars: 2, branches: ['eco', 'inf', 'mil'], fort: 0.1, expand: 1 },
 };
 

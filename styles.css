@@ -2065,7 +2065,7 @@ body.sandbox.in-game .win { margin-left: 0; }
 /* =========================================================================
    Step 7A: Diplomacy window, relations, opinion
    ========================================================================= */
-.win-diplomacy { width: 980px; }
+@media (min-width: 761px) { .win-diplomacy { width: 980px; } }
 .win-diplomacy .win-head { --head-a: #8b5cf6; --head-b: #4c1d95; }
 .dip-layout { display: grid; grid-template-columns: 1fr; gap: 12px; min-height: 0; }
 .dip-layout.has-detail { grid-template-columns: minmax(0, 1fr) 340px; }

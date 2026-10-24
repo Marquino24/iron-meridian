@@ -19,7 +19,7 @@
 export const VICTORY_MODES = { points: 'Victory Points', domination: 'Domination', none: 'No victory' };
 export const TIME_LIMITS = [0, 5, 10, 20, 50];
 /** Share of all the points on the map needed for a Victory Points win. */
-export const POINTS_SHARE = 0.3;
+export const POINTS_SHARE = 0.1;
 export const CAPITAL_POINTS = 3;
 
 const DAY = 864e5;

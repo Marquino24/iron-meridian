@@ -151,6 +151,28 @@ Every nation you don't play runs `js/ai.js`. Each has a personality: **Aggressiv
 
 **Economic weight.** Provinces were cut roughly by land area, so counting them made colonial empires and Siberia huge and compact industrial powers small (WWII Germany earned 410 a day against France's 1,930). `js/development.js` now gives every province a development value: colonies and far frontiers (more than 1,500 km from the capital and not linked to it by land within 4,500 km) produce 0.35×, polar land 0.35×, other nations scale with the square root of their size, and each era's major powers are scaled to their real GDP and population (Maddison-style estimates). The value stays with the province when it's conquered. The 20th-century maps were also rebuilt with each major power's real cities (`majorCities` in `tools/era-config.mjs`; WWII Germany went from 2 cities to 15). `node tools/print-economies.mjs` lists the largest economies per era.
 
+## Diplomacy
+
+Between any two nations: **War**, **Peace**, or treaties on top of peace — **Non-Aggression Pact**, **Right of Passage** (armies may cross the other's land) and **Alliance** (includes both). Every white peace leaves a 90-day truce.
+
+- **Opinion:** every nation has an opinion of every other, −100 to +100, with its reasons shown (hover a row, or open a nation in the Diplomacy window): our ally, historical ties (the era's real alignments: Axis/Allies, Entente/Central Powers, NATO/Warsaw Pact…), common threat, shared enemy, at war / recent war, took our provinces, border tension with a stronger neighbour, temperament, and memories that fade over time — gifts (a year), trade, joining our war, refusing to, cancelling a treaty, and **breaking one** (attacking during a pact, alliance, passage or truce: −60 with the victim for three years, −25 with everyone else for two).
+- **Alliances:** when a nation is attacked, all its allies join the war automatically (you too — an alert says so). Allies can be asked to join offensive wars; they weigh their opinion of you, of the target, and the odds. When the two sides make peace, allies who joined over it follow. Alliance blocs are outlined on the map, one colour per bloc.
+- **Trade and gifts:** offer any swap (e.g. 500 steel for 300 oil); the other side values each resource by how short of it they are and by their opinion of you, and the window previews their answer. Gifts raise opinion in proportion to their size next to the receiver's income.
+- **The AI** forms alliances (with friends who share an enemy or a threat — e.g. "German Reich and Kingdom of Italy formed an alliance"), signs pacts with strong neighbours, ditches allies it has come to dislike, chooses war targets by opinion (pacts hold except for an enraged aggressor), calls its allies in, and makes **proposals to you** — a treaty, a trade, or joining its war — as popups with Accept / Decline (at most one every 10 days).
+- **Diplomacy window (D):** every nation you've met (neighbours, major powers, and anyone you've traded, fought or signed with), filterable and sortable by opinion, power and relation, with buttons to propose or cancel each treaty, ask an ally into a war, trade, send a gift, declare war (with a warning when it breaks a treaty) or offer peace.
+
+## Win conditions
+
+Chosen on the nation screen, after difficulty:
+
+- **Victory Points** (default): every city is worth 1 point and every capital 3 (yours or one you took). The first nation to **10% of all the points on the map** wins (WWII: 53 of 524; the target scales with each era's map).
+- **Domination:** control 40% of the world's provinces.
+- **Off:** play without one (handy in the sandbox).
+- **Time limit** (optional, 5–50 years): when it runs out, the leader in points wins.
+- **Defeat:** you hold no city at all, or another nation reaches the goal first.
+
+The top bar shows your points against the top three (tap for the full leaderboard). The end screen shows victory or defeat, your provinces over time, battles won and lost, units built, nations conquered, game time and time played, with **Main Menu** and **Keep Playing**.
+
 ## Flags
 
 Every nation shows its real flag for the era's date wherever one exists — nation select, top bar, nation panel, war and peace alerts, battle reports, and a small flag on each army marker:
@@ -270,6 +292,10 @@ js/
   palette.js      Vivid nation colours from the era data's muted ones
   flags.js        Real flags from the era sheet, heraldic shields otherwise (repaints when a sheet arrives)
   flag-index.js   GENERATED: nation → tile per era (tools/build-flags.mjs)
+  diplomacy.js    Relations, treaties, opinion with reasons, alliances and call-to-arms, trade and gifts, proposals
+  win-diplomacy.js  Diplomacy window (D)
+  victory.js      Win conditions, points, defeat, end-of-game stats
+  victory-ui.js   Win-condition picker, score widget, leaderboard, end screen
   sandbox.js      Sandbox rules: paint, spawn, resources, war/peace, AI switches, instant modes, play as
   sandbox-ui.js   Sandbox toolbar and panels, nation pickers with pick-on-map
   command-ui.js   Money/manpower bar, army panel, recruit/war sections of the province panel

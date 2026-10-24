@@ -14,6 +14,7 @@ import { Buildings } from '../js/buildings.js';
 import { Research } from '../js/research.js';
 import { AI } from '../js/ai.js';
 import { Diplomacy } from '../js/diplomacy.js';
+import { Victory } from '../js/victory.js';
 
 const args = process.argv.slice(2);
 const months = Number(args.find((a) => /^\d+$/.test(a)) ?? 6);
@@ -21,7 +22,7 @@ const difficulty = args.find((a) => ['easy', 'normal', 'hard'].includes(a)) ?? '
 const eras = args.filter((a) => ERAS.some((e) => e.id === a));
 const list = eras.length ? eras.map(getEra) : ERAS;
 
-export function simulate(era, { months = 6, difficulty = 'normal', quiet = false } = {}) {
+export function simulate(era, { months = 6, difficulty = 'normal', quiet = false, untilVictory = false, bot = null } = {}) {
   const state = new GameState();
   const economy = new Economy(state);
   const buildings = new Buildings(state, economy);
@@ -37,6 +38,8 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   const diplomacy = new Diplomacy(state, sim);
   sim.diplomacy = diplomacy;
   armies.diplomacy = diplomacy;
+  const victory = new Victory(state, sim);
+  sim.victory = victory;
   ai.budgetMs = Infinity;
   const map = era.fictional ? Object.assign(generateMap('SIM-0001'), { era }) : buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era);
   state.loadMap(map);
@@ -46,6 +49,17 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   armies.spawnInitial(-1);
   ai.start(-1, difficulty);
   state.setPhase('playing');
+  victory.start({ mode: 'points', timeLimit: 0 });
+  // A "player bot": one nation played aggressively, thinking often, with Hard production.
+  let botId = -1;
+  if (bot) {
+    botId = map.nations.find((n) => n.name === bot || n.shortName === bot)?.id ?? -1;
+    const b = ai.brains.get(botId);
+    if (b) { b.personality = 'conqueror'; b.every = 8; }
+    const base = economy.bonus;
+    economy.bonus = (n) => (n === botId ? 1.3 : base(n));
+  }
+  const vp = { target: victory.target, total: victory.totalPoints, reached: null, leaders: [] };
   const start = map.nations.map((n) => state.provincesOf(n.id).length);
   const events = { wars: [], peace: [], conquered: [], diplomacy: [] };
   state.events.on('feed', (e) => {
@@ -61,6 +75,12 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
     state.clock.time += 3600e3;
     economy.update(state, 1); research.update(state, 1); buildings.update(state, 1);
     armies.update(state, 1); combat.update(state, 1); ai.update(state, 1);
+    if (h % 24 === 0) {
+      victory.refresh();
+      const lead = victory.scores[0];
+      if (h % (24 * 90) === 0) vp.leaders.push(`${Math.round(h / 24)}d ${map.nations[lead.id].shortName} ${lead.points}${botId >= 0 ? ` (bot ${victory.scoreOf(botId).points})` : ''}`);
+      if (!vp.reached && lead.points >= vp.target) { vp.reached = { days: h / 24, nation: map.nations[lead.id].shortName, points: lead.points }; if (untilVictory) break; }
+    }
     if (h % 240 === 0) {
       const counts = map.nations.map((n) => 0);
       for (const p of map.provinces) if (p.owner >= 0) counts[p.owner]++;
@@ -70,7 +90,7 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   const ms = performance.now() - t0;
   const end = map.nations.map((n) => state.provincesOf(n.id).length);
   const delta = map.nations.map((n, i) => ({ n, start: start[i], end: end[i], d: end[i] - start[i] })).filter((r) => r.start || r.end);
-  return { state, ai, events, delta, maxShare, maxShareNation, ms, hours, units: [...armies.list.values()].reduce((s, a) => s + a.units.length, 0) };
+  return { state, ai, events, delta, maxShare, maxShareNation, ms, hours, vp, units: [...armies.list.values()].reduce((s, a) => s + a.units.length, 0) };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
