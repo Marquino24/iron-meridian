@@ -2209,3 +2209,6 @@ body[data-mode="sandbox"] .victory-row { display: none; }
   .save-acts .btn.ghost span { display: none; }
   .save-acts .btn.ghost svg { margin-right: 0; }
 }
+/* Fictional nations' stature on the nation list. */
+.nation-name em.stature-great { color: var(--accent); border-color: rgba(255, 181, 71, 0.6); }
+.nation-name em.stature-minor { color: var(--text-dim); }

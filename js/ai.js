@@ -71,7 +71,8 @@ export class AI {
     this.reset();
     state.events.on('map:loaded', () => this.reset());
     state.events.on('province:owner', ({ from, to }) => { this.dirtyNeighbors.add(from); this.dirtyNeighbors.add(to); });
-    sim.economy.bonus = (n) => (this.brains.has(n) ? DIFFICULTY[this.difficulty].prod : 1);
+    // Difficulty for computer nations; fictional nations also differ in economic weight.
+    sim.economy.bonus = (n) => (this.brains.has(n) ? DIFFICULTY[this.difficulty].prod : 1) * (this.state.nations[n]?.econ ?? 1);
   }
 
   reset() {
@@ -123,7 +124,7 @@ export class AI {
     const n = this.state.getNation(id);
     size ??= this.state.provinces.filter((p) => p.owner === id).length;
     if (!n || !size) return;
-    const personality = (ERA_PERSONALITY[this.state.map.era?.id] ?? {})[n.name] ?? this.randomPersonality(n.name);
+    const personality = (ERA_PERSONALITY[this.state.map.era?.id] ?? {})[n.name] ?? n.personality ?? this.randomPersonality(n.name);
     const every = (n.major ? 12 : size >= 25 ? 24 : size >= 6 ? 48 : 72) * this.D.think;
     this.brains.set(id, {
       id, personality, every,

@@ -411,7 +411,7 @@ export class Armies {
       const capOk = cap && cap.owner === n.id;
       const big = size > 40;
       if (capOk) {
-        const inf = Math.min(6, 2 + Math.floor(Math.sqrt(size) / 2));
+        const inf = Math.round(Math.min(6, 2 + Math.floor(Math.sqrt(size) / 2)) * (n.might ?? 1));
         this.create(n.id, 'land', cap.id, this.makeUnits({ inf, rng: size > 10 ? 1 : 0, mob: size > 25 ? 1 : 0 }),
           { name: `${cap.cityName ?? cap.name} Garrison`, garrison: true });
       }
@@ -440,9 +440,12 @@ export class Armies {
   spawnField(nation, provs) {
     const map = this.state.map;
     const size = provs.length;
-    const count = size < 10 ? 1 : size < 60 ? 2 : 3;
+    const n = map.nations[nation];
+    // Fictional great powers field more, minor states less (`might`, set by the map).
+    const might = n.might ?? 1;
+    const count = (size < 10 ? 1 : size < 60 ? 2 : 3) + (might > 1.5 ? 1 : 0);
     const extra = size > 100 ? 1 : 0;
-    const cap = map.provinces[map.nations[nation].capitalId];
+    const cap = map.provinces[n.capitalId];
     const border = provs.filter((p) => p.neighbors.some((q) => map.provinces[q].owner !== nation && map.provinces[q].owner >= 0));
     const picks = [cap];
     while (picks.length < count && border.length) {
@@ -456,7 +459,7 @@ export class Armies {
       if (!best) break;
       picks.push(best);
     }
-    for (const p of picks) this.create(nation, 'land', p.id, this.makeUnits({ inf: 3 + extra, mob: 2 + extra, rng: 1 }));
+    for (const p of picks) this.create(nation, 'land', p.id, this.makeUnits({ inf: Math.max(1, Math.round((3 + extra) * might)), mob: Math.max(1, Math.round((2 + extra) * might)), rng: 1 }));
   }
 
   // --- Recruitment -----------------------------------------------------------

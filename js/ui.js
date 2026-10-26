@@ -12,7 +12,7 @@
  * }
  */
 
-import { TERRAIN, AREA_KM2_PER_UNIT, gridRef } from './map.js';
+import { TERRAIN, AREA_KM2_PER_UNIT, gridRef, STATURE } from './map.js';
 import { drawFlag } from './flags.js';
 import { ERAS } from './eras.js';
 
@@ -234,7 +234,7 @@ export class UI {
       row.innerHTML = `
         <span class="flag-slot"></span>
         <span class="nation-main">
-          <span class="nation-name">${escapeHtml(n.name)}${n.major ? ' <em>MAJOR</em>' : ''}</span>
+          <span class="nation-name">${escapeHtml(n.name)}${n.stature ? ` <em class="stature-${n.stature}">${STATURE[n.stature].label.toUpperCase()}</em>` : n.major ? ' <em>MAJOR</em>' : ''}</span>
           <span class="nation-capital">${capital?.isCapital ? `★ ${escapeHtml(capital.name.toUpperCase())}` : '&nbsp;'}</span>
         </span>
         <span class="nation-stats"><b>${s.provinces}</b> PROV<br><b>${s.cities}</b> CITIES</span>`;

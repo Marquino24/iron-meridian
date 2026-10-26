@@ -41,7 +41,7 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   const victory = new Victory(state, sim);
   sim.victory = victory;
   ai.budgetMs = Infinity;
-  const map = era.fictional ? Object.assign(generateMap('SIM-0001'), { era }) : buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era);
+  const map = era.fictional ? Object.assign(generateMap(process.env.SEED ?? 'SIM-0001'), { era }) : buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era);
   state.loadMap(map);
   state.playerNationId = -1;
   buildings.start();

@@ -590,6 +590,36 @@ function decorateCityName(rng, base, p) {
  * @param {string|number} seed
  * @param {Partial<typeof DEFAULT_CONFIG>} overrides
  */
+/** Starting army size, economy and likely temperament for each stature. */
+export const STATURE = {
+  great: { label: 'Great power', might: 1.8, econ: 1.3, temper: [['aggressive', 0.45], ['expansionist', 0.4], ['balanced', 0.15]] },
+  regional: { label: 'Regional power', might: 1.1, econ: 1, temper: [['aggressive', 0.25], ['expansionist', 0.15], ['balanced', 0.4], ['defensive', 0.2]] },
+  minor: { label: 'Minor state', might: 0.7, econ: 0.85, temper: [['balanced', 0.45], ['defensive', 0.55]] },
+};
+
+/**
+ * Fictional nations differ: the largest are usually great powers, the smallest
+ * minor states, with some luck either way; each gets a temperament to match.
+ * Hashed from the seed (not drawn from the map's random stream), so a seed
+ * still makes the same map.
+ */
+function assignStature(nations, provinces, seed) {
+  const size = nations.map(() => 0);
+  for (const p of provinces) if (p.owner >= 0) size[p.owner]++;
+  const roll = (n, what) => (hashSeed(`${seed}:${what}:${n.id}`) % 1000) / 1000;
+  const ranked = [...nations].sort((a, b) => size[b.id] * (0.7 + roll(b, 'luck') * 0.6) - size[a.id] * (0.7 + roll(a, 'luck') * 0.6));
+  ranked.forEach((n, i) => {
+    const q = i / Math.max(1, ranked.length - 1);
+    n.stature = q < 0.25 ? 'great' : q < 0.7 ? 'regional' : 'minor';
+    const S = STATURE[n.stature];
+    let r = roll(n, 'temper');
+    n.personality = S.temper.find(([, w]) => (r -= w) < 0)?.[0] ?? S.temper[0][0];
+    n.might = S.might;
+    n.econ = S.econ;
+    n.major = n.stature !== 'minor';
+  });
+}
+
 export function generateMap(seed, overrides = {}) {
   const cfg = { ...DEFAULT_CONFIG, ...overrides };
   const rng = createRng(seed);
@@ -684,6 +714,8 @@ export function generateMap(seed, overrides = {}) {
       major: true,
     };
   });
+
+  assignStature(nations, provinces, seed);
 
   // 7. Cities (capitals are always urban; other cities often are).
   placeCities(rng, provinces, nations, cfg);
