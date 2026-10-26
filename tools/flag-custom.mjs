@@ -1,9 +1,40 @@
 /**
  * flag-custom.mjs — Banners drawn here as SVG (3:2, 300×200), for eras before
  * national flags: the Roman vexillum, a Han banner, and medieval banners of
- * arms simple enough to draw faithfully (lions and eagles come from Commons).
+ * arms simple enough to draw faithfully (lions and eagles come from Commons),
+ * and the colonial flags of a few major colonies (step 7B).
  * Original work for this game, same licence as the game.
  */
+
+/** Union Flag on a 60×30 grid (the canton of the British ensigns). */
+const UNION = `<clipPath id="u-s"><path d="M0 0v30h60V0z"/></clipPath><clipPath id="u-t"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath>
+  <g clip-path="url(#u-s)"><path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/>
+  <path d="M0 0l60 30m0-30L0 30" clip-path="url(#u-t)" stroke="#c8102e" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/>
+  <path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></g>`;
+
+/** Five-pointed star path, centred on (cx, cy), outer radius r. */
+const star = (cx, cy, r, inner = 0.382) => {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * inner : r;
+    pts.push(`${(cx + rr * Math.cos(a)).toFixed(2)} ${(cy + rr * Math.sin(a)).toFixed(2)}`);
+  }
+  return `M${pts.join('L')}Z`;
+};
+
+/** The Star of India badge: gold rays, a sky-blue garter (its motto left out at this size), a silver star. */
+const starOfIndia = (cx, cy, r) => {
+  let rays = '';
+  for (let i = 0; i < 24; i++) {
+    const a = (i * Math.PI) / 12, w = Math.PI / 40;
+    const p = (ang, rr) => `${(cx + rr * Math.cos(ang)).toFixed(2)} ${(cy + rr * Math.sin(ang)).toFixed(2)}`;
+    rays += `M${p(a - w, r * 0.62)}L${p(a, r * (i % 2 ? 0.88 : 1))}L${p(a + w, r * 0.62)}Z`;
+  }
+  return `<path d="${rays}" fill="#f2c230" stroke="#b07d10" stroke-width="0.3"/>
+    <circle cx="${cx}" cy="${cy}" r="${r * 0.6}" fill="#7cc0ea" stroke="#f2c230" stroke-width="0.8"/>
+    <circle cx="${cx}" cy="${cy}" r="${r * 0.42}" fill="#fff" stroke="#f2c230" stroke-width="0.6"/>
+    <path d="${star(cx, cy, r * 0.36)}" fill="#e9eef2" stroke="#7d8a96" stroke-width="0.4"/>`;
+};
 
 /** Heraldic fleur-de-lis, centred on (0,0), about 40 units tall. */
 const FLEUR = 'M0-20c-4 5-6 10-5 15 1 4 4 7 5 9 1-2 4-5 5-9 1-5-1-10-5-15zM-3 4c-6-1-12-6-14-12-1-4 1-7 5-7 3 0 5 3 4 6-1-1-3-2-4-1-2 1-1 4 1 6 2 3 5 5 8 6zM3 4c6-1 12-6 14-12 1-4-1-7-5-7-3 0-5 3-4 6 1-1 3-2 4-1 2 1 1 4-1 6-2 3-5 5-8 6zM-8 5h16v3h-16zM-2 8h4l2 10c-2 1-6 1-8 0z';
@@ -30,6 +61,12 @@ const CASTLE = `<g fill="#f4c430" stroke="#6b4a08" stroke-width="2">
 <path d="M112 100h6v-10h-6zM147 90h6v-12h-6zM182 100h6v-10h-6zM110 135h8v-12h-8zM182 135h8v-12h-8z" fill="#2a4fa0"/>`;
 
 export const CUSTOM_FLAGS = {
+  // British India (Star of India ensign): the Red Ensign defaced with the Star of India.
+  'star-of-india': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><rect width="120" height="60" fill="#c8102e"/>${UNION}${starOfIndia(90, 30, 19)}</svg>`,
+  // Belgian Congo (1908–1960, as the Congo Free State before it): blue with a gold star.
+  'belgian-congo': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><rect width="300" height="200" fill="#1c4fa3"/><path d="${star(150, 104, 58)}" fill="#f7d117"/></svg>`,
+  // French Indochina (1923–1945): yellow with the French tricolour in the canton.
+  'french-indochina': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><rect width="300" height="200" fill="#f7d117"/><rect width="50" height="100" fill="#0055a4"/><rect x="50" width="50" height="100" fill="#fff"/><rect x="100" width="50" height="100" fill="#ef4135"/></svg>`,
   // Mali Federation (1959–60, Senegal and French Sudan): green-yellow-red with a black kanaga figure.
   'mali-federation': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
     <rect width="100" height="200" fill="#14b53a"/><rect x="100" width="100" height="200" fill="#fcd116"/><rect x="200" width="100" height="200" fill="#ce1126"/>

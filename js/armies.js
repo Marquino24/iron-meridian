@@ -19,6 +19,7 @@
 import { MinHeap, TERRAIN } from './map.js';
 import { unproject } from './projection.js';
 import { rosterFor, makeUnit, levelStats } from './units.js';
+import { colonyOf } from './colonies.js';
 import { UNIT_REQUIREMENT, TRAIN_FACTOR } from './buildings.js';
 
 /** Hours to board or leave transports. */
@@ -366,6 +367,9 @@ export class Armies {
       fresh: !!opts.fresh,
       retreating: false,
     };
+    // Raised or garrisoned in a major colony of its own: flies the colonial flag.
+    const colony = node < this.P ? colonyOf(this.state.map, this.state.map.provinces[node]) : null;
+    if (colony && colony.sovereign === nation) army.colony = colony.id;
     this.list.set(army.id, army);
     if (!this.byNode.has(node)) this.byNode.set(node, new Set());
     this.byNode.get(node).add(army);

@@ -14,6 +14,7 @@
 
 import { TERRAIN, AREA_KM2_PER_UNIT, gridRef, STATURE } from './map.js';
 import { drawFlag } from './flags.js';
+import { colonyOf, provinceFlag } from './colonies.js';
 import { ERAS } from './eras.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -353,6 +354,7 @@ export class UI {
 
     const map = state.map;
     const owner = state.getNation(p.owner);
+    const colony = colonyOf(map, p);
     const terrain = TERRAIN[p.terrain];
     const isPlayer = owner && owner.id === state.playerNationId;
     const tags = [
@@ -389,6 +391,7 @@ export class UI {
       <dl class="stats">
         <dt>OWNER</dt>
         <dd class="owner">${ownerHtml}</dd>
+        ${colony ? `<dt>COLONY</dt><dd>${escapeHtml(colony.name.toUpperCase())}</dd>` : ""}
         <dt>TERRAIN</dt>
         <dd><span class="terrain-chip t-${terrain.id}"></span>${terrain.label.toUpperCase()}</dd>
         <dt>CITY</dt>
@@ -405,7 +408,7 @@ export class UI {
       ${this.command ? this.command.provinceHtml(p) : ''}
       <div class="section-title">ADJACENT PROVINCES</div>
       <ul class="neighbor-list">${neighbors || '<li class="empty">None — island province</li>'}</ul>`;
-    if (owner) el.panel.querySelector('.flag-slot').replaceWith(flagCanvas(owner.flag, 24, 16));
+    if (owner) el.panel.querySelector('.flag-slot').replaceWith(flagCanvas(provinceFlag(map, p), 24, 16));
     this.command?.markRendered();
   }
 

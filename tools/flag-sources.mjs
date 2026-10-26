@@ -7,6 +7,7 @@
  *   'wc:File.svg'  a Wikimedia Commons file (licence recorded at build time)
  *   'own:id'       drawn here as SVG (tools/flag-custom.mjs): Roman vexillum, Han banner, a few arms
  *   'col:<src>'    a colony / protectorate / occupied land: its sovereign's flag
+ *   'ens:<src>'    a colony flying its own colonial flag or ensign (step 7B)
  *   (missing)      no known flag or banner for that date: the game draws a
  *                  generated heraldic shield instead (clearly not a real flag)
  *
@@ -14,6 +15,18 @@
  * flag), not the swastika flag — illegal to display in Germany and avoided by
  * commercial WWII games.
  */
+
+/**
+ * Major colonies that are part of their sovereign on the map (their land is
+ * the ruling power's), with the colonial flag or ensign they flew. world.js
+ * marks the provinces inside each colony's box (js/colonies.js); there the
+ * province panel and the sovereign's garrisons and locally raised armies
+ * fly the colonial flag. Minor colonies keep the ruler's flag.
+ */
+export const COLONY_FLAGS = {
+  ww1: { 'British India': 'ens:own:star-of-india', 'Belgian Congo': 'ens:own:belgian-congo' },
+  ww2: { 'British India': 'ens:own:star-of-india', 'Belgian Congo': 'ens:own:belgian-congo' },
+};
 
 // Flags used by several colonies / dependencies.
 const UK = 'col:fi:gb';
@@ -202,7 +215,7 @@ export const FLAG_SOURCES = {
     'Yugoslavia': 'wc:Flag of the Kingdom of Yugoslavia.svg',
     'New Zealand': 'fi:nz',
     'Ecuador': 'fi:ec',
-    'Laos': FR,
+    'Laos': 'ens:own:french-indochina', // part of French Indochina
     'Uruguay': 'fi:uy',
     'Guyana': UK,
     'Tunisia': 'fi:tn',

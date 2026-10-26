@@ -12,6 +12,9 @@ import { fmtHours } from './ui-kit.js';
 import { drawIcon, unitIcon } from './icons.js';
 import { drawFlag, flagsVersion } from './flags.js';
 
+/** The colony an army flies the flag of (raised or garrisoned there, still serving its sovereign), or null. */
+const armyColony = (map, a) => { const c = a.colony != null ? map.colonies?.[a.colony] : null; return c && c.sovereign === a.nation ? c : null; };
+
 /** Marker radius, gap between stacked markers, and how far markers float above their spot. */
 const R = 14, GAP = 5;
 const LIFT = 26;
@@ -315,6 +318,7 @@ export function drawForces(r) {
     const role = a.kind === 'naval' ? 'nav' : A.mainRole(a);
     drawMarker(r, x, y, R, {
       icon: unitIcon(eraId, role), nation: st.map.nations[a.nation], own: a.nation === player,
+      colony: armyColony(st.map, a),
       hostile: C.atWar(player, a.nation), selected: a.id === sel || !!group?.has(a.id),
       count: a.units.length, strength: A.strength(a), retreating: a.retreating,
     });
@@ -389,7 +393,7 @@ function drawMarker(r, x, y, rad, o) {
   const state = o.selected ? 'sel' : o.hostile ? 'host' : o.own ? 'own' : 'other';
   const pad = 7;
   const S = (rad + pad) * 2;
-  const sprite = r.fx.sprite(`mk|${o.icon}|${o.nation?.id}|${state}|${rad}|${!!o.stack}|${flagsVersion()}`, S, S, (g) => {
+  const sprite = r.fx.sprite(`mk|${o.icon}|${o.nation?.id}|${o.colony?.id ?? ''}|${state}|${rad}|${!!o.stack}|${flagsVersion()}`, S, S, (g) => {
     const m = S / 2;
     if (state === 'sel' || state === 'host' || state === 'own') {
       const glow = state === 'sel' ? '255,213,74' : state === 'host' ? '255,70,50' : '255,255,255';
@@ -435,10 +439,10 @@ function drawMarker(r, x, y, rad, o) {
     g.fillStyle = 'rgba(255,255,255,0.12)';
     g.fill();
     drawIcon(g, o.icon, m, m, rad * 1.36, '#ffffff');
-    // The nation's flag, small, on the upper left of the ring.
+    // The nation's flag (or its colony's), small, on the upper left of the ring.
     if (o.nation) {
       const fw = rad * 0.95, fh = fw * 2 / 3;
-      drawFlag(g, o.nation.flag, m - rad - 1, m - rad - 1, fw, fh);
+      drawFlag(g, o.colony?.flag ?? o.nation.flag, m - rad - 1, m - rad - 1, fw, fh);
     }
   });
   ctx.drawImage(sprite, x - S / 2, y - S / 2, S, S);

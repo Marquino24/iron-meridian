@@ -13,6 +13,7 @@
  */
 
 import { FLAG_INDEX } from './flag-index.js';
+import { assignColonies } from './colonies.js';
 import { vivid } from './palette.js';
 import { graticule, formatLatLon, unproject } from './projection.js';
 
@@ -167,7 +168,7 @@ export function buildWorldMap(data, era) {
 
   const sizes = provinces.map((p) => Math.sqrt(p.area)).sort((a, b) => a - b);
 
-  return {
+  const map = {
     kind: 'world',
     era,
     seed: era.id,
@@ -185,4 +186,7 @@ export function buildWorldMap(data, era) {
     formatCoord: formatLatLon,
     startDate: era.start ?? Date.now(),
   };
+  // Major colonies inside their sovereign fly their own flag (colonies.js).
+  assignColonies(map, era.id);
+  return map;
 }
