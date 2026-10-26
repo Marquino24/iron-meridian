@@ -70,7 +70,7 @@ export function snapshot({ state, sim, feed }, extra = {}) {
     economy: { stock: economy.stock },
     buildings: pick(buildings, ['levels', 'construction']),
     armies: { list: [...armies.list.values()], ...pick(armies, ['queues', 'nextId', 'counters', 'refitClock', 'started']) },
-    combat: { battles, active: [...combat.active].map(([node, b]) => [node, b.id]), ...pick(combat, ['wars', 'warInfo', 'truces', 'history', 'occupations', 'nextId']) },
+    combat: { battles, active: [...combat.active].map(([node, b]) => [node, b.id]), ...pick(combat, ['wars', 'warInfo', 'truces', 'history', 'occupations', 'nextId', 'levyHours']) },
     research: [...research.nations].map(([n, r]) => [n, { done: r.done, active: r.active, queue: r.queue }]),
     ai: pick(ai, ['difficulty', 'enabled', 'disabled', 'brains', 'clockHours']),
     diplomacy: pick(diplomacy, ['treaties', 'memory', 'links', 'metBy', 'lastAny', 'lastFrom']),
@@ -136,7 +136,8 @@ export function restore({ state, sim, feed }, save) {
   const byId = (id) => armies.list.get(id);
   combat.battles = new Map(d.combat.battles.map((b) => [b.id, { ...b, sides: b.sides.map((s) => ({ ...s, armies: new Set(s.armies.map(byId).filter(Boolean)) })) }]));
   combat.active = new Map(d.combat.active.map(([node, id]) => [node, combat.battles.get(id)]).filter(([, b]) => b));
-  Object.assign(combat, pick(d.combat, ['wars', 'warInfo', 'truces', 'history', 'occupations', 'nextId']));
+  Object.assign(combat, pick(d.combat, ['wars', 'warInfo', 'truces', 'history', 'occupations', 'nextId', 'levyHours']));
+  combat.levyHours ??= 0; // saves from before step 9
 
   research.nations = new Map(d.research.map(([n, r]) => [n, { ...r, fx: null }]));
 

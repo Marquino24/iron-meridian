@@ -520,7 +520,7 @@ export class Armies {
     if (this.queues.delete(provinceId)) this.changed();
   }
 
-  finishUnit(provinceId, typeKey) {
+  finishUnit(provinceId, typeKey, { levy = false } = {}) {
     const p = this.state.getProvince(provinceId);
     const t = this.roster.byKey[typeKey];
     const naval = t.role === 'nav';
@@ -532,7 +532,7 @@ export class Armies {
     else this.create(p.owner, naval ? 'naval' : 'land', node, [unit], { fresh: true });
     if (p.owner === this.state.playerNationId) this.state.events.emit('feed', {
       kind: 'unit', tone: 'good',
-      text: `${t.name} ready in ${p.cityName ?? p.name}`, node, nation: p.owner,
+      text: levy ? `Levies raised in ${p.cityName ?? p.name}: ${t.name}` : `${t.name} ready in ${p.cityName ?? p.name}`, node, nation: p.owner,
     });
     this.changed();
   }

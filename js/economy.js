@@ -14,6 +14,12 @@ export const CAPITAL_LOST_FACTOR = 0.5;
 
 const zero = (keys) => Object.fromEntries(keys.map((k) => [k, 0]));
 
+/** Share of its output a conquered province gives its new owner (unrest, partisans, a hostile population). */
+export const CONQUERED_YIELD = 0.45;
+
+/** Output factor of province `p` for `nation`: its own land 1, land taken from another nation CONQUERED_YIELD. */
+export const heldYield = (p, nation) => (p.homeOf != null && p.homeOf >= 0 && p.homeOf !== nation ? CONQUERED_YIELD : 1);
+
 export class Economy {
   constructor(state) {
     this.state = state;
@@ -91,12 +97,14 @@ export class Economy {
     const t = this.tally[nation];
     if (!t) return;
     if (p.isCapital) t.capitals += sign; else if (p.isCity) t.cities += sign; else t.land += sign;
+    // Overextension: conquered land (another nation's at the start) is restless and yields less.
+    const f = sign * heldYield(p, nation);
     for (const k of this.keys) {
       const b = y.base[k] ?? 0, e = y.built[k] ?? 0;
-      t.base[k] += b * sign;
-      t.built[k] += e * sign;
-      t.roads[k] += (b + e) * (y.mult - 1) * sign;
-      t.raw[k] += y.total[k] * sign;
+      t.base[k] += b * f;
+      t.built[k] += e * f;
+      t.roads[k] += (b + e) * (y.mult - 1) * f;
+      t.raw[k] += y.total[k] * f;
     }
   }
 

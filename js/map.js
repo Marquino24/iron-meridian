@@ -592,9 +592,9 @@ function decorateCityName(rng, base, p) {
  */
 /** Starting army size, economy and likely temperament for each stature. */
 export const STATURE = {
-  great: { label: 'Great power', might: 1.8, econ: 1.3, temper: [['aggressive', 0.45], ['expansionist', 0.4], ['balanced', 0.15]] },
+  great: { label: 'Great power', might: 1.35, econ: 1.15, temper: [['aggressive', 0.45], ['expansionist', 0.4], ['balanced', 0.15]] },
   regional: { label: 'Regional power', might: 1.1, econ: 1, temper: [['aggressive', 0.25], ['expansionist', 0.15], ['balanced', 0.4], ['defensive', 0.2]] },
-  minor: { label: 'Minor state', might: 0.7, econ: 0.85, temper: [['balanced', 0.45], ['defensive', 0.55]] },
+  minor: { label: 'Minor state', might: 0.85, econ: 0.9, temper: [['balanced', 0.45], ['defensive', 0.55]] },
 };
 
 /**

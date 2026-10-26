@@ -29,6 +29,10 @@ export const TRUCE_DAYS = 90;
 
 const warKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
+/** Homeland levies: checked every 2 game days, for nations that lost this share of their home provinces. */
+const LEVY_EVERY_H = 48;
+const LEVY_FROM = 0.2;
+
 export class Combat {
   constructor(state, armies) {
     this.state = state;
@@ -47,6 +51,7 @@ export class Combat {
     this.history = [];            // finished battle ids, newest first
     this.occupations = new Map(); // provinceId → { nation, done, total }
     this.nextId = 1;
+    this.levyHours = 0;          // game hours since the last levy check
   }
 
   // --- War -------------------------------------------------------------------
@@ -74,10 +79,12 @@ export class Combat {
    * pre-war owner, armies on the other side's land withdraw home, and a
    * 90-day truce follows. The sandbox passes { revert: false, truce: false }.
    */
-  makePeace(a, b, { revert = true, truce = true } = {}) {
+  makePeace(a, b, { revert = true, truce = true, cede = -1 } = {}) {
     const k = warKey(a, b);
     if (!this.wars.has(k)) return false;
     const info = this.warInfo.get(k);
+    // Peace with terms: the winner keeps a slice of what it took (see cession()).
+    const kept = cede === a || cede === b ? this.cession(info, cede, cede === a ? b : a) : new Set();
     this.wars.delete(k);
     this.warInfo.delete(k);
     if (truce) this.truces.set(k, this.state.clock.time + TRUCE_DAYS * 864e5);
@@ -94,16 +101,44 @@ export class Combat {
     // Status quo ante (the sandbox can end a war keeping today's borders).
     if (revert) for (const c of [...(info?.captured ?? [])].reverse()) {
       const p = this.state.getProvince(c.pid);
-      if (p && p.owner === c.to) this.state.setOwner(c.pid, c.from);
+      if (p && p.owner === c.to && !kept.has(c.pid)) this.state.setOwner(c.pid, c.from);
     }
     this.armies.withdraw(a, b);
     this.armies.withdraw(b, a);
     const na = this.state.getNation(a), nb = this.state.getNation(b);
     const me = this.state.playerNationId;
     this.state.events.emit('war', { a, b, peace: true });
-    this.state.events.emit('feed', { kind: 'peace', tone: 'good', text: `${na.name} and ${nb.name} made peace`, nation: b, involvesPlayer: a === me || b === me });
+    const terms = kept.size ? `: ${this.state.getNation(cede).shortName} keeps ${kept.size} province${kept.size === 1 ? '' : 's'}` : '';
+    this.state.events.emit('feed', { kind: 'peace', tone: 'good', text: `${na.name} and ${nb.name} made peace${terms}`, nation: b, involvesPlayer: a === me || b === me, ceded: kept.size });
     this.armies.changed();
     return true;
+  }
+
+  /**
+   * What a winner keeps at the peace table: provinces it took from the loser
+   * in this war and still holds, next to land it held before the war, never
+   * the loser's capital, at most a quarter of the loser's home provinces.
+   */
+  cession(info, winner, loser) {
+    const st = this.state;
+    const taken = (info?.captured ?? []).filter((c) => c.to === winner && c.from === loser && st.provinces[c.pid]?.owner === winner).map((c) => c.pid);
+    const takenSet = new Set(taken);
+    const before = (p) => p.owner === winner && !takenSet.has(p.id);
+    const loserHome = st.provinces.filter((p) => p.homeOf === loser).length || 1;
+    const max = Math.max(1, Math.floor(loserHome / 4));
+    const kept = new Set();
+    // Grow outward from the old border, so the new border stays contiguous.
+    let frontier = taken.filter((pid) => st.provinces[pid].neighbors.some((q) => before(st.provinces[q])));
+    while (frontier.length && kept.size < max) {
+      const next = [];
+      for (const pid of frontier) {
+        if (kept.size >= max || kept.has(pid) || pid === st.getNation(loser)?.capitalId) continue;
+        kept.add(pid);
+        for (const q of st.provinces[pid].neighbors) if (takenSet.has(q) && !kept.has(q)) next.push(q);
+      }
+      frontier = next;
+    }
+    return kept;
   }
 
   enemiesOf(nation) {
@@ -208,6 +243,35 @@ export class Combat {
       }
     }
     this.updateOccupation(hours);
+    // Homeland levies, checked every few game days.
+    this.levyHours = (this.levyHours ?? 0) + hours;
+    if (this.levyHours >= LEVY_EVERY_H) { this.levyHours -= LEVY_EVERY_H; this.raiseLevies(); }
+  }
+
+  /**
+   * Homeland levies: a nation at war that has lost a fifth of its home
+   * provinces raises free infantry in a city it still holds (two units past
+   * 40%). Invaded nations dig in, so swallowing a neighbour whole takes time.
+   */
+  raiseLevies() {
+    const st = this.state, A = this.armies;
+    const inf = A.roster?.byRole.inf;
+    if (!inf) return;
+    const home = new Map(), lost = new Map();
+    for (const p of st.provinces) {
+      if (p.homeOf == null || p.homeOf < 0) continue;
+      home.set(p.homeOf, (home.get(p.homeOf) ?? 0) + 1);
+      if (p.owner !== p.homeOf) lost.set(p.homeOf, (lost.get(p.homeOf) ?? 0) + 1);
+    }
+    for (const [n, gone] of lost) {
+      if (!this.enemiesOf(n).length) continue;
+      const share = gone / home.get(n);
+      if (share < LEVY_FROM) continue;
+      const cap = st.provinces[st.getNation(n)?.capitalId];
+      const city = cap?.owner === n ? cap : st.provinces.find((p) => p.owner === n && p.isCity);
+      if (!city) continue;
+      for (let i = 0; i < (share >= 2 * LEVY_FROM ? 2 : 1); i++) A.finishUnit(city.id, inf.key, { levy: true });
+    }
   }
 
   /** One hour of fighting. */
@@ -336,6 +400,7 @@ export class Combat {
     this.occupations.delete(p.id);
     st.setOwner(p.id, nation);
     if (from >= 0) this.warInfo.get(warKey(from, nation))?.captured.push({ pid: p.id, from, to: nation });
+    if (from >= 0) this.armies.diplomacy?.onCapture(nation, from, p);
     const player = st.playerNationId;
     const winner = st.getNation(nation), loser = st.getNation(from);
     if (nation === player || from === player) {

@@ -47,13 +47,15 @@ const ERA_PERSONALITY = {
   coldwar: { 'Soviet Union': 'expansionist', 'United States': 'balanced' },
 };
 /** How warlike each era is overall (the 20th-century world wars more, the nuclear age less). */
-const ERA_WAR_RATE = { rome: 1, medieval: 1, ww1: 1.2, ww2: 1.2, coldwar: 0.6, modern: 0.4, fictional: 1 };
+const ERA_WAR_RATE = { rome: 1, medieval: 1, ww1: 1.2, ww2: 1.2, coldwar: 0.6, modern: 0.4, fictional: 2 };
 const RANDOM_MIX = [['aggressive', 0.15], ['balanced', 0.4], ['defensive', 0.35], ['expansionist', 0.1]];
 
 const MIN_ATTACK_UNITS = 3;
 /** Overseas landings: coastal provinces considered per enemy, and the extra strength they need. */
 const LANDING_SITES = 6;
 const LANDING_MARGIN = 1.3;
+/** A neighbour this big (share of all provinces, and 1.25× us) can be a coalition's target. */
+const COALITION_SHARE = 0.08;
 const PEACE_COOLDOWN_H = 24 * 30;
 
 export class AI {
@@ -223,8 +225,8 @@ export class AI {
       for (const nb of p.neighbors) { const o = map.provinces[nb].owner; if (o >= 0 && o !== nation) set.add(o); }
       if (major) for (const s of p.seaNeighbors) seas.add(s);
     }
-    // Major powers reach across the sea: their own sea zones and the next ones out.
-    if (major) for (const s of [...seas]) for (const t of map.seaZones[s].neighbors) seas.add(t);
+    // In the Fictional World (few nations, often an ocean apart) powers also reach the next sea zones out.
+    if (major && map.era?.fictional) for (const s of [...seas]) for (const t of map.seaZones[s].neighbors) seas.add(t);
     for (const s of seas) for (const pid of map.seaZones[s].coastalProvinces) { const o = map.provinces[pid].owner; if (o >= 0 && o !== nation) set.add(o); }
     this.neighbors.set(nation, set);
     this.dirtyNeighbors.delete(nation);
@@ -359,6 +361,7 @@ export class AI {
     for (const a of mine) {
       if (!a.fresh || a.seg) continue;
       const p = prov(a.node);
+      if (!p) { a.fresh = false; continue; } // at sea (e.g. it sailed before its first think)
       const garrison = mine.find((g) => g.garrison && g.node === a.node && g !== a);
       const need = p.isCapital ? 3 + (enemies.length ? 2 : 0) : border.has(p.id) ? (enemies.length ? 2 : 1) : 1;
       if (garrison && garrison.units.length < need) { A.merge(garrison.id, a.id); continue; }
@@ -533,21 +536,27 @@ export class AI {
       const startSize = mine.length + lost;
       const losing = (lost >= Math.max(2, startSize * 0.15) && ratio < 1) || (ratio < 0.5 && days > 20);
       const stalemate = days > 150 && won <= lost;
-      if (!(losing || stalemate)) continue;
+      const tired = this.exhaustion(n, e) >= 1;
+      if (!(losing || stalemate || tired)) continue;
       if (this.clockHours - b.lastPeaceOffer < PEACE_COOLDOWN_H) continue;
       b.lastPeaceOffer = this.clockHours;
       if (e === this.state.playerNationId) {
         this.state.events.emit('peace:offer', { from: n, to: e });
       } else if (this.acceptsPeace(e, n)) {
-        C.makePeace(n, e);
+        // Between computer nations, the side clearly ahead keeps part of its gains.
+        const lead = won - lost;
+        C.makePeace(n, e, { cede: lead >= 2 ? n : lead <= -2 ? e : -1 });
       }
     }
     this.doTreaties({ n, P, b });
+    this.doCoalition({ n, P });
     // New wars.
     if (enemies.length >= P.maxWars) return;
     // warChance is per month; minor nations start wars far less often.
     const major = this.state.getNation(n).major;
-    const perHour = (P.warChance * D.chance * (major ? 1 : 0.3) * (ERA_WAR_RATE[this.state.map.era?.id] ?? 1)) / 730;
+    // Restraint: a nation its neighbours already fear starts fewer new wars.
+    const restraint = this.fearedBy(n) >= 2 ? 0.4 : 1;
+    const perHour = (P.warChance * D.chance * (major ? 1 : 0.3) * restraint * (ERA_WAR_RATE[this.state.map.era?.id] ?? 1)) / 730;
     if (Math.random() > perHour * b.every) return;
     const Dp = this.sim.diplomacy;
     let best = -1, bs = 0;
@@ -617,10 +626,84 @@ export class AI {
   }
 
   /** Would AI nation `n` accept a white peace from `other`? */
+  /**
+   * War exhaustion of nation n in its war with `other`: a year of war is 1,
+   * and losing the army you had is 1.5 more. At 1 a nation wants peace; at
+   * 0.8 it accepts one even while winning. Quick victories cost little, long
+   * grinding wars end.
+   */
+  exhaustion(n, other) {
+    const C = this.sim.combat;
+    const info = C.warInfo.get(n < other ? `${n}:${other}` : `${other}:${n}`);
+    if (!info) return 0;
+    const days = (this.state.clock.time - info.start) / 864e5;
+    const lost = info.unitsLost?.[n] ?? 0;
+    let units = 0;
+    for (const a of this.sim.armies.list.values()) if (a.nation === n) units += a.units.length;
+    return days / 365 + 1.5 * lost / Math.max(1, lost + units);
+  }
+
+  /**
+   * Coalitions: a nation that fears a bigger neighbour (opinion -20 or
+   * worse, mostly from "Dangerous expansion") joins a war that neighbour is
+   * already fighting, on the victim's side, when together they stand a chance.
+   */
+  doCoalition({ n, P }) {
+    const Dp = this.sim.diplomacy, C = this.sim.combat;
+    if (!Dp || C.enemiesOf(n).length >= P.maxWars + 1 || Math.random() > 0.5) return;
+    const sizes = this.sizes();
+    const total = this.state.provinces.length;
+    for (const m of this.neighborsOf(n)) {
+      if (C.atWar(n, m) || Dp.has(n, m, 'alliance') || Dp.has(n, m, 'nap') || C.truceUntil(n, m) != null) continue;
+      if ((sizes.get(m) ?? 0) < Math.max(COALITION_SHARE * total, 1.25 * (sizes.get(n) ?? 0))) continue;
+      const victims = C.enemiesOf(m).filter((v) => v !== n && !Dp.has(n, v, 'nap') && !C.atWar(n, v));
+      // Feared, or about to swallow a neighbour whole (a victim down to half its homeland).
+      const dying = victims.some((v) => this.homeLost(v) >= 0.5);
+      if (Dp.opinion(n, m).value > (dying ? 0 : -20)) continue;
+      if (!victims.length) continue;
+      const odds = (this.powerOf(n) + victims.reduce((t, v) => t + this.powerOf(v), 0)) / Math.max(1, this.powerOf(m));
+      if (odds < 0.7) continue;
+      const victim = victims.sort((a, b) => (sizes.get(b) ?? 0) - (sizes.get(a) ?? 0))[0];
+      if (Dp.joinWar(n, m, victim, 'coalition')) { this.stats.coalitions = (this.stats.coalitions ?? 0) + 1; return; }
+    }
+  }
+
+  /** Share of nation n's home provinces held by others. */
+  homeLost(n) {
+    let home = 0, lost = 0;
+    for (const p of this.state.provinces) if (p.homeOf === n) { home++; if (p.owner !== n) lost++; }
+    return home ? lost / home : 0;
+  }
+
+  /** How many neighbours fear nation n (their opinion of it is -20 or worse). */
+  fearedBy(n) {
+    const Dp = this.sim.diplomacy;
+    if (!Dp) return 0;
+    let k = 0;
+    for (const o of this.neighborsOf(n)) if (Dp.opinion(o, n).value <= -20) k++;
+    return k;
+  }
+
+  /** Provinces per nation (recounted with the strength table, every 6 game hours). */
+  sizes() {
+    if (this.sizeAt === this.strengthAt && this.sizeCache) return this.sizeCache;
+    const s = new Map();
+    for (const p of this.state.provinces) if (p.owner >= 0) s.set(p.owner, (s.get(p.owner) ?? 0) + 1);
+    this.sizeAt = this.strengthAt;
+    this.sizeCache = s;
+    return s;
+  }
+
   acceptsPeace(n, other) {
     const C = this.sim.combat;
     const info = C.warInfo.get(n < other ? `${n}:${other}` : `${other}:${n}`);
     if (!info) return true;
+    if (this.exhaustion(n, other) >= 0.8) return true; // tired of it, even when winning
+    // The region turning against it: settle before a coalition forms.
+    if (this.fearedBy(n) >= 2 && (this.state.clock.time - info.start) / 864e5 > 45) return true;
+    // Holding as much as a peace would let it keep: take the terms.
+    const keepable = Math.max(2, Math.floor(this.state.provinces.filter((p) => p.homeOf === other).length / 4));
+    if (other !== this.state.playerNationId && info.captured.filter((c) => c.from === other && c.to === n && this.state.provinces[c.pid].owner === n).length >= keepable) return true;
     const won = info.captured.filter((c) => c.from === other && this.state.provinces[c.pid].owner === n).length;
     const lost = info.captured.filter((c) => c.from === n && this.state.provinces[c.pid].owner === other).length;
     const ratio = this.powerOf(n) / Math.max(1, this.powerOf(other));

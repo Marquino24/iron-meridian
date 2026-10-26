@@ -53,6 +53,9 @@ const DAY = 864e5;
 const key = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+/** Floor of the stacking "Dangerous expansion" opinion penalty. */
+const EXPANSION_CAP = -50;
+
 export class Diplomacy {
   /**
    * @param {import('./state.js').GameState} state
@@ -271,16 +274,32 @@ export class Diplomacy {
   }
 
   /** `joiner` enters `leader`'s war against `enemy`. */
+  /**
+   * A province changed hands in a war: its neighbours and the victim's allies
+   * take note ("Dangerous expansion"; stacks, fades over two years). This is
+   * what turns the region against a runaway conqueror (the AI's coalitions).
+   */
+  onCapture(conqueror, victim, p) {
+    if (p.homeOf === conqueror || conqueror < 0) return; // taking back your own land is fine
+    const ai = this.sim.ai;
+    const witnesses = new Set([...(ai?.neighborsOf(conqueror) ?? []), ...this.allies(victim)]);
+    witnesses.delete(conqueror);
+    const weight = p.isCapital ? 8 : p.isCity ? 4 : 2.5;
+    for (const o of witnesses) this.remember(o, conqueror, 'expansion', 'Dangerous expansion: conquering its neighbours', -weight, 2 * 365);
+  }
+
   joinWar(joiner, enemy, leader, why) {
     const st = this.state, me = st.playerNationId;
     // The alliance obliges: no betrayal penalty for honouring it.
     this.treaties.get(key(joiner, enemy))?.clear();
     this.sim.combat.truces.delete(key(joiner, enemy));
     if (!this.declareWar(joiner, enemy, { ally: leader })) return false;
-    this.remember(leader, joiner, 'joined', why === 'defend' ? 'Came to our defence' : 'Joined our war', 25, 2 * 365);
+    this.remember(leader, joiner, 'joined', why === 'defend' ? 'Came to our defence' : why === 'coalition' ? 'Stood with us against a conqueror' : 'Joined our war', 25, 2 * 365);
     st.events.emit('feed', {
       kind: 'diplomacy', tone: 'war', nation: joiner, involvesPlayer: joiner === me || enemy === me || leader === me,
-      text: `${st.getNation(joiner).name} joins the war against ${st.getNation(enemy).name} as ${st.getNation(leader).shortName}'s ally`,
+      text: why === 'coalition'
+        ? `${st.getNation(joiner).name} joins the coalition against ${st.getNation(enemy).name}`
+        : `${st.getNation(joiner).name} joins the war against ${st.getNation(enemy).name} as ${st.getNation(leader).shortName}'s ally`,
     });
     if (joiner === me) st.events.emit('diplomacy:called', { leader, enemy, why });
     return true;
@@ -412,6 +431,7 @@ export class Diplomacy {
     const old = list.find((m) => m.kind === kindName);
     const now = this.state.clock.time;
     if (old && kindName === 'gift') { old.value = clamp(this.memoryNow(old, now) + value, -100, 40); old.at = now; old.text = text; }
+    else if (old && kindName === 'expansion') { old.value = clamp(this.memoryNow(old, now) + value, EXPANSION_CAP, 0); old.at = now; old.text = text; }
     else if (old) Object.assign(old, { value: Math.sign(value) === Math.sign(old.value) && Math.abs(old.value) > Math.abs(value) ? old.value : value, at: now, days, text });
     else list.push({ kind: kindName, text, value, at: now, days });
     this.memory.set(k, list);

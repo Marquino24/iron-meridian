@@ -61,13 +61,15 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   }
   const vp = { target: victory.target, total: victory.totalPoints, reached: null, leaders: [] };
   const start = map.nations.map((n) => state.provincesOf(n.id).length);
-  const events = { wars: [], peace: [], conquered: [], diplomacy: [] };
+  const events = { wars: [], newWars: [], peace: [], conquered: [], diplomacy: [] };
   state.events.on('feed', (e) => {
     if (e.kind === 'war') events.wars.push(e.text);
     if (e.kind === 'peace') events.peace.push(e.text);
     if (e.kind === 'annexed') events.conquered.push(e.text);
     if (e.kind === 'diplomacy') events.diplomacy.push(e.text);
   });
+  // New conflicts (a nation choosing to attack), apart from allies and coalitions joining one.
+  state.events.on('war:declared', ({ a, b }) => events.newWars.push(`${state.getNation(a).name} → ${state.getNation(b).name}`));
   const hours = months * 730;
   let maxShare = 0, maxShareNation = '';
   const t0 = performance.now();
