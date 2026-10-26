@@ -152,8 +152,11 @@ export class WindowManager {
     requestAnimationFrame(() => this.clamp(el));
   }
 
-  /** Keep a window between the top bar (and resource strip) and the command bar, whole. */
-  clamp(el) {
+  /**
+   * Keep a window between the top bar (and resource strip) and the command bar:
+   * whole when it opens or the screen changes; after a drag, at least its title bar.
+   */
+  clamp(el, { dragged = false } = {}) {
     if (isNarrow() || el.hidden) return;
     const r = el.getBoundingClientRect();
     const scale = r.width / el.offsetWidth || 1; // UI scale (CSS zoom)
@@ -161,10 +164,10 @@ export class WindowManager {
     const top = Math.max(box('topbar')?.bottom ?? 60, box('resources')?.bottom ?? 0) / scale + 8;
     const floor = Math.min(box('command-bar')?.top || window.innerHeight, box('statusbar')?.top || window.innerHeight) / scale - 8;
     const maxX = window.innerWidth / scale - el.offsetWidth - 8;
-    const maxY = floor - el.offsetHeight;
+    const maxY = floor - (dragged ? 48 : el.offsetHeight);
     el.style.left = `${Math.max(8, Math.min(parseFloat(el.style.left) || 0, maxX))}px`;
     el.style.top = `${Math.max(top, Math.min(parseFloat(el.style.top) || 0, maxY))}px`;
-    el.style.maxHeight = `${Math.max(160, floor - top)}px`;
+    if (!dragged) el.style.maxHeight = `${Math.max(160, floor - top)}px`;
   }
 
   makeDraggable(w, handle) {
@@ -186,7 +189,7 @@ export class WindowManager {
       if (!start) return;
       start = null;
       w.el.classList.remove('dragging');
-      this.clamp(w.el);
+      this.clamp(w.el, { dragged: true });
     };
     handle.addEventListener('pointerup', end);
     handle.addEventListener('pointercancel', end);
