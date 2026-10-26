@@ -195,7 +195,10 @@ check(inst.queue === 0 && inst.units === 3, `instant recruit: 3 units ready (${i
 check(inst.tech === 'done', `instant research: tech ${inst.tech}`);
 
 // 16× time.
-await click('#speed-group [data-speed="16"]');
+if (MOBILE) {
+  // Phones show two speed buttons: pause, and one that cycles 1× → 2× → 4× → 8× → 16×.
+  for (let i = 0; i < 6 && await IM(() => window.ironMeridian.state.clock.speed) !== 16; i++) await click('#speed-group button.cur');
+} else await click('#speed-group [data-speed="16"]');
 const t0 = await IM(() => window.ironMeridian.state.clock.time);
 await page.waitForTimeout(1000);
 const hours = (await IM(() => window.ironMeridian.state.clock.time) - t0) / 36e5;
