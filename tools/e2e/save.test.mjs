@@ -28,10 +28,14 @@ const watch = (p) => {
 watch(page);
 /** Diplomacy popups (an AI declaring war on you...) pause the game at random: wave them off first. */
 async function dismissPopups() {
+  let any = false;
   for (let i = 0; i < 4 && await page.locator('#diplo-modal:not([hidden])').count(); i++) {
+    any = true;
     await page.click('#diplo-modal [data-diplo="decline"], #diplo-modal [data-diplo="ok"], #diplo-modal [data-diplo="reject"], #diplo-modal button').catch(() => {});
     await page.waitForTimeout(100);
   }
+  // Closing a popup resumes the speed it paused; the test drives the clock itself.
+  if (any) await page.evaluate(() => window.ironMeridian.state.setSpeed(0));
 }
 const click = async (sel) => { await dismissPopups(); return MOBILE ? page.tap(sel) : page.click(sel); };
 const IM = (fn, arg) => page.evaluate(fn, arg);
@@ -117,6 +121,7 @@ await page.evaluate(() => { const s = window.ironMeridian.state; s.speeds.includ
 await IM(() => window.ironMeridian.state.setSpeed(48));
 await page.waitForFunction(() => window.ironMeridian.sim.combat.active.size > 0 && [...window.ironMeridian.sim.combat.active.values()].some((b) => b.sides.some((s) => s.nation === window.ironMeridian.state.playerNationId)), null, { timeout: 120000 });
 await IM(() => window.ironMeridian.state.setSpeed(0));
+await dismissPopups();
 const before = await fingerprint();
 const counts = await IM(() => { const { sim, state } = window.ironMeridian; return { armies: sim.armies.list.size, battles: sim.combat.active.size, wars: sim.combat.wars.size, treaties: sim.diplomacy.treaties.size, active: sim.research.nations.get(state.playerNationId).active.length, day: Math.round((state.clock.time - state.clock.start) / 864e5) }; });
 console.log(`     mid-war on day ${counts.day}: ${counts.armies} armies, ${counts.battles} battles, ${counts.wars} wars, ${counts.treaties} treaty pairs, ${counts.active} research projects`);
