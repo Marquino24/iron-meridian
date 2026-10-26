@@ -200,7 +200,8 @@ export class InputController {
 
   onPointerDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    this.canvas.setPointerCapture(e.pointerId);
+    // Safari can refuse capture (e.g. a finger already lifted): carry on without it.
+    try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const p = this.local(e);
     this.pointers.set(e.pointerId, p);
     this.camera.stop();

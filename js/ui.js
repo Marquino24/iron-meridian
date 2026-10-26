@@ -50,6 +50,9 @@ function flagCanvas(flag, w, h, cls = 'flag') {
   return c;
 }
 
+/** Touch screens up to 900 px wide show two speed buttons (pause, and one that cycles speeds). */
+const COMPACT_SPEED = typeof matchMedia === 'function' ? matchMedia('(max-width: 900px) and (pointer: coarse)') : { matches: false };
+
 export class UI {
   constructor(state, actions) {
     this.state = state;
@@ -287,7 +290,17 @@ export class UI {
     this.state.events.on('mode', () => { this.renderSpeedButtons(); this.renderSpeed(); });
     group.addEventListener('click', (e) => {
       const b = e.target.closest('[data-speed]');
-      if (b) this.state.setSpeed(Number(b.dataset.speed));
+      if (!b) return;
+      const s = Number(b.dataset.speed), now = this.state.clock.speed;
+      // Compact (touch, narrow): two buttons. Pause toggles; the speed button cycles 1× → 2× → 4×.
+      if (COMPACT_SPEED.matches) {
+        const fast = this.state.speeds.filter((x) => x > 0);
+        if (s === 0) { this.state.setSpeed(now === 0 ? this.lastSpeed ?? 1 : 0); return; }
+        if (now === 0) { this.state.setSpeed(s); return; }
+        this.state.setSpeed(fast[(fast.indexOf(now) + 1) % fast.length]);
+        return;
+      }
+      this.state.setSpeed(s);
     });
     this.el.menuBtn.addEventListener('click', () => this.actions.returnToMenu());
     window.addEventListener('keydown', (e) => {
@@ -317,8 +330,13 @@ export class UI {
   }
 
   renderSpeed() {
+    const now = this.state.clock.speed;
+    if (now > 0) this.lastSpeed = now;
     for (const b of this.el.speedGroup.children) {
-      b.classList.toggle('active', Number(b.dataset.speed) === this.state.clock.speed);
+      const s = Number(b.dataset.speed);
+      b.classList.toggle('active', s === now);
+      // The one speed button shown in compact mode: the current speed, or the last one while paused.
+      b.classList.toggle('cur', s > 0 && s === (now || this.lastSpeed || 1));
     }
   }
 

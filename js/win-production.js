@@ -209,7 +209,7 @@ export class ProductionWindow extends CityWindowBase {
       const ht = head && this.roster.byKey[head.type];
       const lv = B.of(p.id);
       return `<tr class="${el.ok ? '' : 'na'} ${this.selected.has(p.id) ? 'sel' : ''}">
-        <td class="c-check"><input type="checkbox" data-pick="${p.id}" ${this.selected.has(p.id) ? 'checked' : ''} ${el.ok ? '' : 'disabled'} aria-label="Select ${esc(this.cityName(p))}"></td>
+        <td class="c-check"><label class="hit"><input type="checkbox" data-pick="${p.id}" ${this.selected.has(p.id) ? 'checked' : ''} ${el.ok ? '' : 'disabled'} aria-label="Select ${esc(this.cityName(p))}"></label></td>
         <td class="c-name"><button type="button" class="link-btn" data-city="${p.id}">${p.isCapital ? '★ ' : ''}${esc(this.cityName(p))}</button>${p.isCity ? '' : ' <em>oil field</em>'}
           <small class="lv">${p.isCity ? `${esc(B.name('barracks'))} ${ROMAN[lv.barracks]}${p.seaNeighbors.length ? ` · ${esc(B.name('port'))} ${ROMAN[lv.port]}` : ''}` : ''}</small></td>
         <td class="c-queue${head ? '' : ' none'}">${head ? `<span class="job"><span><span class="unit-glyph r-${ht.role}">${ROLE_GLYPH[ht.role]}</span>${esc(ht.name)}${q.length > 1 ? ` <em>+${q.length - 1}</em>` : ''}</span>${bar(head.done / head.total, `data-q="${p.id}"`)}<small data-q-left="${p.id}">${fmtHours(head.total - head.done)}</small></span>` : '<span class="dim">—</span>'}</td>
@@ -386,7 +386,7 @@ export class BuildingsWindow extends CityWindowBase {
       ${sites.length ? `<div class="grid-wrap"><table class="win-table b-grid">
         <thead><tr><th class="c-check"></th><th class="c-name">City</th>${types.map((k) => `<th><button type="button" data-col="${k}" class="${k === this.bulkType ? 'on' : ''}" title="${esc(B.name(k))}: ${esc(B.describe(k, 1))}"><span class="b-glyph">${buildingSvg(k)}</span><span class="b-name">${esc(B.name(k))}</span></button></th>`).join('')}</tr></thead>
         <tbody>${sites.map((p) => `<tr class="${this.selected.has(p.id) ? 'sel' : ''}">
-          <td class="c-check"><input type="checkbox" data-pick="${p.id}" ${this.selected.has(p.id) ? 'checked' : ''} aria-label="Select ${esc(this.cityName(p))}"></td>
+          <td class="c-check"><label class="hit"><input type="checkbox" data-pick="${p.id}" ${this.selected.has(p.id) ? 'checked' : ''} aria-label="Select ${esc(this.cityName(p))}"></label></td>
           <td class="c-name"><button type="button" class="link-btn" data-city="${p.id}">${p.isCapital ? '★ ' : ''}${esc(this.cityName(p))}</button>${p.isCity ? '' : ' <em>oil</em>'}</td>
           ${types.map((k) => cellHtml(p, k)).join('')}</tr>`).join('')}</tbody></table></div>` : '<p class="empty">You have no cities.</p>'}
       ${detail}

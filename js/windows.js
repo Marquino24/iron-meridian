@@ -152,14 +152,19 @@ export class WindowManager {
     requestAnimationFrame(() => this.clamp(el));
   }
 
+  /** Keep a window between the top bar (and resource strip) and the command bar, whole. */
   clamp(el) {
     if (isNarrow() || el.hidden) return;
     const r = el.getBoundingClientRect();
     const scale = r.width / el.offsetWidth || 1; // UI scale (CSS zoom)
+    const box = (id) => document.getElementById(id)?.getBoundingClientRect();
+    const top = Math.max(box('topbar')?.bottom ?? 60, box('resources')?.bottom ?? 0) / scale + 8;
+    const floor = Math.min(box('command-bar')?.top || window.innerHeight, box('statusbar')?.top || window.innerHeight) / scale - 8;
     const maxX = window.innerWidth / scale - el.offsetWidth - 8;
-    const maxY = window.innerHeight / scale - 80;
+    const maxY = floor - el.offsetHeight;
     el.style.left = `${Math.max(8, Math.min(parseFloat(el.style.left) || 0, maxX))}px`;
-    el.style.top = `${Math.max(60, Math.min(parseFloat(el.style.top) || 0, maxY))}px`;
+    el.style.top = `${Math.max(top, Math.min(parseFloat(el.style.top) || 0, maxY))}px`;
+    el.style.maxHeight = `${Math.max(160, floor - top)}px`;
   }
 
   makeDraggable(w, handle) {
