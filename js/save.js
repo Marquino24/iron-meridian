@@ -143,6 +143,7 @@ export function restore({ state, sim, feed }, save) {
   ai.reset();
   Object.assign(ai, d.ai);
   ai.current = null;
+  ai.refreshStrength(); // power of every nation, read by opinions and the AI
 
   diplomacy.reset();
   Object.assign(diplomacy, d.diplomacy);
@@ -205,7 +206,9 @@ function db() {
 
 /** Where IndexedDB is blocked (some embeds, private windows): saves last for this page load only. */
 const memory = new Map();
-export let persistent = true;
+let persistent = true;
+/** False once IndexedDB turned out to be unavailable (saves then last for this page load). */
+export const isPersistent = () => persistent;
 const memoryStore = {
   put(rec) { memory.set(rec.slot, rec); return { result: rec.slot }; },
   getAll() { return { result: [...memory.values()] }; },

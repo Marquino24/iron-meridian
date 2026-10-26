@@ -81,10 +81,13 @@
   <!-- Main menu: game-launcher style over the slowly panning map. -->
   <section id="main-menu" class="screen menu" hidden aria-label="Main menu">
     <div class="menu-panel screen-left">
-      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.7.0</div>
+      <div class="eyebrow">STRATEGIC COMMAND TERMINAL // BUILD 0.7.1</div>
       <h1 class="menu-title">IRON<span>MERIDIAN</span></h1>
       <nav class="menu-list" aria-label="Main menu">
         <button type="button" class="menu-item resume" data-menu="resume" hidden><span>Resume game</span><small id="resume-detail"></small></button>
+        <button type="button" class="menu-item continue" data-menu="continue" hidden><span>Continue</span><small id="continue-detail"></small></button>
+        <button type="button" class="menu-item" data-menu="save" hidden><span>Save Game</span><small>Eight slots, plus an autosave every week</small></button>
+        <button type="button" class="menu-item" data-menu="load"><span>Load Game</span><small id="load-detail">Saved games and files</small></button>
         <button type="button" class="menu-item primary" data-menu="single"><span>Single Player</span><small>Seven eras, any nation</small></button>
         <button type="button" class="menu-item" data-menu="multi" disabled><span>Multiplayer</span><em>Coming soon</em></button>
         <button type="button" class="menu-item sandbox-item" data-menu="sandbox"><span>Sandbox</span><small>Paint borders, spawn armies, bend the rules</small></button>
@@ -96,6 +99,23 @@
         <span id="account-provider" class="account-provider"></span>
         <span>Signed in as <b id="account-name"></b></span>
       </div>
+    </div>
+  </section>
+
+  <!-- Save / load -->
+  <section id="saves-screen" class="screen side" hidden aria-label="Saved games">
+    <div class="side-panel screen-left saves-panel">
+      <div class="screen-head">
+        <button type="button" class="back-btn" data-back>‹ Back</button>
+        <div class="eyebrow" id="saves-eyebrow">SAVED GAMES</div>
+      </div>
+      <h2 class="screen-title" id="saves-title">Load game</h2>
+      <div class="saves-tools">
+        <button type="button" class="btn small" id="save-import"><span data-icon="upload"></span>Import file</button>
+        <input type="file" id="save-file" accept=".json,application/json" hidden>
+        <span id="saves-note" class="saves-note"></span>
+      </div>
+      <div id="saves-list" class="saves-list" role="list" aria-label="Save slots"></div>
     </div>
   </section>
 
@@ -217,7 +237,7 @@
   <!-- Sign-in and beta gate. Without Supabase settings (dev preview) it offers a demo sign-in. -->
   <section id="launcher" class="launcher" hidden aria-label="Sign in">
     <div class="launcher-hero">
-      <div class="eyebrow">CLOSED BETA · BUILD 0.7.0</div>
+      <div class="eyebrow">CLOSED BETA · BUILD 0.7.1</div>
       <h1 class="launcher-title">IRON<span>MERIDIAN</span></h1>
       <p class="launcher-sub">Real-time grand strategy across two thousand years of real borders.</p>
       <ul class="launcher-facts">

@@ -46,6 +46,8 @@ import { Victory } from './victory.js';
 import { VictoryUI } from './victory-ui.js';
 import { DiplomacyWindow } from './win-diplomacy.js';
 import { SandboxUI } from './sandbox-ui.js';
+import { SaveUI } from './save-ui.js';
+import { restore } from './save.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
@@ -242,6 +244,7 @@ const ui = new UI(state, {
     screens.show('game');
     state.setPhase('playing');
     victory.start(victoryUI.config());
+    saveUI.arm();
     const cap = state.getProvince(state.getNation(id).capitalId);
     state.setSelected(cap.id);
     focusOn(cap.center.x, cap.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.2);
@@ -631,8 +634,42 @@ const screens = new Screens({
       if (cap) focusOn(cap.center.x, cap.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 0.8);
     },
     signOut() { launcher?.signOut(); },
+    continueGame() { saveUI.continueLatest().catch((e) => notice(e.message)); },
+    openSaves(mode) { saveUI.open(mode); },
+    menuShown() { saveUI.refreshMenu(); },
   },
 });
+
+/**
+ * Load a saved game: rebuild its map (era data, or the fictional seed), put the
+ * saved state back on it, paused.
+ */
+async function loadGame(save) {
+  const m = save.meta;
+  const era = ERAS.find((e) => e.id === m.era);
+  if (!era) throw new Error(`Unknown era in this save: ${m.era}`);
+  notice(`Loading ${m.nationName}, ${m.eraLabel}…`);
+  state.setSpeed(0);
+  screens.setMode(m.sandbox ? 'sandbox' : 'single');
+  if (era.fictional) loadMap(m.seed); else await loadEra(m.era);
+  if (state.map?.era?.id !== m.era) throw new Error('Could not load the map for this save.');
+  restore({ state, sim, feed }, save);
+  renderer.ownershipDirty = true;
+  state.setFocusedNation(-1);
+  screens.gameInProgress = true;
+  screens.show('game');
+  state.setPhase('playing');
+  state.setSpeed(0); // a loaded game starts paused: Space or a speed button resumes
+  pausedSpeed = 1;
+  saveUI.arm();
+  const cap = state.getProvince(state.playerNation?.capitalId);
+  const own = cap?.owner === state.playerNationId ? cap : state.provincesOf(state.playerNationId)[0];
+  if (own) { state.setSelected(own.id); focusOn(own.center.x, own.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.0); }
+  notice(`Loaded ${m.nationName}, ${new Date(m.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}. Paused: press Space to play.`);
+  renderer.requestRender();
+}
+
+const saveUI = new SaveUI(state, sim, { feed, screens, loadGame, notice });
 
 /** A wide, slowly drifting view of the world behind the menus. */
 function menuCamera() {
@@ -710,6 +747,7 @@ function frame(now) {
   windows.update(dt);
   updateBadges(dt);
   victoryUI.update(dt);
+  saveUI.update();
 
   renderer.render();
   adaptQuality(dt);
@@ -719,4 +757,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame };

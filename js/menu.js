@@ -3,6 +3,7 @@
  *
  *   MAIN MENU → Single Player → ERA → NATION → game
  *             → Sandbox       → ERA → NATION → sandbox game (free tools)
+ *             → Continue / Load Game → saved games (Save Game too while a game is paused)
  *             → Settings
  *
  * Exactly one screen is visible at a time; Back always goes one step up.
@@ -11,8 +12,8 @@
 
 import { QUALITIES, deviceClass } from './settings.js';
 
-const SCREENS = { menu: '#main-menu', era: '#era-screen', nation: '#start-screen', settings: '#settings-screen' };
-const PARENT = { era: 'menu', nation: 'era', settings: null, menu: null };
+const SCREENS = { menu: '#main-menu', era: '#era-screen', nation: '#start-screen', settings: '#settings-screen', saves: '#saves-screen' };
+const PARENT = { era: 'menu', nation: 'era', settings: null, menu: null, saves: 'menu' };
 
 export class Screens {
   /**
@@ -37,6 +38,8 @@ export class Screens {
       if (a === 'single' || a === 'sandbox') this.show('era');
       if (a === 'settings') this.show('settings');
       if (a === 'resume') this.actions.resume();
+      if (a === 'continue') this.actions.continueGame?.();
+      if (a === 'save' || a === 'load') this.actions.openSaves?.(a);
       if (a === 'signout') this.actions.signOut();
     });
     for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => this.back());
@@ -63,9 +66,12 @@ export class Screens {
     document.body.dataset.screen = name ?? 'launcher';
     const resume = document.querySelector('[data-menu="resume"]');
     resume.hidden = !this.gameInProgress;
+    document.querySelector('[data-menu="save"]').hidden = !this.gameInProgress;
+    if (this.gameInProgress) document.querySelector('[data-menu="continue"]').hidden = true;
     if (name === 'settings') this.renderSettings();
+    if (name === 'menu') this.actions.menuShown?.();
     // Move focus into the new screen for keyboard users.
-    const first = name && this.el[name]?.querySelector('[data-menu="resume"]:not([hidden]), .menu-item.primary, .back-btn');
+    const first = name && this.el[name]?.querySelector('[data-menu="resume"]:not([hidden]), [data-menu="continue"]:not([hidden]), .menu-item.primary, .back-btn');
     first?.focus({ preventScroll: true });
   }
 

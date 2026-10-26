@@ -121,7 +121,7 @@ check(bt && bt.sides.every((s) => [...s.armies].every((a) => B.sim.armies.list.g
 check(B.sim.combat.atWar(me, target) && B.sim.combat.warInfo.size === A.sim.combat.warInfo.size, 'wars and war info restored');
 check(JSON.stringify([...B.sim.research.nations.get(me).active]) === JSON.stringify([...A.sim.research.nations.get(me).active]), 'research in progress restored');
 check(!ally || B.sim.diplomacy.has(me, ally.id, 'nap'), 'treaties restored');
-A.sim.diplomacy.cache.clear(); A.sim.ai.strengthAt = -Infinity; // opinions and power are cached; compare fresh values
+A.sim.diplomacy.cache.clear(); A.sim.ai.strengthAt = -Infinity; A.sim.ai.refreshStrength(); // opinions and power are cached; compare fresh values
 const opA = A.sim.diplomacy.opinion(target, me).value, opB = B.sim.diplomacy.opinion(target, me).value;
 check(opA === opB, `opinion restored (${opA} → ${opB})`);
 check(B.sim.ai.brains.size === A.sim.ai.brains.size, `AI brains restored (${B.sim.ai.brains.size})`);
