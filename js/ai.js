@@ -56,6 +56,9 @@ const LANDING_SITES = 6;
 const LANDING_MARGIN = 1.3;
 /** A neighbour this big (share of all provinces, and 1.25× us) can be a coalition's target. */
 const COALITION_SHARE = 0.08;
+/** War score a computer nation needs to demand land from you, and to keep land in a peace with another computer nation. */
+const DEMAND_SCORE = 25;
+const CEDE_SCORE = 20;
 const PEACE_COOLDOWN_H = 24 * 30;
 
 export class AI {
@@ -565,15 +568,25 @@ export class AI {
       const losing = (lost >= Math.max(2, startSize * 0.15) && ratio < 1) || (ratio < 0.5 && days > 20);
       const stalemate = days > 150 && won <= lost;
       const tired = this.exhaustion(n, e) >= 1;
+      const score = C.warScore(n, e);
+      const player = e === this.state.playerNationId;
+      // Winning against you: demand land (the provinces the rules allow), after a month of war.
+      if (player && score >= DEMAND_SCORE && days > 30 && this.clockHours - b.lastPeaceOffer >= PEACE_COOLDOWN_H) {
+        const pids = [...C.cession(info, n, e)];
+        if (pids.length) {
+          b.lastPeaceOffer = this.clockHours;
+          this.state.events.emit('peace:demand', { from: n, to: e, provinces: pids, score });
+          continue;
+        }
+      }
       if (!(losing || stalemate || tired)) continue;
       if (this.clockHours - b.lastPeaceOffer < PEACE_COOLDOWN_H) continue;
       b.lastPeaceOffer = this.clockHours;
-      if (e === this.state.playerNationId) {
+      if (player) {
         this.state.events.emit('peace:offer', { from: n, to: e });
       } else if (this.acceptsPeace(e, n)) {
-        // Between computer nations, the side clearly ahead keeps part of its gains.
-        const lead = won - lost;
-        C.makePeace(n, e, { cede: lead >= 2 ? n : lead <= -2 ? e : -1 });
+        // Between computer nations, the side clearly ahead on war score keeps part of its gains.
+        C.makePeace(n, e, { cede: score >= CEDE_SCORE ? n : score <= -CEDE_SCORE ? e : -1 });
       }
     }
     this.doTreaties({ n, P, b });
@@ -668,7 +681,44 @@ export class AI {
     const lost = info.unitsLost?.[n] ?? 0;
     let units = 0;
     for (const a of this.sim.armies.list.values()) if (a.nation === n) units += a.units.length;
-    return days / 365 + 1.5 * lost / Math.max(1, lost + units);
+    // A losing war score wears a nation down faster.
+    const score = this.sim.combat.warScore(n, other);
+    return (days / 365 + 1.5 * lost / Math.max(1, lost + units) + Math.max(0, -score) / 150) * (1 - this.sim.research.fx(n, 'zeal') / 100);
+  }
+
+  /**
+   * Chance (0.02–0.98) that computer nation `n` accepts peace from the player
+   * on these terms (pids: provinces the player keeps; none = white peace):
+   * the player's war score minus what the demand costs, n's exhaustion and its
+   * opinion of the player. Shown in the peace window before sending.
+   */
+  peaceChance(n, player, pids = []) {
+    const C = this.sim.combat;
+    const score = C.warScore(player, n);
+    const cost = pids.length ? C.demandCost(n, pids) : 0;
+    const op = this.sim.diplomacy?.opinion(n, player).value ?? 0;
+    const diff = this.difficulty === 'easy' ? 0.1 : this.difficulty === 'hard' ? -0.1 : 0;
+    return Math.max(0.02, Math.min(0.98, 0.5 + (score - cost) / 40 + this.exhaustion(n, player) * 0.35 + op / 250 + diff));
+  }
+
+  /**
+   * The player proposes peace to computer nation n (pids: provinces to keep).
+   * → { ok, chance } or { ok: false, reason }. A refused nation won't talk again for a week.
+   */
+  proposePeace(n, player, pids = []) {
+    const C = this.sim.combat;
+    const info = C.warInfo.get(n < player ? `${n}:${player}` : `${player}:${n}`);
+    if (!info) return { ok: false, reason: 'You are not at war with them.' };
+    if (pids.length) { const v = C.validTerms(player, n, pids); if (!v.ok) return v; }
+    const now = this.state.clock.time;
+    if (info.peaceRefusedAt != null && now - info.peaceRefusedAt < 7 * 864e5) return { ok: false, reason: 'They refused a week ago and won\'t talk again yet.' };
+    const chance = this.peaceChance(n, player, pids);
+    if (Math.random() < chance) {
+      C.makePeace(n, player, pids.length ? { cede: player, keep: pids } : {});
+      return { ok: true, chance };
+    }
+    info.peaceRefusedAt = now;
+    return { ok: false, chance, reason: `${this.state.getNation(n).shortName} refuses.` };
   }
 
   /**

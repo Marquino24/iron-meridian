@@ -33,6 +33,8 @@ const warKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 const LEVY_EVERY_H = 48;
 const LEVY_FROM = 0.2;
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
 export class Combat {
   constructor(state, armies) {
     this.state = state;
@@ -79,12 +81,18 @@ export class Combat {
    * pre-war owner, armies on the other side's land withdraw home, and a
    * 90-day truce follows. The sandbox passes { revert: false, truce: false }.
    */
-  makePeace(a, b, { revert = true, truce = true, cede = -1 } = {}) {
+  makePeace(a, b, { revert = true, truce = true, cede = -1, keep = null } = {}) {
     const k = warKey(a, b);
     if (!this.wars.has(k)) return false;
     const info = this.warInfo.get(k);
-    // Peace with terms: the winner keeps a slice of what it took (see cession()).
-    const kept = cede === a || cede === b ? this.cession(info, cede, cede === a ? b : a) : new Set();
+    // Peace with terms: the winner keeps a slice of what it took — picked by the
+    // rules (cession()) or named in a negotiated deal (keep, checked by validTerms()).
+    let kept = new Set();
+    if (cede === a || cede === b) {
+      const loser = cede === a ? b : a;
+      if (keep) { if (this.validTerms(cede, loser, keep).ok) kept = new Set(keep); }
+      else kept = this.cession(info, cede, loser);
+    }
     this.wars.delete(k);
     this.warInfo.delete(k);
     if (truce) this.truces.set(k, this.state.clock.time + TRUCE_DAYS * 864e5);
@@ -139,6 +147,91 @@ export class Combat {
       frontier = next;
     }
     return kept;
+  }
+
+  // --- War score and peace terms -----------------------------------------------
+
+  /** Value of a province at the peace table: capital 5, city 2, other land 1. */
+  static provinceValue(p) { return p.isCapital ? 5 : p.isCity ? 2 : 1; }
+
+  /** Total value of a nation's homeland (the provinces it held when the game began). */
+  homeValue(n) {
+    let v = 0;
+    for (const p of this.state.provinces) if (p.homeOf === n) v += Combat.provinceValue(p);
+    return v || 1;
+  }
+
+  /**
+   * War score of nation a in its war with b, from -100 to 100: the other side's
+   * homeland it holds (up to ±60, weighted by value), battles won (±25) and
+   * casualties inflicted (±15). Drives peace terms and war exhaustion.
+   */
+  warScore(a, b) { return this.warScoreParts(a, b).total; }
+
+  /** The war score with its parts: { occupation, battles, casualties, total, wins, losses, killed, lost, held, lostLand }. */
+  warScoreParts(a, b) {
+    const info = this.warInfo.get(warKey(a, b));
+    if (!info) return { occupation: 0, battles: 0, casualties: 0, total: 0, wins: 0, losses: 0, killed: 0, lost: 0, held: 0, lostLand: 0 };
+    let heldA = 0, heldB = 0, nA = 0, nB = 0;
+    for (const p of this.state.provinces) {
+      if (p.homeOf === b && p.owner === a) { heldA += Combat.provinceValue(p); nA++; }
+      else if (p.homeOf === a && p.owner === b) { heldB += Combat.provinceValue(p); nB++; }
+    }
+    const occupation = clamp(120 * (heldA / this.homeValue(b) - heldB / this.homeValue(a)), -60, 60);
+    const wa = info.wins?.[a] ?? 0, wb = info.wins?.[b] ?? 0;
+    const la = info.unitsLost?.[a] ?? 0, lb = info.unitsLost?.[b] ?? 0;
+    const battles = 25 * (wa - wb) / (wa + wb + 2), casualties = 15 * (lb - la) / (la + lb + 4);
+    return {
+      occupation: Math.round(occupation), battles: Math.round(battles), casualties: Math.round(casualties),
+      total: Math.round(clamp(occupation + battles + casualties, -100, 100)),
+      wins: wa, losses: wb, killed: lb, lost: la, held: nA, lostLand: nB,
+    };
+  }
+
+  /** The most provinces a peace can hand over: a quarter of the loser's homeland (at least one). */
+  maxCession(loser) { return Math.max(1, Math.floor(this.state.provinces.filter((p) => p.homeOf === loser).length / 4)); }
+
+  /** Provinces the winner could ask for: taken from the loser in this war, still held, never its capital. */
+  termCandidates(winner, loser) {
+    const info = this.warInfo.get(warKey(winner, loser));
+    const cap = this.state.getNation(loser)?.capitalId;
+    const ids = new Set();
+    for (const c of info?.captured ?? []) {
+      const p = this.state.provinces[c.pid];
+      if (c.to === winner && c.from === loser && p?.owner === winner && p.id !== cap) ids.add(p.id);
+    }
+    return [...ids];
+  }
+
+  /** War score a demand costs: the share of the loser's homeland value it takes, ×1.5. */
+  demandCost(loser, pids) {
+    const v = pids.reduce((t, id) => t + Combat.provinceValue(this.state.provinces[id]), 0);
+    return Math.round(150 * v / this.homeValue(loser));
+  }
+
+  /**
+   * Are these terms allowed? Provinces taken in this war, not the capital, at most a
+   * quarter of the loser's homeland, and along the border: each one touches land
+   * the winner held before the war or another province in the deal.
+   */
+  validTerms(winner, loser, pids) {
+    const cand = new Set(this.termCandidates(winner, loser));
+    if (pids.some((id) => !cand.has(id))) return { ok: false, reason: 'Only provinces you took in this war (never the capital).' };
+    if (pids.length > this.maxCession(loser)) return { ok: false, reason: `At most ${this.maxCession(loser)} provinces (a quarter of their homeland).` };
+    const P = this.state.provinces, want = new Set(pids), reached = new Set();
+    const oldLand = (q) => P[q].owner === winner && !cand.has(q);
+    let frontier = pids.filter((id) => P[id].neighbors.some(oldLand));
+    while (frontier.length) {
+      const next = [];
+      for (const id of frontier) {
+        if (reached.has(id)) continue;
+        reached.add(id);
+        for (const q of P[id].neighbors) if (want.has(q) && !reached.has(q)) next.push(q);
+      }
+      frontier = next;
+    }
+    if (reached.size < want.size) return { ok: false, reason: 'Provinces must join up with your old border.' };
+    return { ok: true };
   }
 
   enemiesOf(nation) {
@@ -350,6 +443,9 @@ export class Combat {
     if (alive[0] && alive[1]) return;
     b.done = true;
     b.winner = alive[0] ? 0 : alive[1] ? 1 : -1;
+    // Battles won count toward the war score.
+    const info = this.warInfo.get(warKey(b.sides[0].nation, b.sides[1].nation));
+    if (info && b.winner >= 0) { info.wins ??= {}; const w = b.sides[b.winner].nation; info.wins[w] = (info.wins[w] ?? 0) + 1; }
     b.end = this.state.clock.time;
     this.active.delete(b.node);
     this.history.unshift(b.id);

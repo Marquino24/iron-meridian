@@ -16,6 +16,7 @@ import { AI } from '../js/ai.js';
 import { Diplomacy } from '../js/diplomacy.js';
 import { Victory } from '../js/victory.js';
 import { Sandbox } from '../js/sandbox.js';
+import { Integration } from '../js/integration.js';
 import { snapshot, restore, pack, unpack, exportText, importBytes } from '../js/save.js';
 
 const args = process.argv.slice(2);
@@ -43,6 +44,7 @@ function makeGame() {
   armies.diplomacy = sim.diplomacy;
   sim.victory = new Victory(state, sim);
   sim.sandbox = new Sandbox(state, sim);
+  sim.integration = new Integration(state, sim);
   sim.ai.budgetMs = Infinity;
   const map = era.fictional ? Object.assign(generateMap('SAVE-TEST'), { era }) : buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era);
   state.loadMap(map);
@@ -53,7 +55,7 @@ function run(g, hours) {
   const { state, sim } = g;
   for (let h = 0; h < hours; h++) {
     state.clock.time += 3600e3;
-    for (const s of ['economy', 'research', 'buildings', 'armies', 'combat', 'ai', 'victory']) sim[s].update(state, 1);
+    for (const s of ['economy', 'research', 'buildings', 'armies', 'combat', 'integration', 'ai', 'victory']) sim[s].update(state, 1);
   }
 }
 

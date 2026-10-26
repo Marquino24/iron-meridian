@@ -26,6 +26,7 @@ export class DiplomacyUI {
 
     state.events.on('war:declared', ({ a, b }) => { if (b === state.playerNationId) this.push({ kind: 'war', from: a }); });
     state.events.on('peace:offer', ({ from, to }) => { if (to === state.playerNationId) this.push({ kind: 'peace', from }); });
+    state.events.on('peace:demand', ({ from, to, provinces, score }) => { if (to === state.playerNationId) this.push({ kind: 'demand', from, provinces, score }); });
     state.events.on('diplomacy:proposal', (p) => { if (p.to === state.playerNationId) this.push({ kind: 'proposal', from: p.from, p }); });
     state.events.on('diplomacy:called', ({ leader, enemy }) => this.push({ kind: 'called', from: leader, enemy }));
     state.events.on('map:loaded', () => { this.queue = []; this.close(); });
@@ -105,6 +106,13 @@ export class DiplomacyUI {
          <dl class="diplo-stats"><dt>Their army strength</dt><dd>${theirs}</dd><dt>Yours</dt><dd>${ours}</dd><dt>Their temperament</dt><dd>${esc(pers)}</dd></dl>
          <div class="btn-row"><button type="button" class="btn primary" data-diplo="ok">To arms</button>
            <button type="button" class="btn ghost" data-diplo="show">Show their capital</button></div>`
+      : kind === 'demand'
+        ? `<div class="alert-kicker">☮ PEACE TERMS</div>
+         <h2>${esc(n.name)} demands peace on its terms</h2>
+         <p>They are winning (war score ${this.open.score > 0 ? '+' : ''}${this.open.score} for them) and offer peace if you give up ${this.open.provinces.length} province${this.open.provinces.length === 1 ? '' : 's'} they hold: <b>${this.open.provinces.map((id) => esc(st.provinces[id].cityName ?? st.provinces[id].name)).join(', ')}</b>. Everything else they took returns to you, and a ${TRUCE_DAYS}-day truce follows.</p>
+         <dl class="diplo-stats"><dt>Their army strength</dt><dd>${theirs}</dd><dt>Yours</dt><dd>${ours}</dd></dl>
+         <div class="btn-row"><button type="button" class="btn primary" data-diplo="accept">Accept terms</button>
+           <button type="button" class="btn ghost" data-diplo="decline">Fight on</button></div>`
       : `<div class="alert-kicker peace">☮ PEACE OFFER</div>
          <h2>${esc(n.name)} offers a white peace</h2>
          <p>The war ends with no demands: provinces taken in it return to their pre-war owner, both armies withdraw home, and a ${TRUCE_DAYS}-day truce follows.</p>
@@ -137,6 +145,11 @@ export class DiplomacyUI {
     if (item.kind === 'proposal') {
       const r = this.sim.diplomacy.answer(item.p, yes);
       if (yes && !r.ok) this.actions.notice(r.reason ?? 'That is no longer possible.');
+    }
+    if (item.kind === 'demand') {
+      const me = this.state.playerNationId;
+      if (yes) this.sim.combat.makePeace(item.from, me, { cede: item.from, keep: item.provinces });
+      else this.state.events.emit('feed', { kind: 'peace', tone: 'war', text: `You rejected ${this.state.getNation(item.from).shortName}'s peace terms` });
     }
     if (item.kind === 'peace') {
       if (yes) this.sim.combat.makePeace(item.from, this.state.playerNationId);

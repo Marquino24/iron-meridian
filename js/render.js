@@ -219,6 +219,19 @@ function createPaperPattern(ctx) {
   return ctx.createPattern(c, 'repeat');
 }
 
+/** Diagonal hatching for conquered land that is still integrating (step 10). */
+function createHatch(ctx) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 16;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(10,12,20,0.9)';
+  g.lineWidth = 2.2;
+  g.beginPath();
+  for (let k = -16; k <= 16; k += 8) { g.moveTo(k, 16); g.lineTo(k + 16, 0); }
+  g.stroke();
+  return ctx.createPattern(c, 'repeat');
+}
+
 function createTerrainPatterns(ctx) {
   const S = 32, R = 2;
   const make = (draw) => {
@@ -281,6 +294,7 @@ export class Renderer {
     this.dirty = true;
     this.cache = null;
     this.patterns = createTerrainPatterns(this.ctx);
+    this.hatch = createHatch(this.ctx);
     this.paper = createPaperPattern(this.ctx);
     this.style = 'political';      // political | satellite | terrain
     this.quality = 'high';         // low | medium | high
@@ -299,7 +313,7 @@ export class Renderer {
     // Borders are rebuilt once per frame however many provinces changed (sandbox painting).
     state.events.on('province:owner', () => { this.ownershipDirty = true; this.requestRender(); });
     for (const evt of ['hover', 'select', 'select:army', 'select:group', 'armies', 'war']) state.events.on(evt, redraw);
-    for (const evt of ['focus:nation', 'player', 'phase', 'diplomacy']) state.events.on(evt, relayer);
+    for (const evt of ['focus:nation', 'player', 'phase', 'diplomacy', 'integration']) state.events.on(evt, relayer);
     document.fonts?.ready.then(redraw);
   }
 
@@ -722,6 +736,19 @@ export class Renderer {
         }
         ctx.globalAlpha = 1;
       }
+    }
+
+    // Conquered land still integrating: faint hatching, fading as it settles in.
+    if (state.phase === 'playing' && this.hatch) {
+      this.hatch.setTransform?.(new DOMMatrix().scale(px));
+      ctx.fillStyle = this.hatch;
+      for (let i = 0; i < paths.length; i++) {
+        const p = map.provinces[i];
+        if (p.integ == null || p.integ >= 1 || p.owner < 0 || !intersects(p.bbox, view)) continue;
+        ctx.globalAlpha = 0.08 + 0.3 * (1 - p.integ) / 0.55;
+        ctx.fill(paths[i], 'evenodd');
+      }
+      ctx.globalAlpha = 1;
     }
 
     // Old-map paper grain over everything.

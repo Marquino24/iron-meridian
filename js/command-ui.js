@@ -339,7 +339,7 @@ export class CommandUI {
     let action;
     if (war) {
       action = `<div class="war-state">⚔ AT WAR — your armies may enter its land</div>
-        <button type="button" class="btn ghost wide" data-cmd="offer-peace" data-nation="${n.id}">Offer white peace</button>`;
+        <button type="button" class="btn ghost wide" data-cmd="offer-peace" data-nation="${n.id}">Negotiate peace</button>`;
     } else if (truce != null) {
       const d = new Date(truce);
       action = `<div class="war-state truce">☮ Truce until ${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCFullYear()}: no war can be declared before then</div>`;
@@ -407,17 +407,7 @@ export class CommandUI {
       case 'war': this.confirmWar = Number(b.dataset.nation); break;
       case 'war-cancel': this.confirmWar = -1; break;
       case 'war-confirm': (this.sim.diplomacy ?? C).declareWar(st.playerNationId, Number(b.dataset.nation)); this.confirmWar = -1; break;
-      case 'offer-peace': {
-        const other = Number(b.dataset.nation);
-        if (this.sim.ai?.acceptsPeace(other, st.playerNationId) ?? true) {
-          C.makePeace(st.playerNationId, other);
-          this.actions.notice(`${st.getNation(other).shortName} accepts a white peace`);
-        } else {
-          this.actions.notice(`${st.getNation(other).shortName} refuses: they think they're winning`);
-          st.events.emit('feed', { kind: 'peace', tone: 'bad', text: `${st.getNation(other).name} refused your peace offer` });
-        }
-        break;
-      }
+      case 'offer-peace': this.actions.openPeace?.(Number(b.dataset.nation)); break;
       default: return false;
     }
     this.actions.rerender();

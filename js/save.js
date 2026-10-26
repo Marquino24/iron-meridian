@@ -67,6 +67,8 @@ export function snapshot({ state, sim, feed }, extra = {}) {
     sandbox: st.sandbox,
     owners: map.provinces.map((p) => p.owner),
     homeOf: map.provinces.map((p) => p.homeOf ?? p.owner),
+    integ: map.provinces.map((p) => p.integ ?? null),
+    integration: sim.integration ? { hours: sim.integration.hours, warned: sim.integration.warned } : null,
     economy: { stock: economy.stock },
     buildings: pick(buildings, ['levels', 'construction']),
     armies: { list: [...armies.list.values()], ...pick(armies, ['queues', 'nextId', 'counters', 'refitClock', 'started']) },
@@ -113,7 +115,12 @@ export function restore({ state, sim, feed }, save) {
 
   st.setSandbox(d.sandbox);
   st.setPlayerNation(d.player);
-  map.provinces.forEach((p, i) => { p.owner = d.owners[i]; p.homeOf = d.homeOf[i]; });
+  map.provinces.forEach((p, i) => {
+    p.owner = d.owners[i]; p.homeOf = d.homeOf[i];
+    // Saves from before step 10 have no integration: conquered land starts at the old flat 45%.
+    if (d.integ?.[i] != null) p.integ = d.integ[i]; else delete p.integ;
+  });
+  if (sim.integration) { sim.integration.reset(); if (d.integration) Object.assign(sim.integration, d.integration); }
 
   // Buildings first: income depends on them.
   buildings.levels = d.buildings.levels;

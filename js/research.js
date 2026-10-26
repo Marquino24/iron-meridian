@@ -62,7 +62,12 @@ export class Research {
         else if (e.attack) fx.attack[e.attack] = (fx.attack[e.attack] ?? 0) + e.pct;
         else if (e.slots) fx.slots += e.slots;
         else if (e.synth) fx.synth.push(e);
-        else for (const k of ['move', 'defense', 'buildTime', 'buildCost', 'trainTime']) if (e[k]) fx[k] += e[k];
+        else if (['move', 'defense', 'buildTime', 'buildCost', 'trainTime'].some((k) => e[k])) { for (const k of ['move', 'defense', 'buildTime', 'buildCost', 'trainTime']) if (e[k]) fx[k] += e[k]; }
+        // Other effect kinds (integration, era signatures): numbers add up, flags switch on.
+        else for (const [k, v] of Object.entries(e)) {
+          if (typeof v === 'number') fx[k] = (fx[k] ?? 0) + v;
+          else if (v === true) fx[k] = true;
+        }
       }
     }
     r.fx = fx;
@@ -79,6 +84,10 @@ export class Research {
   buildCostMult(nation) { return 1 - this.effects(nation).buildCost / 100; }
   trainTimeMult(nation) { return 1 - this.effects(nation).trainTime / 100; }
   slots(nation) { return this.effects(nation).slots; }
+  /** Integration speed of conquered land (integration.js). */
+  integrationMult(nation) { return 1 + (this.effects(nation).integration ?? 0) / 100; }
+  /** A numeric era effect (0 when the nation doesn't have it), e.g. fx(n, 'roadSpeed'). */
+  fx(nation, key) { return nation >= 0 ? this.effects(nation)[key] ?? 0 : 0; }
   /** Free research slots. */
   idle(nation) { return Math.max(0, this.slots(nation) - this.of(nation).active.length); }
   queued(nation, id) { return this.of(nation).queue.includes(id); }

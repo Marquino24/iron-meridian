@@ -143,7 +143,7 @@ export class DiplomacyWindow {
       </div>
       <div class="section-title">War and peace</div>
       <div class="btn-row wrap">${war
-        ? '<button type="button" class="btn small" data-peace>Offer white peace</button>'
+        ? '<button type="button" class="btn small" data-peace>Negotiate peace</button>'
         : this.confirmWar
           ? `<p class="hint-line warn">${breaking ? `This breaks your ${truce != null && !D.treatiesOf(me, id).length ? 'truce' : 'treaty'}: every nation will think less of you.` : 'Their allies will join the war.'}</p>
              <button type="button" class="btn small danger" data-war="confirm">Declare war</button><button type="button" class="btn small ghost" data-war="cancel">Cancel</button>`
@@ -187,11 +187,7 @@ export class DiplomacyWindow {
       notice(r.ok ? ('gift' in d ? `${n.shortName} thanks you for the gift (+${r.boost} opinion)` : `${n.shortName} accepts the trade`) : `${n.shortName}: ${r.reason}`);
       return true;
     }
-    if ('peace' in d) {
-      if (this.sim.ai.acceptsPeace(id, me)) { D.makePeace(me, id); notice(`${n.shortName} accepts a white peace`); }
-      else notice(`${n.shortName} refuses: they think they're winning`);
-      return true;
-    }
+    if ('peace' in d) { this.actions.openPeace?.(id); return true; }
     if (d.war === 'ask') { this.confirmWar = true; return true; }
     if (d.war === 'cancel') { this.confirmWar = false; return true; }
     if (d.war === 'confirm') { D.declareWar(me, id); this.confirmWar = false; notice(`You declared war on ${n.name}`); return true; }
