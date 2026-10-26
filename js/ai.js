@@ -51,6 +51,9 @@ const ERA_WAR_RATE = { rome: 1, medieval: 1, ww1: 1.2, ww2: 1.2, coldwar: 0.6, m
 const RANDOM_MIX = [['aggressive', 0.15], ['balanced', 0.4], ['defensive', 0.35], ['expansionist', 0.1]];
 
 const MIN_ATTACK_UNITS = 3;
+/** Overseas landings: coastal provinces considered per enemy, and the extra strength they need. */
+const LANDING_SITES = 6;
+const LANDING_MARGIN = 1.3;
 const PEACE_COOLDOWN_H = 24 * 30;
 
 export class AI {
@@ -219,6 +222,8 @@ export class AI {
       for (const nb of p.neighbors) { const o = map.provinces[nb].owner; if (o >= 0 && o !== nation) set.add(o); }
       if (major) for (const s of p.seaNeighbors) seas.add(s);
     }
+    // Major powers reach across the sea: their own sea zones and the next ones out.
+    if (major) for (const s of [...seas]) for (const t of map.seaZones[s].neighbors) seas.add(t);
     for (const s of seas) for (const pid of map.seaZones[s].coastalProvinces) { const o = map.provinces[pid].owner; if (o >= 0 && o !== nation) set.add(o); }
     this.neighbors.set(nation, set);
     this.dirtyNeighbors.delete(nation);
@@ -406,12 +411,16 @@ export class AI {
         const power = this.armyPower(a);
         let best = null, bs = -Infinity;
         for (const t of targets) {
-          if (power < t.defense * D.attackRatio) continue;
+          if (power < t.defense * D.attackRatio * (t.landing ? LANDING_MARGIN : 1)) continue;
+          if (t.landing && a.units.length < MIN_ATTACK_UNITS + 1) continue;
           const d = Math.hypot(A.pos[t.id].x - A.pos[a.node].x, A.pos[t.id].y - A.pos[a.node].y);
           const s = t.value * (D.smart ? 2 / (1 + t.defense / power) : 1) - d / 40 + (D.smart ? 0 : Math.random() * 1.5);
           if (s > bs) { bs = s; best = t; }
         }
-        if (best && order(a, best.id)) targets.splice(targets.indexOf(best), 1);
+        if (best && order(a, best.id)) {
+          targets.splice(targets.indexOf(best), 1);
+          if (best.landing) { this.stats.landings = (this.stats.landings ?? 0) + 1; this.escort(ctx, best.id); }
+        }
       }
       // Armies too small to attack walk to the strongest one to combine.
       const lead = ready.filter((a) => A.list.has(a.id)).sort((x, y) => y.units.length - x.units.length)[0];
@@ -425,7 +434,7 @@ export class AI {
   }
 
   /** Candidate target provinces: enemy land next to ours, lost provinces first. */
-  targets({ n, P, enemies, border }) {
+  targets({ n, P, enemies, border, mine }) {
     const A = this.sim.armies, C = this.sim.combat;
     const prov = this.state.provinces;
     const out = [];
@@ -445,12 +454,47 @@ export class AI {
     for (const id of border) for (const nb of prov[id].neighbors) consider(prov[nb]);
     // Our own lost provinces anywhere, if held by an enemy.
     if (enemies.length) for (const q of prov) if (q.homeOf === n && q.owner !== n && q.owner >= 0 && C.atWar(n, q.owner)) consider(q);
+    // Enemies out of reach by land (islands, other continents): plan landings on their coasts.
+    const coasts = mine.filter((p) => p.seaNeighbors.length);
+    if (coasts.length) {
+      for (const e of enemies) {
+        if (out.some((t) => prov[t.id].owner === e)) continue;
+        const shores = [];
+        for (const q of prov) {
+          if (q.owner !== e || !q.seaNeighbors.length) continue;
+          let d = Infinity;
+          for (const c of coasts) d = Math.min(d, Math.hypot(c.center.x - q.center.x, c.center.y - q.center.y));
+          shores.push([q, d]);
+        }
+        shores.sort((x, y) => x[1] - y[1]);
+        for (const [q] of shores.slice(0, LANDING_SITES)) {
+          const before = out.length;
+          consider(q);
+          if (out.length > before) out[out.length - 1].landing = true;
+        }
+      }
+    }
     return out;
+  }
+
+  /** Send the nearest idle fleet to cover a landing at province `target`. */
+  escort({ n, orders }, target) {
+    const A = this.sim.armies, C = this.sim.combat;
+    const sea = this.state.provinces[target].seaNeighbors[0];
+    if (sea == null || orders.length >= 4) return;
+    const node = A.P + sea;
+    const fleets = [...A.list.values()].filter((a) => a.nation === n && a.kind === 'naval' && a.units.length && !a.seg && !a.path.length && !C.inBattle(a) && a.node !== node);
+    const f = this.nearestArmy(fleets, node);
+    if (f) orders.push([f.id, node]);
   }
 
   stagingCity({ n, cities, border }) {
     const target = this.likelyTarget(n);
-    const cands = cities.filter((c) => border.has(c.id));
+    const prov = this.state.provinces;
+    // A rival across the sea: gather at the port nearest to it.
+    const byLand = target >= 0 && [...border].some((id) => prov[id].neighbors.some((q) => prov[q].owner === target));
+    let cands = cities.filter((c) => border.has(c.id));
+    if (target >= 0 && !byLand) cands = cities.filter((c) => c.seaNeighbors.length);
     if (!cands.length) return this.state.getNation(n).capitalId;
     if (target < 0) return cands[0].id;
     const tc = this.state.provinces[this.state.getNation(target).capitalId]?.center;
