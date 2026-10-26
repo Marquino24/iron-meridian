@@ -418,12 +418,18 @@ export class AI {
           if (power < t.defense * D.attackRatio * (t.landing ? LANDING_MARGIN : 1)) continue;
           if (t.landing && a.units.length < MIN_ATTACK_UNITS + 1) continue;
           const d = Math.hypot(A.pos[t.id].x - A.pos[a.node].x, A.pos[t.id].y - A.pos[a.node].y);
-          const s = t.value * (D.smart ? 2 / (1 + t.defense / power) : 1) - d / 40 + (D.smart ? 0 : Math.random() * 1.5);
+          const s = t.landing ? this.landingScore(t, power, d)
+            : t.value * (D.smart ? 2 / (1 + t.defense / power) : 1) - d / 40 + (D.smart ? 0 : Math.random() * 1.5);
           if (s > bs) { bs = s; best = t; }
         }
         if (best && order(a, best.id)) {
           targets.splice(targets.indexOf(best), 1);
-          if (best.landing) { this.stats.landings = (this.stats.landings ?? 0) + 1; this.escort(ctx, best.id); }
+          if (best.landing) {
+            this.stats.landings = (this.stats.landings ?? 0) + 1;
+            const q = this.state.provinces[best.id];
+            (this.landingLog ??= []).push({ n, kind: q.isCapital ? 'capital' : q.isCity ? 'city' : 'land', defense: best.defense / Math.max(1, power), sea: best.sea, beach: best.beach });
+            this.escort(ctx, best.id);
+          }
         }
       }
       // Armies too small to attack walk to the strongest one to combine.
@@ -470,15 +476,37 @@ export class AI {
           for (const c of coasts) d = Math.min(d, Math.hypot(c.center.x - q.center.x, c.center.y - q.center.y));
           shores.push([q, d]);
         }
+        // Nearest shores first, and always the ones next to a beachhead already held.
         shores.sort((x, y) => x[1] - y[1]);
-        for (const [q] of shores.slice(0, LANDING_SITES)) {
+        const picks = shores.slice(0, LANDING_SITES);
+        for (const sh of shores.slice(LANDING_SITES)) if (this.beachhead(n, sh[0])) picks.push(sh);
+        for (const [q, d] of picks) {
           const before = out.length;
           consider(q);
-          if (out.length > before) out[out.length - 1].landing = true;
+          if (out.length > before) Object.assign(out[out.length - 1], { landing: true, sea: d, beach: this.beachhead(n, q) });
         }
       }
     }
     return out;
+  }
+
+  /**
+   * How attractive a landing is: a modest prize (capital 2.5, city 2, other
+   * land 1) times how weakly it's held, a bonus for landing next to land we or
+   * an ally already hold (reinforcement and supply over land), minus the sea
+   * crossing from our own coast (supply distance) and the army's trip there.
+   */
+  landingScore(t, power, armyDist) {
+    const q = this.state.provinces[t.id];
+    const prize = q.isCapital ? 2.5 : q.isCity ? 2 : 1;
+    const weak = 2 / (1 + t.defense / Math.max(1, power));
+    return prize * weak + (t.beach ? 2 : 0) - t.sea / 30 - armyDist / 80 + Math.random() * 0.5;
+  }
+
+  /** Does province q border land held by nation n or one of its allies (a beachhead to land next to)? */
+  beachhead(n, q) {
+    const Dp = this.sim.diplomacy;
+    return q.neighbors.some((id) => { const o = this.state.provinces[id].owner; return o === n || (o >= 0 && !!Dp?.has(n, o, 'alliance')); });
   }
 
   /** Send the nearest idle fleet to cover a landing at province `target`. */

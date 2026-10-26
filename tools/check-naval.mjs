@@ -15,6 +15,13 @@ import { AI } from '../js/ai.js';
 import { Diplomacy } from '../js/diplomacy.js';
 
 const months = Number(process.argv[2] ?? 6);
+const RUNS = Number(process.argv.find((a) => a.startsWith('--runs='))?.split('=')[1] ?? 1);
+// Seeded dice (--runs=N repeats each case with different seeds, so before/after compare like for like).
+function seedDice(seed) {
+  let s = [...String(seed)].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+  Math.random = () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const log = [];
 // [era, attacker, defender]: enemies with no land border between them.
 const CASES = [
   ['ww2', 'German Reich', 'United Kingdom'],
@@ -24,7 +31,8 @@ const CASES = [
 ];
 let failures = 0;
 
-for (const [eraId, atk, def] of CASES) {
+for (let run = 0; run < RUNS; run++) for (const [eraId, atk, def] of CASES) {
+  seedDice(`${eraId}:${atk}:${def}#${run}`);
   const era = getEra(eraId);
   const state = new GameState();
   const economy = new Economy(state);
@@ -70,9 +78,21 @@ for (const [eraId, atk, def] of CASES) {
     if (h % 24 === 0 && !combat.atWar(A, D) && combat.truceUntil(A, D) == null) sim.diplomacy.declareWar(A, D);
   }
   const taken = state.provinces.filter((p) => p.homeOf === D && p.owner === A).length;
+  for (const l of ai.landingLog ?? []) if (l.n === A) log.push({ ...l, war: `${atk} → ${def}` });
   const ok = landings.length > 0;
   if (!ok) failures++;
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${era.label}: ${atk} → ${def}${landBorder ? ' (they also share a land border)' : ''}: ${landings.length} landings${landings.length ? ` (first on day ${landings[0].day} at ${landings[0].place})` : ''}, ${taken} of ${before} provinces taken, ${ai.stats.landings ?? 0} landing orders`);
+}
+// Where the attackers chose to land (every landing order), per war and overall.
+if (log.length) {
+  const stat = (rows) => {
+    const share = (f) => `${(100 * rows.filter(f).length / rows.length).toFixed(0)}%`.padStart(4);
+    const avg = (k) => rows.reduce((t, l) => t + l[k], 0) / rows.length;
+    return `${String(rows.length).padStart(4)}  ${share((l) => l.kind === 'capital')} ${share((l) => l.kind === 'city')} ${share((l) => l.kind === 'land')}   ${share((l) => l.beach)}     ${avg('defense').toFixed(2)}  ${share((l) => l.defense === 0)}   ${avg('sea').toFixed(0).padStart(4)}`;
+  };
+  console.log('landing orders                       n  capt city land  beachhead  def  undef   sea');
+  for (const war of [...new Set(log.map((l) => l.war))]) console.log(`${war.padEnd(34)} ${stat(log.filter((l) => l.war === war))}`);
+  console.log(`${'all'.padEnd(34)} ${stat(log)}`);
 }
 console.log(failures ? `${failures} failure(s)` : 'all naval checks passed');
 process.exit(failures ? 1 : 0);
