@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "npx --yes serve -l 3000 .",
-    "test": "node tools/check-secrets.mjs && node tools/check-map.mjs && node tools/check-eras.mjs && node tools/check-war.mjs",
+    "test": "node tools/check-secrets.mjs && node tools/check-map.mjs && node tools/check-eras.mjs && node tools/check-war.mjs && node tools/check-save.mjs ww2",
     "sim:ai": "node tools/sim-ai.mjs 6 normal",
     "bundle": "node tools/bundle.mjs && node tools/bundle.mjs --fragment",
     "build:eras": "node tools/build-eras.mjs",
