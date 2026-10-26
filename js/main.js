@@ -712,8 +712,8 @@ state.events.on('map:loaded', (map) => {
   if (screens.ambient) menuCamera();
 });
 
-// Real sign-in when Supabase is configured; otherwise (claude.ai preview,
-// local dev) a demo sign-in that fakes an approved owner on this device.
+// Real sign-in on the real site; a demo sign-in that fakes an approved owner
+// on this device only in the claude.ai preview and local development (auth.js).
 screens.show(null);
 launcher = new Launcher(authEnabled() ? new AuthService() : new DemoAuthService());
 launcher.run().then(() => {

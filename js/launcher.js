@@ -5,7 +5,7 @@
  * `run()` resolves once the player may play. A remembered session skips the
  * sign-in screen entirely; an approved player goes straight through.
  *
- * The owner (decided by the database, see is_owner() in supabase/schema.sql)
+ * The owner (decided by the database, see is_owner() in docs/supabase-setup.sql)
  * is always let in and gets an Admin button on every screen.
  */
 
@@ -14,7 +14,7 @@ import { brandIcon } from './brand-icons.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const PROVIDER_LABEL = Object.fromEntries([...PROVIDERS.map((p) => [p.id, p.label]), ['email', 'Email link'], ['twitter', 'X'], ['demo', 'Demo']]);
+const PROVIDER_LABEL = Object.fromEntries([...PROVIDERS.map((p) => [p.id, p.label]), ['email', 'Email link'], ['demo', 'Demo']]);
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 const STATUS_TEXT = { pending: 'Pending', approved: 'Approved', denied: 'Denied' };
 
@@ -80,10 +80,15 @@ export class Launcher {
         if (!row) row = await this.auth.requestAccess(); // owner's row is created approved
         return this.grant();
       }
-      if (!row) return this.render('request');
+      // Everyone else lands in Pending straight away (the server forces the status).
+      if (!row) row = await this.auth.requestAccess();
       this.onRow(row);
     } catch (err) {
-      this.render('error', { text: `Could not check your access: ${err.message}` });
+      // PGRST205/PGRST202: the table or function doesn't exist yet.
+      const notSetUp = /PGRST20[25]|schema cache/i.test(`${err.code ?? ''} ${err.message}`);
+      this.render('error', { text: notSetUp
+        ? 'The beta database isn\'t set up yet. (Owner: run docs/supabase-setup.sql in the Supabase SQL editor.)'
+        : `Could not check your access: ${err.message}` });
     }
   }
 
@@ -152,10 +157,9 @@ export class Launcher {
 
       case 'signin': {
         const buttons = PROVIDERS.map((p) => `
-          <button type="button" class="provider-btn" data-provider="${p.id}" ${p.enabled ? '' : 'disabled aria-disabled="true"'}>
+          <button type="button" class="provider-btn" data-provider="${p.id}">
             <span class="provider-icon">${brandIcon(p.id, 20)}</span>
-            <span class="provider-label">${p.enabled ? `Continue with ${escapeHtml(p.label)}` : escapeHtml(p.label)}</span>
-            ${p.enabled ? '' : '<span class="soon">Coming soon</span>'}
+            <span class="provider-label">Continue with ${escapeHtml(p.label)}</span>
           </button>`).join('');
         const demo = this.auth.demo ? `
           <div class="demo-box">
@@ -174,6 +178,7 @@ export class Launcher {
               <input id="magic-email" type="email" autocomplete="email" placeholder="you@example.com" required>
               <button type="submit" class="btn">${brandIcon('email', 16)} Email me a link</button>
             </div>
+            <p class="magic-note">Email links can take a few minutes, and only a few can be sent per hour. If yours doesn't arrive, use Discord or Google instead.</p>
           </form>
           <p class="card-msg" role="status" aria-live="polite">${escapeHtml(opts.message ?? '')}</p>
           <p class="fine">Closed beta. New accounts need approval before they can play. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p>`;
@@ -192,6 +197,7 @@ export class Launcher {
             <span class="status-icon">${brandIcon('email', 34)}</span>
             <h2>Check your email</h2>
             <p>We sent a sign-in link to <b>${escapeHtml(opts.email)}</b>. Open it <b>in this browser</b> to continue.</p>
+            <p class="magic-note">Nothing after a few minutes? Check your spam folder, or sign in with Discord or Google instead.</p>
             <button type="button" class="link-btn" data-action="back">Use a different method</button>
           </div>`;
         break;

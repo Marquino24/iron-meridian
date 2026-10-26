@@ -3,20 +3,41 @@
  *
  * Wraps the Supabase client so the rest of the game never talks to it
  * directly. Security does not depend on this file: the database enforces
- * who can read and change what (supabase/schema.sql).
+ * who can read and change what (docs/supabase-setup.sql).
  *
  * The client library is loaded on demand from vendor/, so builds without
  * sign-in (dev preview) never fetch it.
  */
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JS } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JS, SITE_URL } from './config.js';
 
-/** True when this build should require sign-in. */
-export function authEnabled() {
-  if (typeof window !== 'undefined' && window.__IM_PREVIEW__) return false;
-  if (typeof window !== 'undefined' && window.__IM_SUPABASE_FACTORY__) return true; // automated tests
-  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+/** Hosts where the game runs from a developer's machine. */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '']);
+
+/**
+ * Which sign-in this page uses:
+ *   'real'  Supabase sign-in. Always on the real site (github.io) and any
+ *           other host: there is no way to get demo sign-in there.
+ *   'demo'  a fake owner in this browser, for the claude.ai dev preview (the
+ *           bundled build sets __IM_PREVIEW__) and local development
+ *           (localhost or a file:// page). Add ?auth=real on localhost to try
+ *           the real flow (needs localhost in Supabase's redirect URLs).
+ */
+export function authMode() {
+  if (typeof window === 'undefined') return 'real';
+  if (window.__IM_SUPABASE_FACTORY__) return 'real'; // automated tests with a fake server
+  if (window.__IM_PREVIEW__) return 'demo';
+  let forceReal = false;
+  try { forceReal = new URLSearchParams(location.search).get('auth') === 'real'; } catch { /* ignore */ }
+  if (LOCAL_HOSTS.has(location.hostname) && !forceReal) return 'demo';
+  return 'real';
 }
+
+/** True when this page requires real sign-in. */
+export function authEnabled() { return authMode() === 'real'; }
+
+/** True when the real-sign-in settings are filled in. */
+export const authConfigured = () => Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -28,9 +49,18 @@ function loadScript(src) {
   });
 }
 
-/** Where providers send the player back to: this page, without query or hash. */
+/**
+ * Where providers send the player back to. On the real site always SITE_URL
+ * (https://marquino24.github.io/iron-meridian/, allowed in Supabase), so a
+ * visit to …/index.html or with ?era=… still returns to the canonical page.
+ * Elsewhere (local testing with ?auth=real): this page, without query or hash.
+ */
 export function redirectUrl() {
-  return `${location.origin}${location.pathname}`;
+  try {
+    const site = new URL(SITE_URL);
+    if (location.host === site.host && location.pathname.startsWith(site.pathname.replace(/\/$/, ''))) return SITE_URL;
+  } catch { /* ignore */ }
+  return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
 }
 
 export class AuthService {
@@ -45,6 +75,7 @@ export class AuthService {
   async init() {
     // Tests can inject a fake client; production loads the vendored library.
     let factory = window.__IM_SUPABASE_FACTORY__;
+    if (!factory && !authConfigured()) throw new Error('sign-in is not configured (js/config.js).');
     if (!factory) {
       if (!window.supabase?.createClient) await loadScript(SUPABASE_JS);
       factory = window.supabase.createClient;
@@ -186,10 +217,10 @@ export class AuthService {
 }
 
 /**
- * Demo sign-in for builds without Supabase (the claude.ai preview and local
- * development). It fakes an approved owner account in this browser only, so
- * the whole flow (menu, admin panel) can be tried. It has no backend and no
- * powers: builds with Supabase settings never use it or show its button.
+ * Demo sign-in for the claude.ai dev preview and local development (see
+ * authMode). It fakes an approved owner account in this browser only, so the
+ * whole flow (menu, admin panel) can be tried. It has no backend and no
+ * powers, and the real site (github.io) never uses it or shows its button.
  */
 export class DemoAuthService {
   constructor() {
@@ -200,8 +231,8 @@ export class DemoAuthService {
       { user_id: 'demo-owner', provider: 'demo', display_name: 'Demo Commander', email: 'demo@iron-meridian.test', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 3).toISOString() },
       { user_id: 'demo-1', provider: 'google', display_name: '[Sample] Ada Lovelace', email: 'ada@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 5).toISOString() },
       { user_id: 'demo-2', provider: 'discord', display_name: '[Sample] Basil Hart', email: 'basil@example.com', status: 'pending', requested_at: new Date(Date.now() - 36e5 * 2).toISOString() },
-      { user_id: 'demo-3', provider: 'azure', display_name: '[Sample] Chen Wei', email: 'chen@example.com', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 2).toISOString() },
-      { user_id: 'demo-4', provider: 'x', display_name: '[Sample] Dana Ruiz', email: 'dana@example.com', status: 'denied', requested_at: new Date(Date.now() - 864e5 * 4).toISOString() },
+      { user_id: 'demo-3', provider: 'github', display_name: '[Sample] Chen Wei', email: 'chen@example.com', status: 'approved', requested_at: new Date(Date.now() - 864e5 * 2).toISOString() },
+      { user_id: 'demo-4', provider: 'twitch', display_name: '[Sample] Dana Ruiz', email: 'dana@example.com', status: 'denied', requested_at: new Date(Date.now() - 864e5 * 4).toISOString() },
     ];
   }
 

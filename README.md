@@ -16,6 +16,8 @@ npx serve .
 python3 -m http.server 3000
 ```
 
+On localhost the game uses the demo sign-in (no account needed); add `?auth=real` to try the real one. The live site is GitHub Pages: pushing to `main` deploys it (see `docs/SETUP.md`).
+
 Open a specific scenario from the URL: `?era=ww2` (rome, medieval, ww1, ww2, coldwar, modern, fictional), plus `&seed=ABCD-1234` for the fictional world. The URL follows your choice, so reloading keeps it.
 
 Single-file build (all JS and CSS inlined; Google Fonts with a system-font fallback):
@@ -42,18 +44,18 @@ npm test
 
 ## Sign-in and closed beta
 
-The hosted game (GitHub Pages) requires sign-in through Supabase Auth: Google, Discord, Microsoft, GitHub, Twitch, X or an email magic link (Apple is shown as "Coming soon"). New players request beta access and wait for approval; the owner approves, denies or revokes them in the in-game **Admin** panel.
+The real game lives at **https://marquino24.github.io/iron-meridian/** (GitHub Pages, `main` branch of `marquino24/iron-meridian`) and requires sign-in through Supabase Auth: Google, Discord, GitHub, Twitch or an email magic link. Everyone who signs in lands in **Pending** until an owner approves them; owners approve, deny or revoke testers in the in-game **Admin** panel.
 
-- `docs/SETUP.md`: step-by-step setup of GitHub Pages, the Supabase project and every sign-in provider.
+- `docs/SETUP.md`: going live: the one SQL script to run, what to set in GitHub Pages, owners, email limits, troubleshooting.
 - `docs/TESTERS.md`: what testers do to get in.
-- `supabase/schema.sql`: the beta table, owner check, triggers and row-level security. Run it once in the Supabase SQL editor.
-- `js/config.js`: the Supabase project URL and **publishable** key (public by design). Leave them empty to run without sign-in, as local development and the claude.ai preview do. Never put secret keys in any frontend file; `npm test` fails if one appears.
+- `docs/supabase-setup.sql`: the beta table, owner list, grants, triggers and row-level security. Paste it into the Supabase SQL editor once (safe to re-run).
+- `js/config.js`: the Supabase project URL, the **publishable** key (public by design) and the **owner email list** (`>>> OWNERS <<<`; keep it the same as the list in the SQL script, which `npm test` checks). Never put secret keys in the repository; `npm test` fails if one appears.
 
-Screen flow: sign-in → beta gate (request access / pending / access not granted) → **main menu** (Single Player, Multiplayer and Sandbox "coming soon", Settings, Admin for the owner, Sign out) → era → nation → game. Every screen has a Back button; the in-game MENU pauses and returns to the main menu with **Resume**.
+Screen flow: sign-in → beta gate (pending / access not granted) → **main menu** (Single Player, Multiplayer and Sandbox "coming soon", Settings, Admin for the owner, Sign out) → era → nation → game. Every screen has a Back button; the in-game MENU pauses and returns to the main menu with **Resume**.
 
-Without Supabase settings (local development, the claude.ai preview) the sign-in screen offers **Demo sign-in**, which fakes an approved owner account in that browser so the whole flow can be tried. Builds with Supabase settings never show it.
+**Demo sign-in** (a fake approved owner in that browser, with `[Sample]` testers and a DEMO DATA banner in the admin panel) exists only in the claude.ai dev preview (the bundled `dist/` build) and on localhost for development (`?auth=real` tries the real flow there). The real site never shows it: `js/auth.js` decides, and `tools/e2e/pages.test.mjs` checks the site as GitHub Pages serves it.
 
-Who can do what is enforced by the database, not the browser: testers can only create and read their own row, the server fills in their name, email and provider and forces status to pending, and only the owner (matched by confirmed email) can change status. `npm run test:policies` runs these rules against a local PostgreSQL; `npm run test:e2e` runs the sign-in flow in a browser against a fake Supabase client.
+Who can do what is enforced by the database, not the browser: testers can only create and read their own row, the server fills in their name, email and provider and forces status to pending, and only owners (matched by confirmed email, from any provider) can read every row and change status. `npm run test:policies` runs these rules against a local PostgreSQL; `npm run test:e2e` runs the sign-in flow in a browser against a fake Supabase client.
 
 The game's files are public on GitHub Pages, so the gate controls who can play through the site; it doesn't hide the code or map data itself.
 
@@ -268,10 +270,9 @@ tools/
   check-eras.mjs  Era map checks
   build-imagery.py  Reprojects Blue Marble and Natural Earth rasters into assets/
   bundle.mjs      Inlines everything (code, CSS, gzip'd era data, imagery) into one HTML file (dist/)
-docs/             SETUP.md (hosting + Supabase + providers), TESTERS.md
+docs/             SETUP.md (going live), TESTERS.md, supabase-setup.sql (paste into Supabase), FLAGS.md
 supabase/
-  schema.sql      Beta table, owner check, triggers, row-level security
-  test/           Policy tests on plain PostgreSQL with a mock auth schema
+  test/           Policy tests for docs/supabase-setup.sql on plain PostgreSQL with a mock auth schema
 vendor/           @supabase/supabase-js 2.117.3 (UMD, MIT), loaded only when sign-in is on
 privacy.html, terms.html   Linked from the sign-in screen and provider consent screens
 js/

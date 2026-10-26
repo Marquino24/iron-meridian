@@ -1,17 +1,20 @@
--- Behaviour tests for schema.sql. Each block acts as a specific user, the way
+-- Behaviour tests for docs/supabase-setup.sql. Each block acts as a specific user, the way
 -- PostgREST does (role + JWT claims), and asserts what must succeed or fail.
 \set ON_ERROR_STOP on
 \set QUIET on
 \pset tuples_only on
 \pset format unaligned
-update private.settings set value = 'owner@example.com' where key = 'owner_email';
+-- The script's own list has the real owner; add a test owner alongside.
+select case when exists (select 1 from private.owner_emails where email = 'marcoferreirag3@gmail.com') then 'ok   script seeded the owner list' else 'FAIL: owner list not seeded' end;
+insert into private.owner_emails values ('owner@example.com');
 
 insert into auth.users values
   ('00000000-0000-0000-0000-00000000000a', 'owner@example.com', now(), '{"provider":"google"}', '{"full_name":"The Owner"}'),
   ('00000000-0000-0000-0000-00000000000b', 'alice@example.com', now(), '{"provider":"discord"}', '{"full_name":"Alice"}'),
   ('00000000-0000-0000-0000-00000000000c', 'bob@example.com', now(), '{"provider":"github"}', '{"user_name":"bobcodes"}'),
-  ('00000000-0000-0000-0000-00000000000d', 'owner@example.com.evil', now(), '{"provider":"x"}', '{}'),
-  ('00000000-0000-0000-0000-00000000000e', 'OWNER@example.com', null, '{"provider":"twitch"}', '{}');
+  ('00000000-0000-0000-0000-00000000000d', 'owner@example.com.evil', now(), '{"provider":"github"}', '{}'),
+  ('00000000-0000-0000-0000-00000000000e', 'OWNER@example.com', null, '{"provider":"twitch"}', '{}'),
+  ('00000000-0000-0000-0000-00000000000f', 'MarcoFerreiraG3@gmail.com', now(), '{"provider":"discord"}', '{"full_name":"Marco"}');
 
 create function pg_temp.act_as(uid text) returns void language plpgsql as $$
 begin
@@ -85,6 +88,15 @@ select pg_temp.check((select status = 'approved' from public.beta_users), 'alice
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
 select pg_temp.check((select status = 'denied' from public.beta_users), 'bob sees denied');
 select pg_temp.expect_error($$insert into public.beta_users (user_id, provider) values ('00000000-0000-0000-0000-00000000000c', 'x')$$, 'bob re-requesting after denial (duplicate row)');
+commit;
+
+-- The real owner, signing in with Discord (any provider works: matched by confirmed email).
+begin;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000f');
+select pg_temp.check(public.is_owner(), 'listed owner recognised via Discord, email case ignored');
+select pg_temp.check((select count(*) >= 3 from public.beta_users), 'second owner also sees all rows');
+select pg_temp.expect_error($$select * from private.owner_emails$$, 'signed-in user reading the owner list');
+select pg_temp.expect_error($$insert into private.owner_emails values ('me@evil.com')$$, 'signed-in user adding themselves as owner');
 commit;
 
 -- Anonymous visitors get nothing.

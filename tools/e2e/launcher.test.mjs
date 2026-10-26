@@ -30,14 +30,17 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   await page.goto(BASE + '?era=ww2');
   await page.waitForSelector('.provider-btn');
   const labels = await page.$$eval('.provider-btn', (b) => b.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
-  check(labels.length === 7, `7 provider buttons: ${labels.join(' | ')}`);
-  check(await page.locator('[data-provider="apple"]').isDisabled(), 'Apple button disabled ("Coming soon")');
+  check(labels.join(' | ') === 'Continue with Google | Continue with Discord | Continue with GitHub | Continue with Twitch', `4 provider buttons: ${labels.join(' | ')}`);
+  const card = await page.textContent('#launcher-card');
+  check(!/Microsoft|Apple|Twitter|\bX\b|Coming soon/i.test(card), 'no Microsoft, Apple, X or "Coming soon"');
+  check(/Discord or Google/.test(await page.textContent('.magic-note')), `note under the email field: "${(await page.textContent('.magic-note')).trim()}"`);
   check((await page.locator('[data-action="demo"]').count()) === 0, 'real sign-in build shows no demo button');
   check(await gated(page), 'game hidden behind the launcher');
   await page.waitForTimeout(800);
   await shot(page, 'l1-signin');
 
-  // 2. A provider that isn't configured in Supabase shows a friendly message.
+  // 2. A provider that isn't set up in Supabase shows a friendly message.
+  await page.evaluate(() => { window.__mockDisabled = ['twitch']; });
   await page.click('[data-provider="twitch"]');
   await page.waitForTimeout(200);
   check((await page.textContent('.card-msg')).includes("isn't switched on yet"), 'unconfigured provider → friendly error');
@@ -58,12 +61,10 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   const { ctx, page } = await newPage();
   await page.goto(BASE + '?era=ww2');
   await page.click('[data-provider="discord"]');
-  await page.waitForSelector('text=Request beta access', { timeout: 10000 });
-  check(true, 'after sign-in: "Request beta access"');
-  await shot(page, 'l2-request');
-  await page.click('[data-action="request"]');
-  await page.waitForSelector('text=Pending approval');
-  check(true, 'request → "Pending approval"');
+  await page.waitForSelector('text=Pending approval', { timeout: 10000 });
+  check(true, 'after sign-in: straight to "Pending approval" (request made automatically)');
+  const redirect = await page.evaluate(() => JSON.parse(localStorage.getItem('mock-supabase')).lastRedirect);
+  check(redirect === BASE, `provider sends the player back to ${redirect}`);
   await page.waitForTimeout(500);
   await shot(page, 'l3-pending');
   await page.evaluate(() => window.__mockDecide('u-discord.player@example.com', 'approved'));
@@ -83,9 +84,7 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   const { ctx, page } = await newPage();
   await page.goto(BASE + '?era=ww2');
   await page.click('[data-provider="github"]');
-  await page.waitForSelector('[data-action="request"]', { timeout: 10000 });
-  await page.click('[data-action="request"]');
-  await page.waitForSelector('text=Pending approval');
+  await page.waitForSelector('text=Pending approval', { timeout: 10000 });
   await page.evaluate(() => window.__mockDecide('u-github.player@example.com', 'denied'));
   await page.waitForSelector('text=Access not granted', { timeout: 5000 });
   check(true, 'denial arrives live → "Access not granted"');
@@ -102,8 +101,8 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   const seed = `localStorage.setItem('mock-supabase', JSON.stringify({ session: null, rows: [
     { user_id: 'u-a', provider: 'google', display_name: 'Ada Lovelace', email: 'ada@example.com', status: 'pending', requested_at: '2026-10-08T09:14:00Z' },
     { user_id: 'u-b', provider: 'discord', display_name: 'Basil Hart', email: 'basil@example.com', status: 'pending', requested_at: '2026-10-08T11:02:00Z' },
-    { user_id: 'u-c', provider: 'azure', display_name: 'Chen Wei', email: 'chen@example.com', status: 'approved', requested_at: '2026-10-07T18:40:00Z' },
-    { user_id: 'u-d', provider: 'x', display_name: 'Dana Ruiz', email: 'dana@example.com', status: 'denied', requested_at: '2026-10-06T08:00:00Z' },
+    { user_id: 'u-c', provider: 'github', display_name: 'Chen Wei', email: 'chen@example.com', status: 'approved', requested_at: '2026-10-07T18:40:00Z' },
+    { user_id: 'u-d', provider: 'twitch', display_name: 'Dana Ruiz', email: 'dana@example.com', status: 'denied', requested_at: '2026-10-06T08:00:00Z' },
     { user_id: 'u-e', provider: 'email', display_name: 'eli', email: 'eli@example.com', status: 'approved', requested_at: '2026-10-05T21:30:00Z' }
   ] })); window.__mockNextEmail = 'owner@example.com'; window.__mockNextName = 'The Commander';`;
   const { ctx, page } = await newPage(undefined, `if (!localStorage.getItem('mock-supabase')) { ${seed} } window.__mockNextEmail = 'owner@example.com'; window.__mockNextName = 'The Commander';`);

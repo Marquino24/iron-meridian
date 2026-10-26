@@ -1,26 +1,48 @@
 -- =============================================================================
--- Iron Meridian — beta access schema for Supabase
+-- Iron Meridian — beta access setup for Supabase
 --
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
--- It is safe to run again (it replaces functions and policies).
+-- Safe to run again: it replaces functions, triggers and policies, and makes
+-- the owner list match the one below. It never deletes testers.
 --
--- BEFORE RUNNING: replace owner@example.com on the line marked  >>> OWNER <<<
--- with the email of the account YOU will sign in with (for example the
--- Google account you'll use). The owner is always approved and is the only
--- person who can approve, deny or revoke testers.
+-- Written for this project's settings: new tables are NOT exposed to the API
+-- automatically (so this file grants exactly what the game needs) and RLS is
+-- on for new tables (this file also turns it on explicitly).
+--
+-- What it allows:
+--   • a signed-in user can create their OWN row (always as "pending") and
+--     read their own row (their status)
+--   • owners (the emails listed below) can read every row and change status
+--   • nobody else can read other people's rows or change any status
 -- =============================================================================
 
--- Private schema: not exposed through the public API.
+-- Private schema: not exposed through the API.
 create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
 
-create table if not exists private.settings (
-  key   text primary key,
-  value text not null
+-- -----------------------------------------------------------------------------
+-- Owners. >>> EDIT THIS LIST <<< (keep it the same as OWNER_EMAILS in
+-- js/config.js; `npm test` checks that they match). Matched by the CONFIRMED
+-- email of whatever account the owner signs in with: Google, Discord, GitHub,
+-- Twitch or an email link.
+-- -----------------------------------------------------------------------------
+
+create table if not exists private.owner_emails (
+  email text primary key check (email = lower(email))
 );
+revoke all on private.owner_emails from public, anon, authenticated;
 
-insert into private.settings (key, value)
-values ('owner_email', lower('owner@example.com'))          -- >>> OWNER <<<
-on conflict (key) do update set value = excluded.value;
+with wanted(email) as (
+  values
+    ('marcoferreirag3@gmail.com')
+)
+, added as (
+  insert into private.owner_emails (email)
+  select lower(email) from wanted
+  on conflict (email) do nothing
+)
+delete from private.owner_emails o
+where o.email not in (select lower(email) from wanted);
 
 -- -----------------------------------------------------------------------------
 -- Beta users
@@ -41,11 +63,11 @@ create table if not exists public.beta_users (
   decided_by   uuid
 );
 
-comment on table public.beta_users is 'Iron Meridian beta testers. Rows are created by the users themselves (as pending); only the owner can change status.';
+comment on table public.beta_users is 'Iron Meridian beta testers. Users create their own row (always pending); only owners change status.';
 
 -- -----------------------------------------------------------------------------
--- Owner check. The owner is the signed-in user whose CONFIRMED email matches
--- private.settings.owner_email. security definer lets it read auth.users.
+-- Owner check: the signed-in user's email is confirmed and on the owner list.
+-- security definer so it can read auth.users and private.owner_emails.
 -- -----------------------------------------------------------------------------
 
 create or replace function public.is_owner()
@@ -58,9 +80,8 @@ as $$
   select exists (
     select 1
     from auth.users u
-    join private.settings s on s.key = 'owner_email'
+    join private.owner_emails o on o.email = lower(u.email)
     where u.id = auth.uid()
-      and lower(u.email) = s.value
       and u.email_confirmed_at is not null
   );
 $$;
@@ -71,7 +92,7 @@ grant execute on function public.is_owner() to authenticated;
 -- -----------------------------------------------------------------------------
 -- Triggers: users can't forge their own row. On insert the server fills in
 -- provider, name and email from the auth record and forces status = pending
--- (approved for the owner). On update the decision time and decider are stamped.
+-- (approved for an owner). On update the decision time and decider are stamped.
 -- -----------------------------------------------------------------------------
 
 create or replace function private.beta_users_before_insert()
@@ -120,6 +141,9 @@ begin
 end;
 $$;
 
+revoke all on function private.beta_users_before_insert() from public, anon, authenticated;
+revoke all on function private.beta_users_before_update() from public, anon, authenticated;
+
 drop trigger if exists beta_users_before_insert on public.beta_users;
 create trigger beta_users_before_insert
   before insert on public.beta_users
@@ -131,17 +155,18 @@ create trigger beta_users_before_update
   for each row execute function private.beta_users_before_update();
 
 -- -----------------------------------------------------------------------------
--- Row-level security
---   • a user can create and read only their own row
---   • the owner can read every row and change status
---   • nobody (not even the owner, through the API) can edit other columns
+-- Grants (new tables aren't exposed automatically in this project) and
+-- row-level security.
 -- -----------------------------------------------------------------------------
 
-alter table public.beta_users enable row level security;
+grant usage on schema public to authenticated;
+grant usage on type public.beta_status to authenticated;
 
-revoke all on public.beta_users from anon, authenticated;
+revoke all on public.beta_users from public, anon, authenticated;
 grant select, insert on public.beta_users to authenticated;
 grant update (status) on public.beta_users to authenticated;
+
+alter table public.beta_users enable row level security;
 
 drop policy if exists "read own row or owner reads all" on public.beta_users;
 create policy "read own row or owner reads all"
@@ -163,10 +188,10 @@ create policy "owner changes status"
   with check ((select public.is_owner()));
 
 -- -----------------------------------------------------------------------------
--- Realtime: the "Pending approval" screen updates live when you approve.
+-- Realtime: the "Pending approval" screen updates live when an owner approves.
 -- (Realtime respects the policies above: testers only receive their own row.)
 -- -----------------------------------------------------------------------------
 
 do $$ begin
   alter publication supabase_realtime add table public.beta_users;
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; when undefined_object then null; end $$;

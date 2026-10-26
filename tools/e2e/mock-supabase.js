@@ -1,6 +1,6 @@
 // Fake Supabase client for browser tests of the launcher (injected with
 // Playwright's addInitScript). It mimics the parts the game uses and the
-// rules in supabase/schema.sql: a user sees only their own row, the owner
+// rules in docs/supabase-setup.sql: a user sees only their own row, the owner
 // sees all and is the only one who can change status, rows are created
 // pending (approved for the owner), and Realtime channels get updates.
 (() => {
@@ -55,9 +55,11 @@
     auth: {
       async getSession() { return { data: { session: load().session }, error: null }; },
       onAuthStateChange(cb) { authListeners.push(cb); return { data: { subscription: { unsubscribe() {} } } }; },
-      async signInWithOAuth({ provider }) {
-        if (provider === 'twitch') return { error: { message: 'Unsupported provider: provider is not enabled' } };
+      async signInWithOAuth({ provider, options }) {
+        // Tests can switch a provider off (as if not set up in Supabase).
+        if ((window.__mockDisabled ?? []).includes(provider)) return { error: { message: 'Unsupported provider: provider is not enabled' } };
         const db = load();
+        db.lastRedirect = options?.redirectTo ?? null;
         const email = window.__mockNextEmail || `${provider}.player@example.com`;
         db.session = { user: { id: `u-${email}`, email, app_metadata: { provider }, user_metadata: { full_name: window.__mockNextName || `${provider[0].toUpperCase()}${provider.slice(1)} Player` } } };
         save(db);
