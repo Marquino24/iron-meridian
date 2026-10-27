@@ -29,7 +29,7 @@ export function bulkRecruit(sim, pids, typeKey, qty) {
   for (const pid of pids) {
     let here = 0;
     for (let i = 0; i < qty; i++) {
-      const r = sim.armies.recruit(pid, typeKey);
+      const r = sim.commands.issue('unit.recruit', { province: pid, type: typeKey });
       if (r.error) { if (/resources/i.test(r.error)) short = true; break; }
       here++;
     }
@@ -44,7 +44,7 @@ export function bulkRecruit(sim, pids, typeKey, qty) {
 export function bulkBuild(sim, pids, type) {
   let started = 0, short = false;
   for (const pid of pids) {
-    const r = sim.buildings.build(pid, type);
+    const r = sim.commands.issue('building.build', { province: pid, type });
     if (r.error) { if (/resources/i.test(r.error)) { short = true; break; } continue; }
     started++;
   }
@@ -412,11 +412,11 @@ export class BuildingsWindow extends CityWindowBase {
     if (d.col) { this.bulkType = d.col; return true; }
     if (d.city) { this.actions.openCity(Number(d.city)); return false; }
     if ('upgrade' in d && this.cell) {
-      const r = B.build(this.cell.pid, this.cell.type);
+      const r = this.sim.commands.issue('building.build', { province: this.cell.pid, type: this.cell.type });
       if (r.error) this.actions.notice(r.error);
       return true;
     }
-    if (d.cancel) { B.cancel(Number(d.cancel)); return true; }
+    if (d.cancel) { this.sim.commands.issue('building.cancel', { province: Number(d.cancel) }); return true; }
     if (d.select) {
       if (d.select === 'none') this.selected.clear(); else for (const p of this.sites()) this.selected.add(p.id);
       return true;

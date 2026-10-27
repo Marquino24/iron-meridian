@@ -170,6 +170,9 @@ const hop = (a, b) => A.hopHours(army, a, b);
     for (const o of nbs) give2(o, { deterrence: 60 });
     const t1 = ai2.warTarget(DE, P, b, power);
     check(t0 >= 0 && t1 < 0, `Deterrent (deterrence 60): Germany would attack ${t0 >= 0 ? h.state.getNation(t0).shortName : 'nobody'} without it, ${t1 >= 0 ? h.state.getNation(t1).shortName : 'nobody'} with it`);
+    give2(DE, { deterrence: 60 });
+    const t2 = ai2.warTarget(DE, P, b, power);
+    check(t2 >= 0, `…but a nation with its own deterrent isn't deterred (Germany would attack ${t2 >= 0 ? h.state.getNation(t2).shortName : 'nobody'})`);
   }
   const t = R.tree.find((x) => x.tier === 1);
   const run = () => { const r = R.of(DE); r.active = [{ id: t.id, done: 0, total: t.hours }]; R.update(state, 10); const d = r.active[0]?.done; r.active = []; return d; };

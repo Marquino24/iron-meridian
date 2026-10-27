@@ -168,29 +168,29 @@ export class DiplomacyWindow {
     if (d.filter) { this.filter = d.filter; return true; }
     const id = this.sel, n = st.getNation(id);
     if (d.show) { this.actions.focusNation(Number(d.show)); return false; }
+    const issue = (kind, payload) => this.sim.commands.issue(kind, payload);
     if (d.propose) {
-      const r = D.accepts(id, me, d.propose);
-      if (r.ok) { D.sign(me, id, d.propose); notice(`${n.shortName} accepts the ${TREATIES[d.propose].label.toLowerCase()}`); }
-      else { D.remember(id, me, 'pestered', 'Keeps making proposals', -2, 60); notice(`${n.shortName} declines: ${r.reason}`); }
+      const r = issue('treaty.propose', { nation: id, type: d.propose });
+      notice(r.ok ? `${n.shortName} accepts the ${TREATIES[d.propose].label.toLowerCase()}` : `${n.shortName} declines: ${r.error}`);
       return true;
     }
-    if (d.cancel) { D.cancel(me, id, d.cancel); notice(`You ended the ${TREATIES[d.cancel].label.toLowerCase()} with ${n.shortName}`); return true; }
+    if (d.cancel) { issue('treaty.cancel', { nation: id, type: d.cancel }); notice(`You ended the ${TREATIES[d.cancel].label.toLowerCase()} with ${n.shortName}`); return true; }
     if ('ask' in d) {
-      const r = D.askToJoin(me, id, this.joinTarget);
-      notice(r.ok ? `${n.shortName} joins your war against ${st.getNation(this.joinTarget).shortName}` : `${n.shortName} declines: ${r.reason}`);
+      const r = issue('war.ask-join', { nation: id, target: this.joinTarget });
+      notice(r.ok ? `${n.shortName} joins your war against ${st.getNation(this.joinTarget).shortName}` : `${n.shortName} declines: ${r.error}`);
       return true;
     }
     if ('offer' in d || 'gift' in d) {
       const t = this.trade;
       const give = { [t.give]: t.giveAmt };
-      const r = 'gift' in d ? D.gift(me, id, give) : D.trade(me, id, give, { [t.take]: t.takeAmt });
-      notice(r.ok ? ('gift' in d ? `${n.shortName} thanks you for the gift (+${r.boost} opinion)` : `${n.shortName} accepts the trade`) : `${n.shortName}: ${r.reason}`);
+      const r = 'gift' in d ? issue('trade.gift', { nation: id, give }) : issue('trade.offer', { nation: id, give, take: { [t.take]: t.takeAmt } });
+      notice(r.ok ? ('gift' in d ? `${n.shortName} thanks you for the gift (+${r.boost} opinion)` : `${n.shortName} accepts the trade`) : `${n.shortName}: ${r.error}`);
       return true;
     }
     if ('peace' in d) { this.actions.openPeace?.(id); return true; }
     if (d.war === 'ask') { this.confirmWar = true; return true; }
     if (d.war === 'cancel') { this.confirmWar = false; return true; }
-    if (d.war === 'confirm') { D.declareWar(me, id); this.confirmWar = false; notice(`You declared war on ${n.name}`); return true; }
+    if (d.war === 'confirm') { issue('war.declare', { target: id }); this.confirmWar = false; notice(`You declared war on ${n.name}`); return true; }
     return false;
   }
 

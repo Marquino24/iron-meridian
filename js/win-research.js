@@ -274,17 +274,17 @@ export class ResearchWindow {
     if (d.rtab) { this.tab = d.rtab; return true; }
     if (d.tech) { this.selected = d.tech; this.tab = 'tree'; return true; }
     if (d.start) {
-      const r = R.start(me, d.start);
+      const r = this.sim.commands.issue('research.start', { tech: d.start });
       this.actions.notice(r.error ?? `Researching ${R.byId[d.start].name}`);
       return true;
     }
     if (d.enqueue) {
-      const r = R.enqueue(me, d.enqueue);
+      const r = this.sim.commands.issue('research.queue', { tech: d.enqueue });
       this.actions.notice(r.error ?? (R.status(me, d.enqueue) === 'active' ? `Researching ${R.byId[d.enqueue].name}` : `Queued ${R.byId[d.enqueue].name}`));
       return true;
     }
-    if (d.dequeue) { R.dequeue(me, d.dequeue); return true; }
-    if (d.cancel) { R.cancel(me, d.cancel); return true; }
+    if (d.dequeue) { this.sim.commands.issue('research.dequeue', { tech: d.dequeue }); return true; }
+    if (d.cancel) { this.sim.commands.issue('research.cancel', { tech: d.cancel }); return true; }
     return false;
   }
 }

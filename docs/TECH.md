@@ -18,9 +18,9 @@ Every era has its own tree: three branches (Military, Economy, Infrastructure), 
 | Medieval | **Feudal Levy** (Military II): Homeland levies rise 50% sooner and bring one more unit; Recruitment 10% faster<br>**Siege Engines** (Military III): Longbowmen level 3 (+30% attack, defense, HP); Cities and capitals fall to your sieges 40% faster<br>**Crusading Zeal** (Military IV): War exhaustion 40% lower; +10% Men-at-arms attack<br>**Concentric Castles** (Infrastructure III): Your fortifications give 50% more defense |
 | World War I | **Trench Systems** (Military II): Entrenchment: armies defending your own land +25% defense; Fortifications level III unlocked<br>**Aerial Reconnaissance** (Military II): +25% attack in the first day of every battle<br>**Chemical Warfare** (Military III): Enemy terrain and fortification bonus cut by 40% when you attack<br>**Strategic Railways** (Infrastructure II): Armies move 30% faster through your own provinces |
 | World War II | **Fleet Carriers** (Military III): Destroyer level 3 (+30% attack, defense, HP); Carrier escort: your armies at sea lose 50% less defense<br>**Blitzkrieg Doctrine** (Military IV): Blitzkrieg: 35% faster through and occupying enemy land<br>**Radar** (Economy II): Enemy landings on your coast attack 50% weaker; +5% defense |
-| Cold War | **Airmobile Infantry** (Military II): Mech Infantry level 3 (+30% attack, defense, HP); Air assault: rough terrain slows your armies 50% less<br>**Air Interdiction** (Military III): Air interdiction: enemy armies move 40% slower in your land<br>**Nuclear Deterrent** (Economy IV): Deterrent: other nations need 60% more strength to attack you |
+| Cold War | **Airmobile Infantry** (Military II): Mech Infantry level 3 (+30% attack, defense, HP); Air assault: rough terrain slows your armies 50% less<br>**Air Interdiction** (Military III): Air interdiction: enemy armies move 40% slower in your land<br>**Nuclear Deterrent** (Economy IV): Deterrent: nations without one need 60% more strength to attack you |
 | Modern | **Precision Strikes** (Military III): Rocket Artillery level 3 (+30% attack, defense, HP); Precision strikes: conquered land starts 15% more integrated<br>**Drone Swarms** (Military III): Drones: enemies occupying your homeland take 50% longer<br>**AI Research** (Economy III): +1 research slot; Research 20% faster<br>**Cyber Warfare** (Infrastructure IV): Cyber warfare: nations at war with you earn 20% less money; +15% money |
-| Fictional World | **Bastion Lines** (Military II): Fortifications level III unlocked; Entrenchment: armies defending your own land +20% defense<br>**Siege Doctrine** (Military III): Rocket Artillery level 3 (+30% attack, defense, HP); Cities and capitals fall to your sieges 35% faster<br>**Lightning War** (Military IV): Blitzkrieg: 30% faster through and occupying enemy land<br>**Doomsday Deterrent** (Economy IV): Deterrent: other nations need 50% more strength to attack you<br>**Arterial Roads** (Infrastructure II): Armies move 35% faster through provinces with Roads |
+| Fictional World | **Bastion Lines** (Military II): Fortifications level III unlocked; Entrenchment: armies defending your own land +20% defense<br>**Siege Doctrine** (Military III): Rocket Artillery level 3 (+30% attack, defense, HP); Cities and capitals fall to your sieges 35% faster<br>**Lightning War** (Military IV): Blitzkrieg: 30% faster through and occupying enemy land<br>**Doomsday Deterrent** (Economy IV): Deterrent: nations without one need 50% more strength to attack you<br>**Arterial Roads** (Infrastructure II): Armies move 35% faster through provinces with Roads |
 
 ## Roman Empire (AD 117)
 
@@ -216,7 +216,7 @@ Old saves: 28 of 28 old techs carry over.
 | Economy | III | Military-Industrial Complex | +1 research slot; +15% money | Bretton Woods | grow |
 | Economy | III | Agro-Industry | +15% food; +15% manpower | Baby Boom | grow |
 | Economy | III | Transistors | +25% electronics | Offshore Drilling | grow |
-| Economy | IV | ★ **Nuclear Deterrent** | ★ Deterrent: other nations need 60% more strength to attack you | Military-Industrial Complex, Transistors | defend |
+| Economy | IV | ★ **Nuclear Deterrent** | ★ Deterrent: nations without one need 60% more strength to attack you | Military-Industrial Complex, Transistors | defend |
 | Infrastructure | I | Helicopter Transport | +10% movement speed | — | grow |
 | Infrastructure | I | Interstate Highways | Infrastructure level III unlocked | — | grow |
 | Infrastructure | I | Container Ports | Naval Base level III unlocked | — | grow |
@@ -298,7 +298,7 @@ Old saves: 27 of 28 old techs carry over; refunded: i7.
 | Economy | III | Grand Institutes | +1 research slot; +15% money | Treasury Reform | grow |
 | Economy | III | Settler Harvests | +15% food; +15% manpower; Conquered land integrates 30% faster | Labour Guilds | hold |
 | Economy | III | Circuit Works | +25% electronics | Oil Prospecting | grow |
-| Economy | IV | ★ **Doomsday Deterrent** | ★ Deterrent: other nations need 50% more strength to attack you | Grand Institutes, Circuit Works | defend |
+| Economy | IV | ★ **Doomsday Deterrent** | ★ Deterrent: nations without one need 50% more strength to attack you | Grand Institutes, Circuit Works | defend |
 | Infrastructure | I | Supply Wagons | +10% movement speed | — | grow |
 | Infrastructure | I | Paved Roads | Infrastructure level III unlocked | — | grow |
 | Infrastructure | I | Deepwater Harbors | Naval Base level III unlocked | — | grow |

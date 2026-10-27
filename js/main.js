@@ -24,6 +24,9 @@ import { Settings } from './settings.js';
 import { Screens } from './menu.js';
 import { loadImagery } from './assets.js';
 import { Launcher } from './launcher.js';
+import { MULTIPLAYER_PREVIEW } from './config.js';
+import { SupabaseLobby, DemoLobby } from './lobby.js';
+import { LobbyUI } from './lobby-ui.js';
 import { Economy } from './economy.js';
 import { Armies } from './armies.js';
 import { Combat } from './combat.js';
@@ -44,6 +47,7 @@ import { Sandbox } from './sandbox.js';
 import { Diplomacy } from './diplomacy.js';
 import { Victory } from './victory.js';
 import { Integration } from './integration.js';
+import { Commands } from './commands.js';
 import { VictoryUI } from './victory-ui.js';
 import { DiplomacyWindow } from './win-diplomacy.js';
 import { SandboxUI } from './sandbox-ui.js';
@@ -77,6 +81,9 @@ const victory = new Victory(state, sim);
 sim.victory = victory;
 const integration = new Integration(state, sim);
 sim.integration = integration;
+// Every player order goes through here as a command record (before the popups that answer offers).
+const commands = new Commands(state, sim);
+sim.commands = commands;
 const sandbox = new Sandbox(state, sim);
 sim.sandbox = sandbox;
 renderer.sim = sim;
@@ -284,7 +291,7 @@ function notice(text) {
 }
 
 function orderMove(army, node) {
-  const r = armies.order(army.id, node);
+  const r = commands.issue('army.move', { army: army.id, to: node });
   if (r.error) notice(r.peace != null ? `${r.error} Open one of its provinces to do it.` : r.error);
   armies.preview = null;
   renderer.requestRender();
@@ -303,7 +310,7 @@ function orderGroup(group, nodeFor) {
   for (const a of group) {
     const node = nodeFor(a);
     if (node < 0) { firstError ??= a.kind === 'naval' ? 'Fleets can only sail through sea zones.' : 'Pick a province or a sea zone.'; continue; }
-    const r = armies.order(a.id, node);
+    const r = commands.issue('army.move', { army: a.id, to: node });
     if (r.error) firstError ??= r.error; else sent++;
   }
   armies.preview = null;
@@ -449,7 +456,7 @@ function renderGroupBar() {
 groupBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-group]');
   if (!b) return;
-  if (b.dataset.group === 'stop') for (const a of commandGroup()) armies.stop(a.id);
+  if (b.dataset.group === 'stop') for (const a of commandGroup()) commands.issue('army.stop', { army: a.id });
   else state.setSelectedArmy(-1);
   renderGroupBar();
   renderer.requestRender();
@@ -643,6 +650,7 @@ const screens = new Screens({
     signOut() { launcher?.signOut(); },
     continueGame() { saveUI.continueLatest().catch((e) => notice(e.message)); },
     openSaves(mode) { saveUI.open(mode); },
+    openLobby() { if (!lobbyUI) return; screens.show('lobby'); lobbyUI.open(); },
     menuShown() { saveUI.refreshMenu(); },
   },
 });
@@ -724,9 +732,24 @@ state.events.on('map:loaded', (map) => {
 screens.show(null);
 launcher = new Launcher(authEnabled() ? new AuthService() : new DemoAuthService());
 launcher.run().then(() => {
+  setupMultiplayer();
   screens.show('menu');
   menuCamera();
 });
+
+/**
+ * Multiplayer lobby, behind MULTIPLAYER_PREVIEW (config.js): owners only for
+ * now. For everyone else the menu keeps "Multiplayer · Coming soon".
+ */
+let lobbyUI = null;
+function setupMultiplayer() {
+  const allowed = MULTIPLAYER_PREVIEW === 'everyone' || (MULTIPLAYER_PREVIEW === 'owners' && launcher.isOwner);
+  if (!allowed) return;
+  lobbyUI = new LobbyUI(launcher.auth.demo ? new DemoLobby() : new SupabaseLobby(launcher.auth));
+  const item = document.querySelector('[data-menu="multi"]');
+  item.disabled = false;
+  item.innerHTML = '<span>Multiplayer</span><small>Owner preview · persistent games</small>';
+}
 
 // --- Main loop ---
 
@@ -764,4 +787,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame, peaceUI };
+window.ironMeridian = { commands, state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame, peaceUI };

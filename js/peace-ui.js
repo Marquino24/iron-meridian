@@ -120,14 +120,14 @@ export class PeaceUI {
     const st = this.state, me = st.playerNationId, o = this.other;
     const name = st.getNation(o).shortName;
     const pids = [...this.picked];
-    const r = this.sim.ai.proposePeace(o, me, pids);
+    const r = this.sim.commands.issue('peace.propose', { nation: o, provinces: pids });
     if (r.ok) {
       this.notice(pids.length ? `${name} accepts: you keep ${pids.length} province${pids.length === 1 ? '' : 's'}` : `${name} accepts a white peace`);
       this.close();
       return;
     }
     st.events.emit('feed', { kind: 'peace', tone: 'bad', text: `${st.getNation(o).name} refused your peace terms` });
-    this.message = r.reason;
+    this.message = r.error;
     this.render();
   }
 }

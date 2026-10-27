@@ -687,8 +687,11 @@ export class AI {
       const theirs = this.powerOf(o) + 0.5 * C.enemiesOf(o).length; // allies don't exist yet
       const ratio = power / Math.max(1, theirs);
       const lost = this.state.provinces.some((p) => p.homeOf === n && p.owner === o);
-      // A nuclear (or doomsday) deterrent makes attackers want a bigger edge.
-      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1) * (1 + this.sim.research.fx(o, 'deterrence') / 100) * restless;
+      // A nuclear (or doomsday) deterrent makes attackers want a bigger edge, unless
+      // they have one too (step 11A: deterrents cancel out, so wars don't freeze
+      // once most nations hold one).
+      const R = this.sim.research, deterred = R.fx(n, 'deterrence') > 0 ? 0 : R.fx(o, 'deterrence');
+      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1) * (1 + deterred / 100) * restless;
       if (ratio < need) continue;
       // Value: their cities and capital near us; prefer smaller wars.
       const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1) * (1 + Math.max(0, -op) / 50);

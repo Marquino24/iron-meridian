@@ -2330,3 +2330,38 @@ body[data-mode="sandbox"] .victory-row { display: none; }
 dd.integ { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .integ-bar { width: 70px; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; }
 .integ-bar i { display: block; height: 100%; background: var(--accent); }
+
+/* ---- Step 11A: multiplayer lobby (owner preview) ------------------------------------------- */
+@media (min-width: 761px) { .lobby-panel { width: min(600px, 100%); } }
+.lobby-body { display: flex; flex-direction: column; gap: 12px; }
+.lobby-tools, .lobby-seat { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lobby-seat { justify-content: space-between; padding: 10px 12px; border: 1px solid var(--green); border-radius: 10px; background: rgba(40, 70, 46, 0.45); }
+.lobby-list, .lobby-nations { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lobby-open {
+  width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; text-align: left;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(14, 22, 27, 0.85); color: var(--text); cursor: pointer; font: inherit;
+}
+.lobby-open:hover, .lobby-open:focus-visible { border-color: var(--accent); }
+.lg-name { font-weight: 700; font-size: 15px; }
+.lg-meta { grid-column: 1; font-size: 12px; color: var(--text-dim); margin: 0; }
+.lg-seats { grid-row: 1 / span 2; grid-column: 2; font-family: var(--font-mono); font-size: 15px; color: var(--accent); }
+.lg-mine { font-family: var(--font-mono); font-size: max(9px, var(--min-text)); letter-spacing: 0.1em; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--green); color: var(--green); vertical-align: 2px; }
+.lobby-game-head h3 { margin: 0 0 2px; font-size: 20px; color: #f0ead8; }
+.lobby-msg.bad { margin: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255, 120, 100, 0.6); color: #ffc9a8; background: rgba(120, 30, 20, 0.35); font-size: 13px; }
+.lobby-note { margin: 0; font-size: 12px; line-height: 1.45; color: var(--text-dim); }
+.lobby-form { display: flex; flex-direction: column; gap: 10px; }
+.lobby-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.lobby-form label[hidden] { display: none; }
+.lobby-form input, .lobby-form select, #lobby-filter {
+  font: inherit; font-size: 15px; text-transform: none; letter-spacing: 0; color: var(--text); background: rgba(6, 10, 13, 0.9);
+  border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px 10px; min-height: 40px;
+}
+.lobby-pick { display: flex; flex-direction: column; gap: 8px; }
+.lobby-nations { max-height: min(46vh, 420px); overflow-y: auto; padding-right: 4px; }
+.lobby-nation {
+  width: 100%; display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; min-height: 40px;
+  border: 1px solid var(--line); border-radius: 8px; background: rgba(14, 22, 27, 0.85); color: var(--text); font: inherit; cursor: pointer; text-align: left;
+}
+.lobby-nation small { color: var(--text-dim); font-size: 11px; }
+.lobby-nation.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.lobby-nation:disabled { opacity: 0.45; cursor: not-allowed; }
