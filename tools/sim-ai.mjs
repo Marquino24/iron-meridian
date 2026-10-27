@@ -23,7 +23,7 @@ const difficulty = args.find((a) => ['easy', 'normal', 'hard'].includes(a)) ?? '
 const eras = args.filter((a) => ERAS.some((e) => e.id === a));
 const list = eras.length ? eras.map(getEra) : ERAS;
 
-export function simulate(era, { months = 6, difficulty = 'normal', quiet = false, untilVictory = false, bot = null } = {}) {
+export function simulate(era, { months = 6, difficulty = 'normal', quiet = false, untilVictory = false, bot = null, setup = null, onDay = null } = {}) {
   const state = new GameState();
   const economy = new Economy(state);
   const buildings = new Buildings(state, economy);
@@ -62,6 +62,8 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
     const base = economy.bonus;
     economy.bonus = (n) => (n === botId ? 1.3 : base(n));
   }
+  // Hooks for tools: setup(sim, state) once at the start, onDay({ day, state, sim }) every game day.
+  setup?.(sim, state);
   const vp = { target: victory.target, total: victory.totalPoints, reached: null, leaders: [] };
   const start = map.nations.map((n) => state.provincesOf(n.id).length);
   const events = { wars: [], newWars: [], peace: [], conquered: [], diplomacy: [] };
@@ -81,6 +83,7 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
     economy.update(state, 1); research.update(state, 1); buildings.update(state, 1);
     armies.update(state, 1); combat.update(state, 1); integration.update(state, 1); ai.update(state, 1);
     if (h % 24 === 0) {
+      onDay?.({ day: h / 24, state, sim });
       victory.refresh();
       const lead = victory.scores[0];
       if (h % (24 * 90) === 0) vp.leaders.push(`${Math.round(h / 24)}d ${map.nations[lead.id].shortName} ${lead.points}${botId >= 0 ? ` (bot ${victory.scoreOf(botId).points})` : ''}`);
