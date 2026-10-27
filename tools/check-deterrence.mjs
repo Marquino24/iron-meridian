@@ -2,8 +2,11 @@
 // freeze wars once many nations have it? Runs the eras that have one for two
 // game years, with and without the deterrent effect, and compares new wars per
 // half-year against how many nations hold it. Fails if, in the second year, wars
-// with the deterrent fall below 60% of wars without it.
-//   node tools/check-deterrence.mjs [--months=24] [--runs=2]
+// with the deterrent fall below 60% of wars without it. Unseeded: Modern has
+// no deterrent, so its two halves show the noise (about ±40% with 4 runs).
+// Step 11A result: with deterrents deterring everyone, wars dropped once most
+// nations held one; now a deterrent only deters nations without one.
+//   node tools/check-deterrence.mjs [--months=24] [--runs=4]
 // Slow (several minutes, spread over the CPU cores): `npm run test:sim`.
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
@@ -11,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => args.find((a) => a.startsWith(`--${k}=`))?.split('=')[1] ?? d;
-const months = Number(opt('months', 24)), runs = Number(opt('runs', 2));
+const months = Number(opt('months', 24)), runs = Number(opt('runs', 4));
 const HALF = 182;
 
 if (opt('worker', null)) {
