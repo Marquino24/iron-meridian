@@ -43,10 +43,12 @@ import { DiplomacyUI } from './diplomacy-ui.js';
 import { Sandbox } from './sandbox.js';
 import { Diplomacy } from './diplomacy.js';
 import { Victory } from './victory.js';
+import { Integration } from './integration.js';
 import { VictoryUI } from './victory-ui.js';
 import { DiplomacyWindow } from './win-diplomacy.js';
 import { SandboxUI } from './sandbox-ui.js';
 import { SaveUI } from './save-ui.js';
+import { PeaceUI } from './peace-ui.js';
 import { restore } from './save.js';
 
 const canvas = document.getElementById('map-canvas');
@@ -73,12 +75,14 @@ sim.diplomacy = diplomacy;
 armies.diplomacy = diplomacy;
 const victory = new Victory(state, sim);
 sim.victory = victory;
+const integration = new Integration(state, sim);
+sim.integration = integration;
 const sandbox = new Sandbox(state, sim);
 sim.sandbox = sandbox;
 renderer.sim = sim;
 
 /** Simulation systems, run in order each frame with the game hours elapsed. */
-const systems = [economy, research, buildings, armies, combat, ai, sandbox, victory];
+const systems = [economy, research, buildings, armies, combat, integration, ai, sandbox, victory];
 
 // --- Camera framing ---------------------------------------------------------
 
@@ -315,8 +319,10 @@ function focusNode(node) {
 }
 
 const feed = new Feed(state, sim, { focusNode });
+const peaceUI = new PeaceUI(state, sim, { notice: (t) => notice(t), focusNode: (n) => focusNode(n) });
 ui.command = new CommandUI(state, sim, {
   focusNode,
+  openPeace: (id) => peaceUI.open(id),
   openBattle: (id) => feed.open(id),
   rerender: () => { ui.renderProvincePanel(); renderer.requestRender(); },
   notice,
@@ -345,6 +351,7 @@ const windows = new WindowManager(state, [
   new ResearchWindow(state, sim, { notice }),
   new DiplomacyWindow(state, sim, {
     notice,
+    openPeace: (id) => peaceUI.open(id),
     focusNation(id) {
       const cap = state.getProvince(state.getNation(id)?.capitalId);
       if (cap) focusOn(cap.center.x, cap.center.y, Math.max(camera.zoom, camera.refZoom * 1.5), 0.8);
@@ -757,4 +764,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame };
+window.ironMeridian = { state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame, peaceUI };

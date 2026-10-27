@@ -51,13 +51,19 @@ const tree = await IM(() => window.ironMeridian.sim.research.tree.map((t) => ({ 
 check(await page.locator('.tech').count() === tree.length, `${tree.length} tech cards`);
 check(await page.locator('.tree-lines path').count() === tree.reduce((n, t) => n + t.req, 0), 'one line per requirement');
 check(await page.locator('.tech.st-available').count() === 9 && await page.locator('.tech.st-locked').count() === tree.length - 9, '9 tier-1 techs available, the rest locked');
+// Era trees (step 10): signature techs starred, one column per tier (3 or 4).
+const L = await IM(async () => { const m = await import('./js/tech.js'); const R = window.ironMeridian.sim.research; return m.legacyMap(R.era, R.tree); });
+const sigs = await IM(() => window.ironMeridian.sim.research.tree.filter((t) => t.signature).length);
+const tiers = await IM(() => Math.max(...window.ironMeridian.sim.research.tree.map((t) => t.tier)));
+check(sigs >= 3 && await page.locator('.tech.sig').count() === sigs, `${sigs} signature techs starred`);
+check(await page.locator('.tier-label').count() === tiers, `${tiers} tier columns`);
 await shot(page, '1-tree');
 
 // A locked tech explains what it needs.
-await click('.tech[data-tech="m4"]');
+await click(`.tech[data-tech="${L.m4}"]`);
 check(/Requires/.test(await page.textContent('.tech-detail')), 'locked tech lists its requirement');
 // Start the first military tech and the slot fills.
-await click('.tech[data-tech="m1"]');
+await click(`.tech[data-tech="${L.m1}"]`);
 const fx = await page.textContent('.td-fx');
 check(/level 2/.test(fx), `effects shown: ${fx.trim()}`);
 await shot(page, '1b-detail');
@@ -66,41 +72,41 @@ await page.waitForTimeout(300);
 check(await page.locator('.tech.st-active').count() === 1, 'card shows researching');
 check(await page.locator('.slot.busy').count() === 1, 'slot in use');
 check(await page.locator('#command-bar [data-win="research"] .cb-badge').count() === 0 || (await page.waitForTimeout(700), await page.locator('#command-bar [data-win="research"] .cb-badge').count() === 0), 'badge gone once the slot is busy');
-await click('.tech[data-tech="m3"]');
+await click(`.tech[data-tech="${L.m3}"]`);
 check(/slot busy/i.test(await page.textContent('.tech-detail')), 'second tech: slot busy');
 await click('.tech-detail [data-enqueue]');
 await page.waitForTimeout(200);
-check(await page.locator('.r-queue .q-item').count() === 1 && await page.locator('.tech[data-tech="m3"].queued').count() === 1, 'added to the queue');
+check(await page.locator('.r-queue .q-item').count() === 1 && await page.locator(`.tech[data-tech="${L.m3}"].queued`).count() === 1, 'added to the queue');
 // A tech whose requirement is only queued can join too.
-await click('.tech[data-tech="m8"]');
+await click(`.tech[data-tech="${L.m8}"]`);
 check(/Queue .* first/.test(await page.textContent('.tech-detail')) || await page.locator('.tech-detail [data-enqueue]').count() === 0, 'm8 needs m5 queued first');
-await click('.tech[data-tech="m1"]');
+await click(`.tech[data-tech="${L.m1}"]`);
 await IM(() => window.ironMeridian.state.setSpeed(4));
 await page.waitForTimeout(6000);
-const w = await page.$eval('.tech[data-tech="m1"] .progress i', (e) => parseFloat(e.style.width));
+const w = await page.$eval(`.tech[data-tech="${L.m1}"] .progress i`, (e) => parseFloat(e.style.width));
 check(w > 0, `progress bar moving (${w}%)`);
 await shot(page, '2-researching');
-await page.waitForFunction(() => window.ironMeridian.sim.research.status(window.ironMeridian.state.playerNationId, 'm1') === 'done', null, { timeout: 90000 });
+await page.waitForFunction((id) => window.ironMeridian.sim.research.status(window.ironMeridian.state.playerNationId, id) === 'done', L.m1, { timeout: 90000 });
 await page.waitForTimeout(150);
 const toast = await page.textContent('#toast');
 await IM(() => window.ironMeridian.state.setSpeed(0));
 check(/Research complete/.test(toast), `toast: "${toast}"`);
 await page.waitForTimeout(400);
-check(await IM(() => window.ironMeridian.sim.research.status(window.ironMeridian.state.playerNationId, 'm3')) === 'active', 'queued tech started by itself');
-check(await page.locator('.tech[data-tech="m1"].st-done').count() === 1, 'card shows done');
-check(await page.locator('.tech[data-tech="m5"].st-available').count() === 1, 'its follow-up became available');
+check(await IM((id) => window.ironMeridian.sim.research.status(window.ironMeridian.state.playerNationId, id), L.m3) === 'active', 'queued tech started by itself');
+check(await page.locator(`.tech[data-tech="${L.m1}"].st-done`).count() === 1, 'card shows done');
+check(await page.locator(`.tech[data-tech="${L.m5}"].st-available`).count() === 1, 'its follow-up became available');
 check(await IM(() => window.ironMeridian.feed.items.some((i) => /Research complete/.test(i.text))), 'feed: research complete');
 // Give a few more so the tree shows every state, then screenshot.
-await IM(() => {
+await IM((L) => {
   const { sim, state } = window.ironMeridian;
   const me = state.playerNationId;
-  for (const id of ['e2', 'e1', 'i2', 'e4', 'i1']) sim.research.grant(me, id);
+  for (const id of ['e2', 'e1', 'i2', 'e4', 'i1']) sim.research.grant(me, L[id]);
   for (const k of sim.economy.keys) sim.economy.get(me)[k] += 50000;
-  for (const id of ['e5', 'm5', 'i4', 'm8', 'i6']) sim.research.enqueue(me, id);
-});
+  for (const id of ['e5', 'm5', 'i4', 'm8', 'i6']) sim.research.enqueue(me, L[id]);
+}, L);
 await page.waitForTimeout(600);
 check(await page.locator('.slot.busy').count() === 2, 'two slots busy after the slot tech');
-await click('.tech[data-tech="m5"]');
+await click(`.tech[data-tech="${L.m5}"]`);
 await page.waitForTimeout(300);
 await shot(page, '3-states');
 await click('.win-research [data-rtab="bonuses"]');

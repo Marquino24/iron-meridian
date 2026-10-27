@@ -32,6 +32,15 @@ export const PERSONALITIES = {
   expansionist: { label: 'Expansionist', warRatio: 1.5, warChance: 0.18, military: 0.55, maxWars: 2, branches: ['eco', 'inf', 'mil'], fort: 0.1, expand: 1 },
 };
 
+/** How much each personality wants techs for attack, defense, growth and holding conquests. */
+export const TECH_TASTE = {
+  aggressive: { attack: 3, hold: 1.5, grow: 1, defend: 0.5 },
+  balanced: { grow: 2, attack: 1, defend: 1, hold: 1 },
+  defensive: { defend: 3, grow: 1.5, hold: 0.5, attack: 0.5 },
+  conqueror: { attack: 3, hold: 2.5, grow: 1, defend: 0.3 },
+  expansionist: { hold: 3, grow: 2, attack: 1.5, defend: 0.5 },
+};
+
 export const DIFFICULTY = {
   easy: { label: 'Easy', think: 1.6, warRatio: 1.35, chance: 0.5, prod: 0.9, attackRatio: 1.0, smart: false },
   normal: { label: 'Normal', think: 1, warRatio: 1, chance: 1, prod: 1, attackRatio: 1.2, smart: false },
@@ -47,7 +56,7 @@ const ERA_PERSONALITY = {
   coldwar: { 'Soviet Union': 'expansionist', 'United States': 'balanced' },
 };
 /** How warlike each era is overall (the 20th-century world wars more, the nuclear age less). */
-const ERA_WAR_RATE = { rome: 1, medieval: 1, ww1: 1.2, ww2: 1.2, coldwar: 0.6, modern: 0.4, fictional: 2 };
+const ERA_WAR_RATE = { rome: 1.4, medieval: 1, ww1: 1.2, ww2: 1.2, coldwar: 0.6, modern: 0.4, fictional: 2 };
 const RANDOM_MIX = [['aggressive', 0.15], ['balanced', 0.4], ['defensive', 0.35], ['expansionist', 0.1]];
 
 const MIN_ATTACK_UNITS = 3;
@@ -56,6 +65,9 @@ const LANDING_SITES = 6;
 const LANDING_MARGIN = 1.3;
 /** A neighbour this big (share of all provinces, and 1.25× us) can be a coalition's target. */
 const COALITION_SHARE = 0.08;
+/** War score a computer nation needs to demand land from you, and to keep land in a peace with another computer nation. */
+const DEMAND_SCORE = 25;
+const CEDE_SCORE = 20;
 const PEACE_COOLDOWN_H = 24 * 30;
 
 export class AI {
@@ -259,12 +271,17 @@ export class AI {
     this.doDiplomacy(ctx);
   }
 
-  // Research: keep two techs queued, branches in personality order.
-  doResearch({ n, P }) {
+  // Research: keep two techs queued. Lower tiers first, branches in personality
+  // order, and what the tech is for (TECH_TASTE): an aggressive nation reaches
+  // for siege engines and blitzkrieg, a defensive one for castles and the deterrent.
+  doResearch({ n, P, b }) {
     const R = this.sim.research;
     const r = R.of(n);
     if (r.queue.length >= 2) return;
-    const order = [...R.tree].sort((a, b) => a.tier - b.tier || P.branches.indexOf(a.branch) - P.branches.indexOf(b.branch));
+    const taste = TECH_TASTE[b.personality] ?? TECH_TASTE.balanced;
+    const value = (t) => -10 * t.tier + 2 * (3 - P.branches.indexOf(t.branch)) + 3 * (taste[t.ai] ?? 1)
+      + (t.signature ? 4 * (taste[t.ai] ?? 1) - 4 : 0) + (t.effects.some((e) => e.slots) ? 6 : 0);
+    const order = [...R.tree].sort((x, y) => value(y) - value(x));
     for (const t of order) {
       if (r.queue.length >= 2) break;
       if (R.canQueue(n, t.id).ok) R.enqueue(n, t.id);
@@ -565,19 +582,31 @@ export class AI {
       const losing = (lost >= Math.max(2, startSize * 0.15) && ratio < 1) || (ratio < 0.5 && days > 20);
       const stalemate = days > 150 && won <= lost;
       const tired = this.exhaustion(n, e) >= 1;
+      const score = C.warScore(n, e);
+      const player = e === this.state.playerNationId;
+      // Winning against you: demand land (the provinces the rules allow), after a month of war.
+      if (player && score >= DEMAND_SCORE && days > 30 && this.clockHours - b.lastPeaceOffer >= PEACE_COOLDOWN_H) {
+        const pids = [...C.cession(info, n, e)];
+        if (pids.length) {
+          b.lastPeaceOffer = this.clockHours;
+          this.state.events.emit('peace:demand', { from: n, to: e, provinces: pids, score });
+          continue;
+        }
+      }
       if (!(losing || stalemate || tired)) continue;
       if (this.clockHours - b.lastPeaceOffer < PEACE_COOLDOWN_H) continue;
       b.lastPeaceOffer = this.clockHours;
-      if (e === this.state.playerNationId) {
+      if (player) {
         this.state.events.emit('peace:offer', { from: n, to: e });
       } else if (this.acceptsPeace(e, n)) {
-        // Between computer nations, the side clearly ahead keeps part of its gains.
-        const lead = won - lost;
-        C.makePeace(n, e, { cede: lead >= 2 ? n : lead <= -2 ? e : -1 });
+        // Between computer nations, the side clearly ahead on war score keeps part of its gains.
+        C.makePeace(n, e, { cede: score >= CEDE_SCORE ? n : score <= -CEDE_SCORE ? e : -1 });
       }
     }
     this.doTreaties({ n, P, b });
     this.doCoalition({ n, P });
+    // Days at peace (restlessness, below).
+    b.calm = enemies.length ? 0 : (b.calm ?? 0) + b.every / 24;
     // New wars.
     if (enemies.length >= P.maxWars) return;
     // warChance is per month; minor nations start wars far less often.
@@ -587,23 +616,7 @@ export class AI {
     const perHour = (P.warChance * D.chance * (major ? 1 : 0.3) * restraint * (ERA_WAR_RATE[this.state.map.era?.id] ?? 1)) / 730;
     if (Math.random() > perHour * b.every) return;
     const Dp = this.sim.diplomacy;
-    let best = -1, bs = 0;
-    for (const o of this.neighborsOf(n)) {
-      if (C.atWar(n, o)) continue;
-      const op = Dp?.opinion(n, o).value ?? 0;
-      // Friends are safe; pacts and truces hold, except for a furious aggressor (rarely).
-      if (op >= 25 || Dp?.has(n, o, 'alliance')) continue;
-      const bound = C.truceUntil(n, o) != null || Dp?.has(n, o, 'nap') || Dp?.has(n, o, 'passage');
-      if (bound && !(b.personality === 'aggressive' && op < -60 && Math.random() < 0.15)) continue;
-      const theirs = this.powerOf(o) + 0.5 * C.enemiesOf(o).length; // allies don't exist yet
-      const ratio = me / Math.max(1, theirs);
-      const lost = this.state.provinces.some((p) => p.homeOf === n && p.owner === o);
-      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1);
-      if (ratio < need) continue;
-      // Value: their cities and capital near us; prefer smaller wars.
-      const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1) * (1 + Math.max(0, -op) / 50);
-      if (score > bs) { bs = score; best = o; }
-    }
+    const best = this.warTarget(n, P, b, me);
     if (best >= 0 && (Dp ? Dp.declareWar(n, best) : C.declareWar(n, best))) {
       this.state.events.emit('war:declared', { a: n, b: best, ai: true });
       // Call the allies: AI allies decide at once, the player gets asked.
@@ -653,6 +666,37 @@ export class AI {
     for (const a of Dp.allies(n)) if (Dp.opinion(n, a).value < -10 && Math.random() < 0.3) { Dp.cancel(n, a, 'alliance'); break; }
   }
 
+  /**
+   * The neighbour nation n would attack now (or -1): weak enough by its
+   * personality's ratio (more so if it holds n's land), not a friend, ally or
+   * bound by a truce or pact, ranked by strength ratio and enmity.
+   */
+  warTarget(n, P, b, power) {
+    const C = this.sim.combat, Dp = this.sim.diplomacy, D = this.D;
+    // Restlessness (Fictional World): a long peace lowers the edge a nation wants,
+    // by up to a quarter after a year, so evenly matched worlds still see war.
+    const restless = this.state.map.era?.fictional ? Math.max(0.75, 1 - (b.calm ?? 0) / 1460) : 1;
+    let best = -1, bs = 0;
+    for (const o of this.neighborsOf(n)) {
+      if (C.atWar(n, o)) continue;
+      const op = Dp?.opinion(n, o).value ?? 0;
+      // Friends are safe; pacts and truces hold, except for a furious aggressor (rarely).
+      if (op >= 25 || Dp?.has(n, o, 'alliance')) continue;
+      const bound = C.truceUntil(n, o) != null || Dp?.has(n, o, 'nap') || Dp?.has(n, o, 'passage');
+      if (bound && !(b.personality === 'aggressive' && op < -60 && Math.random() < 0.15)) continue;
+      const theirs = this.powerOf(o) + 0.5 * C.enemiesOf(o).length; // allies don't exist yet
+      const ratio = power / Math.max(1, theirs);
+      const lost = this.state.provinces.some((p) => p.homeOf === n && p.owner === o);
+      // A nuclear (or doomsday) deterrent makes attackers want a bigger edge.
+      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1) * (1 + this.sim.research.fx(o, 'deterrence') / 100) * restless;
+      if (ratio < need) continue;
+      // Value: their cities and capital near us; prefer smaller wars.
+      const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1) * (1 + Math.max(0, -op) / 50);
+      if (score > bs) { bs = score; best = o; }
+    }
+    return best;
+  }
+
   /** Would AI nation `n` accept a white peace from `other`? */
   /**
    * War exhaustion of nation n in its war with `other`: a year of war is 1,
@@ -668,7 +712,44 @@ export class AI {
     const lost = info.unitsLost?.[n] ?? 0;
     let units = 0;
     for (const a of this.sim.armies.list.values()) if (a.nation === n) units += a.units.length;
-    return days / 365 + 1.5 * lost / Math.max(1, lost + units);
+    // A losing war score wears a nation down faster.
+    const score = this.sim.combat.warScore(n, other);
+    return (days / 365 + 1.5 * lost / Math.max(1, lost + units) + Math.max(0, -score) / 150) * (1 - this.sim.research.fx(n, 'zeal') / 100);
+  }
+
+  /**
+   * Chance (0.02–0.98) that computer nation `n` accepts peace from the player
+   * on these terms (pids: provinces the player keeps; none = white peace):
+   * the player's war score minus what the demand costs, n's exhaustion and its
+   * opinion of the player. Shown in the peace window before sending.
+   */
+  peaceChance(n, player, pids = []) {
+    const C = this.sim.combat;
+    const score = C.warScore(player, n);
+    const cost = pids.length ? C.demandCost(n, pids) : 0;
+    const op = this.sim.diplomacy?.opinion(n, player).value ?? 0;
+    const diff = this.difficulty === 'easy' ? 0.1 : this.difficulty === 'hard' ? -0.1 : 0;
+    return Math.max(0.02, Math.min(0.98, 0.5 + (score - cost) / 40 + this.exhaustion(n, player) * 0.35 + op / 250 + diff));
+  }
+
+  /**
+   * The player proposes peace to computer nation n (pids: provinces to keep).
+   * → { ok, chance } or { ok: false, reason }. A refused nation won't talk again for a week.
+   */
+  proposePeace(n, player, pids = []) {
+    const C = this.sim.combat;
+    const info = C.warInfo.get(n < player ? `${n}:${player}` : `${player}:${n}`);
+    if (!info) return { ok: false, reason: 'You are not at war with them.' };
+    if (pids.length) { const v = C.validTerms(player, n, pids); if (!v.ok) return v; }
+    const now = this.state.clock.time;
+    if (info.peaceRefusedAt != null && now - info.peaceRefusedAt < 7 * 864e5) return { ok: false, reason: 'They refused a week ago and won\'t talk again yet.' };
+    const chance = this.peaceChance(n, player, pids);
+    if (Math.random() < chance) {
+      C.makePeace(n, player, pids.length ? { cede: player, keep: pids } : {});
+      return { ok: true, chance };
+    }
+    info.peaceRefusedAt = now;
+    return { ok: false, chance, reason: `${this.state.getNation(n).shortName} refuses.` };
   }
 
   /**

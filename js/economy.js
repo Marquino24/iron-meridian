@@ -14,11 +14,14 @@ export const CAPITAL_LOST_FACTOR = 0.5;
 
 const zero = (keys) => Object.fromEntries(keys.map((k) => [k, 0]));
 
-/** Share of its output a conquered province gives its new owner (unrest, partisans, a hostile population). */
+/** Share of its output a newly conquered province gives its new owner (unrest, a hostile population). */
 export const CONQUERED_YIELD = 0.45;
 
-/** Output factor of province `p` for `nation`: its own land 1, land taken from another nation CONQUERED_YIELD. */
-export const heldYield = (p, nation) => (p.homeOf != null && p.homeOf >= 0 && p.homeOf !== nation ? CONQUERED_YIELD : 1);
+/**
+ * Output factor of province `p` for `nation`: its own land 1; land taken from
+ * another nation gives its integration (CONQUERED_YIELD rising to 1, integration.js).
+ */
+export const heldYield = (p, nation) => (p.homeOf != null && p.homeOf >= 0 && p.homeOf !== nation ? (p.integ ?? CONQUERED_YIELD) : 1);
 
 export class Economy {
   constructor(state) {
@@ -37,6 +40,8 @@ export class Economy {
     // Multiplied totals per nation, cached until something changes them.
     this.totalsCache = new Map();
     state.events.on('research', (e) => { if (e.done) this.totalsCache.delete(e.nation); });
+    // Cyber warfare (modern era) hits the money of whoever is at war with its owner.
+    state.events.on('war', ({ a, b }) => { this.totalsCache.delete(a); this.totalsCache.delete(b); });
   }
 
   get keys() { return this.set.keys; }
@@ -85,6 +90,7 @@ export class Economy {
     this.totalsCache.clear();
     const keys = this.keys;
     this.pyield = [];
+    this.pheld = [];
     this.tally = this.state.nations.map(() => ({ land: 0, cities: 0, capitals: 0, base: zero(keys), built: zero(keys), roads: zero(keys), raw: zero(keys) }));
     for (const p of this.state.provinces) {
       const y = this.provinceYield(p);
@@ -97,8 +103,11 @@ export class Economy {
     const t = this.tally[nation];
     if (!t) return;
     if (p.isCapital) t.capitals += sign; else if (p.isCity) t.cities += sign; else t.land += sign;
-    // Overextension: conquered land (another nation's at the start) is restless and yields less.
-    const f = sign * heldYield(p, nation);
+    // Overextension: conquered land yields its integration share. The factor used is
+    // remembered, so the same amount comes off again when it changes (refreshProvince).
+    const h = sign > 0 ? heldYield(p, nation) : this.pheld[p.id] ?? heldYield(p, nation);
+    if (sign > 0) this.pheld[p.id] = h;
+    const f = sign * h;
     for (const k of this.keys) {
       const b = y.base[k] ?? 0, e = y.built[k] ?? 0;
       t.base[k] += b * f;
@@ -152,6 +161,8 @@ export class Economy {
         tech[k] = total[k] * (m - 1);
         total[k] *= m;
       }
+      const cyber = this.cyberHit(nationId);
+      if (cyber && keys.includes('money')) { tech.money -= total.money * cyber; total.money *= 1 - cyber; }
       // Synthetic production (e.g. fuel from steel).
       for (const e of this.research.effects(nationId).synth) {
         if (!keys.includes(e.to) || !keys.includes(e.synth)) continue;
@@ -161,6 +172,15 @@ export class Economy {
       }
     }
     return { total, tech };
+  }
+
+  /** Share of money lost to enemies' cyber warfare (the strongest one at war with this nation). */
+  cyberHit(nationId) {
+    const C = this.research?.armies?.combat;
+    if (!C) return 0;
+    let worst = 0;
+    for (const e of C.enemiesOf(nationId)) worst = Math.max(worst, this.research.fx(e, 'cyber'));
+    return worst / 100;
   }
 
   capitalLost(nationId) {

@@ -16,7 +16,9 @@ import { AI } from '../js/ai.js';
 import { Diplomacy } from '../js/diplomacy.js';
 import { Victory } from '../js/victory.js';
 import { Sandbox } from '../js/sandbox.js';
-import { snapshot, restore, pack, unpack, exportText, importBytes } from '../js/save.js';
+import { Integration } from '../js/integration.js';
+import { snapshot, restore, pack, unpack, exportText, importBytes, encode, decode } from '../js/save.js';
+import { legacyMap } from '../js/tech.js';
 
 const args = process.argv.slice(2);
 const eraId = args.find((a) => /^[a-z]+\d*$/.test(a) && !/^\d+$/.test(a)) ?? 'ww2';
@@ -43,6 +45,7 @@ function makeGame() {
   armies.diplomacy = sim.diplomacy;
   sim.victory = new Victory(state, sim);
   sim.sandbox = new Sandbox(state, sim);
+  sim.integration = new Integration(state, sim);
   sim.ai.budgetMs = Infinity;
   const map = era.fictional ? Object.assign(generateMap('SAVE-TEST'), { era }) : buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era);
   state.loadMap(map);
@@ -53,7 +56,7 @@ function run(g, hours) {
   const { state, sim } = g;
   for (let h = 0; h < hours; h++) {
     state.clock.time += 3600e3;
-    for (const s of ['economy', 'research', 'buildings', 'armies', 'combat', 'ai', 'victory']) sim[s].update(state, 1);
+    for (const s of ['economy', 'research', 'buildings', 'armies', 'combat', 'integration', 'ai', 'victory']) sim[s].update(state, 1);
   }
 }
 
@@ -147,5 +150,35 @@ for (at = 0; at < 24 * 30 && same; at += 6) {
   if (!same) console.log(`     first difference after ${at + 6} hours:\n     ${diff(a.state, b.state).join('\n     ')}`);
 }
 check(same, 'original and loaded game stay identical 30 days on');
+
+// --- A save from before step 10 (version 1, the old shared tech tree) loads. ---
+{
+  const old = structuredClone(s1);
+  const d = decode(old.state);
+  const R = A.sim.research, back = Object.fromEntries(Object.entries(legacyMap(era.id, R.tree)).filter(([, v]) => v).map(([o, v]) => [v, o]));
+  // Old ids for what the old tree had; the player also had i7 done (maps or refunds) and m5 in progress.
+  for (const [n, r] of d.research) {
+    r.done = new Set([...r.done].map((t) => back[t]).filter(Boolean));
+    r.active = []; r.queue = [];
+    if (n === me) { r.done.add('m1'); r.done.add('e2'); r.done.add('i7'); r.active = [{ id: 'm5', done: 50, total: 540 }]; r.queue = ['m8']; }
+  }
+  delete d.integ; delete d.integration;
+  old.version = 1;
+  old.state = encode(d);
+  const Cg = makeGame();
+  const feed = [];
+  Cg.state.events.on('feed', (e) => feed.push(e.text));
+  const money0 = d.economy.stock[me].money;
+  let err = null;
+  try { restore(Cg, await unpack(await pack(old))); } catch (e) { err = e; }
+  const m = Cg.sim.research.migration;
+  const r = Cg.sim.research.of(me);
+  check(!err && m && m.of[me]?.mapped >= 2 && r.done.size >= 2 && !r.active.length && !r.queue.length, `version-1 save loads: ${m ? `${m.nations} nations moved, ${m.mapped} techs carried over, ${m.refunded} refunded, ${m.dropped} queued dropped` : err?.message}`);
+  check(Cg.sim.economy.get(me).money >= money0 + 1500, `research in progress refunded (money ${Math.round(money0)} → ${Math.round(Cg.sim.economy.get(me).money)})`);
+  check(feed.some((t) => /research moved/.test(t)), `player told: "${feed.find((t) => /research moved/.test(t))}"`);
+  let runErr = null;
+  try { run(Cg, 24 * 10); } catch (e) { runErr = e; }
+  check(!runErr && snapshot(Cg).version === 2, `migrated game runs 10 days and saves as version 2${runErr ? `: ${runErr.message}` : ''}`);
+}
 console.log(failures ? `${failures} failure(s)` : 'all save checks passed');
 process.exit(failures ? 1 : 0);

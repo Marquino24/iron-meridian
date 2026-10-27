@@ -3,7 +3,7 @@
 // months, as in step 5). New wars (a nation choosing to attack) are counted apart
 // from allies and coalitions joining one.
 //   node tools/balance.mjs [fictional|history|all] [--seeds=12] [--months=12] [--check]
-// --check exits 1 if a target is missed: fictional ≤ 25% after a year on every
+// --check exits 1 if a target is missed: fictional ≤ 30% after a year (step 10 target) on every
 // seed, historical 4–16 wars and ≤ 15% share.
 import { simulate } from './sim-ai.mjs';
 import { ERAS, getEra } from '../js/eras.js';
@@ -57,10 +57,10 @@ if (what === 'fictional' || what === 'all') {
     Math.random = realRandom;
     const { r, now } = worst;
     rows.push(now.share);
-    // ~25%: at most 25%, or barely above where the largest nation started (some seeds start at 26–29%).
-    const ok = now.share <= Math.max(0.25, startMax + 0.01) + 1e-9;
+    // Step 10 target: under ~30% after a year on every seed.
+    const ok = now.share <= Math.max(0.30, startMax + 0.01) + 1e-9;
     if (check && !ok) failures++;
-    console.log(`${seed.padEnd(11)} ${pct(now.share).padStart(6)} ${now.name.padEnd(12)} ${pct(r.maxShare).padStart(6)} ${String(r.maxShareNation).padEnd(12)} ${String(r.events.wars.length).padStart(4)}  ${String(r.events.conquered.length).padStart(5)}  start ${pct(startMax)}  runs: ${shares.map(pct).join(' ')}${ok ? '' : '   ← over 25%'}`);
+    console.log(`${seed.padEnd(11)} ${pct(now.share).padStart(6)} ${now.name.padEnd(12)} ${pct(r.maxShare).padStart(6)} ${String(r.maxShareNation).padEnd(12)} ${String(r.events.wars.length).padStart(4)}  ${String(r.events.conquered.length).padStart(5)}  start ${pct(startMax)}  runs: ${shares.map(pct).join(' ')}${ok ? '' : '   ← over 30%'}`);
   }
   console.log(`worst-run max ${pct(Math.max(...rows))}, median ${pct([...rows].sort((a, b) => a - b)[rows.length >> 1])}`);
   console.log(`all ${totals.runs} runs: ${(totals.wars / totals.runs).toFixed(1)} wars, ${(totals.peace / totals.runs).toFixed(1)} peace deals, ${(totals.conquered / totals.runs).toFixed(2)} nations conquered per year; ${totals.quiet} runs without a war; biggest growth of a nation +${totals.growth} provinces\n`);

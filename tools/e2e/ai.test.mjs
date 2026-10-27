@@ -92,9 +92,12 @@ const soviet = await IM(() => {
 });
 await page.waitForTimeout(400);
 await page.click('#province-panel [data-cmd="offer-peace"]');
+await page.waitForSelector('#peace-window:not([hidden]) .peace-card');
+await page.click('#peace-window [data-peace="send"]');
 await page.waitForTimeout(300);
-const toast = await page.textContent('#toast');
-check(/accepts|refuses/.test(toast), `offer peace answered: "${toast}"`);
+const answer = await IM(() => (document.getElementById('peace-window').hidden ? document.getElementById('toast').textContent : document.querySelector('#peace-window .peace-msg').textContent));
+check(/accepts|refus|won't|not/i.test(answer), `offer peace answered: "${answer}"`);
+await IM(() => window.ironMeridian.peaceUI.close());
 await shot(page, '3-nation-panel');
 await IM((n) => { window.ironMeridian.sim.combat.makePeace(window.ironMeridian.state.playerNationId, n); window.ironMeridian.state.setSelected(-1); }, soviet);
 

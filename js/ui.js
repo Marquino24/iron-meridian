@@ -103,7 +103,7 @@ export class UI {
     ev.on('map:loaded', () => this.onMapLoaded());
     ev.on('phase', (phase) => this.onPhase(phase));
     ev.on('player', () => this.renderPlayer());
-    for (const e of ['select', 'select:army', 'province:owner', 'war']) ev.on(e, () => this.renderProvincePanel());
+    for (const e of ['select', 'select:army', 'province:owner', 'war', 'integration']) ev.on(e, () => this.renderProvincePanel());
     ev.on('hover', (id) => this.renderHoverStatus(id));
     ev.on('clock:speed', () => this.renderSpeed());
   }
@@ -410,6 +410,7 @@ export class UI {
         <dt>OWNER</dt>
         <dd class="owner">${ownerHtml}</dd>
         ${colony ? `<dt>COLONY</dt><dd>${escapeHtml(colony.name.toUpperCase())}</dd>` : ""}
+        ${this.integrationRow(p)}
         <dt>TERRAIN</dt>
         <dd><span class="terrain-chip t-${terrain.id}"></span>${terrain.label.toUpperCase()}</dd>
         <dt>CITY</dt>
@@ -428,6 +429,17 @@ export class UI {
       <ul class="neighbor-list">${neighbors || '<li class="empty">None — island province</li>'}</ul>`;
     if (owner) el.panel.querySelector('.flag-slot').replaceWith(flagCanvas(provinceFlag(map, p), 24, 16));
     this.command?.markRendered();
+  }
+
+  /** Conquered land: how far it has settled in, when it's done, and unrest. */
+  integrationRow(p) {
+    const I = this.command?.sim.integration;
+    if (!I || p.owner < 0 || p.homeOf == null || p.homeOf < 0 || p.homeOf === p.owner) return '';
+    const lvl = I.level(p), days = I.daysLeft(p);
+    const was = this.state.getNation(p.homeOf);
+    const unrest = I.restless(p) ? '<span class="tag red">UNREST: STATION TROOPS</span>' : '';
+    return `<dt>INTEGRATION</dt><dd class="integ"><span class="integ-bar"><i style="width:${Math.round(lvl * 100)}%"></i></span>${Math.round(lvl * 100)}%${days ? ` · full in ${days} d` : ''}${unrest}</dd>
+      <dt>TAKEN FROM</dt><dd>${escapeHtml((was?.name ?? '—').toUpperCase())}</dd>`;
   }
 
   // --- Status bar & per-frame ------------------------------------------------

@@ -169,8 +169,19 @@ export class Armies {
     if (seaA !== seaB) return km / this.speedOf(army, true) + EMBARK_HOURS;
     const pa = this.state.map.provinces[a], pb = this.state.map.provinces[b];
     const road = (id) => this.buildings?.roadsMove(id) ?? 1;
-    const cost = (TERRAIN[pa.terrain].moveCost * road(a) + TERRAIN[pb.terrain].moveCost * road(b)) / 2;
-    return (km * cost) / this.speedOf(army, false);
+    const R = this.research, n = army.nation, fx = (k, who = n) => R?.fx(who, k) ?? 0;
+    // Air assault (Cold War): rough terrain slows less.
+    const air = fx('airmobile') / 100;
+    const terr = (p) => { const c = TERRAIN[p.terrain].moveCost; return c > 1 ? 1 + (c - 1) * (1 - air) : c; };
+    const cost = (terr(pa) * road(a) + terr(pb) * road(b)) / 2;
+    let h = (km * cost) / this.speedOf(army, false);
+    // Era signatures: Roman roads, strategic railways, blitzkrieg, air interdiction.
+    if (fx('roadSpeed') && (this.buildings?.level(a, 'roads') || this.buildings?.level(b, 'roads'))) h /= 1 + fx('roadSpeed') / 100;
+    if (fx('railMob') && pa.owner === n && pb.owner === n) h /= 1 + fx('railMob') / 100;
+    const hostile = pb.owner >= 0 && pb.owner !== n && this.combat?.atWar(n, pb.owner);
+    if (hostile && fx('blitz')) h /= 1 + fx('blitz') / 100;
+    if (hostile && fx('interdict', pb.owner)) h *= 1 + fx('interdict', pb.owner) / 100;
+    return h;
   }
 
   /**
@@ -613,7 +624,7 @@ export class Armies {
       if (army.seg || army.kind !== 'land' || this.isSea(army.node) || this.combat?.inBattle(army)) continue;
       const p = this.province(army.node);
       if (p.owner !== army.nation) continue;
-      const rate = (p.isCity ? 0.03 : 0.01) * hours;
+      const rate = (p.isCity ? 0.03 : 0.01) * hours * (1 + (this.research?.fx(army.nation, 'heal') ?? 0) / 100);
       for (const u of army.units) {
         const max = this.unitType(u).hp;
         if (u.hp < max) u.hp = Math.min(max, u.hp + max * rate);

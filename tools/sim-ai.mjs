@@ -15,6 +15,7 @@ import { Research } from '../js/research.js';
 import { AI } from '../js/ai.js';
 import { Diplomacy } from '../js/diplomacy.js';
 import { Victory } from '../js/victory.js';
+import { Integration } from '../js/integration.js';
 
 const args = process.argv.slice(2);
 const months = Number(args.find((a) => /^\d+$/.test(a)) ?? 6);
@@ -40,6 +41,8 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   armies.diplomacy = diplomacy;
   const victory = new Victory(state, sim);
   sim.victory = victory;
+  const integration = new Integration(state, sim);
+  sim.integration = integration;
   ai.budgetMs = Infinity;
   const map = era.fictional ? Object.assign(generateMap(process.env.SEED ?? 'SIM-0001'), { era }) : buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era);
   state.loadMap(map);
@@ -76,7 +79,7 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   for (let h = 0; h < hours; h++) {
     state.clock.time += 3600e3;
     economy.update(state, 1); research.update(state, 1); buildings.update(state, 1);
-    armies.update(state, 1); combat.update(state, 1); ai.update(state, 1);
+    armies.update(state, 1); combat.update(state, 1); integration.update(state, 1); ai.update(state, 1);
     if (h % 24 === 0) {
       victory.refresh();
       const lead = victory.scores[0];
@@ -92,7 +95,7 @@ export function simulate(era, { months = 6, difficulty = 'normal', quiet = false
   const ms = performance.now() - t0;
   const end = map.nations.map((n) => state.provincesOf(n.id).length);
   const delta = map.nations.map((n, i) => ({ n, start: start[i], end: end[i], d: end[i] - start[i] })).filter((r) => r.start || r.end);
-  return { state, ai, events, delta, maxShare, maxShareNation, ms, hours, vp, units: [...armies.list.values()].reduce((s, a) => s + a.units.length, 0) };
+  return { state, ai, integration, events, delta, maxShare, maxShareNation, ms, hours, vp, units: [...armies.list.values()].reduce((s, a) => s + a.units.length, 0) };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

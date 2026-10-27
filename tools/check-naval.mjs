@@ -13,6 +13,7 @@ import { Buildings } from '../js/buildings.js';
 import { Research } from '../js/research.js';
 import { AI } from '../js/ai.js';
 import { Diplomacy } from '../js/diplomacy.js';
+import { Integration } from '../js/integration.js';
 
 const months = Number(process.argv[2] ?? 6);
 const RUNS = Number(process.argv.find((a) => a.startsWith('--runs='))?.split('=')[1] ?? 1);
@@ -48,6 +49,8 @@ for (let run = 0; run < RUNS; run++) for (const [eraId, atk, def] of CASES) {
   sim.ai = ai;
   sim.diplomacy = new Diplomacy(state, sim);
   armies.diplomacy = sim.diplomacy;
+  const integration = new Integration(state, sim);
+  sim.integration = integration;
   ai.budgetMs = Infinity;
   state.loadMap(buildWorldMap(JSON.parse(readFileSync(new URL(`../data/eras/${era.id}.json`, import.meta.url))), era));
   state.playerNationId = -1;
@@ -73,7 +76,7 @@ for (let run = 0; run < RUNS; run++) for (const [eraId, atk, def] of CASES) {
   const before = state.provinces.filter((p) => p.owner === D).length;
   for (let h = 0; h < months * 730; h++) {
     state.clock.time += 3600e3;
-    for (const s of [economy, research, buildings, armies, combat, ai]) s.update(state, 1);
+    for (const s of [economy, research, buildings, armies, combat, integration, ai]) s.update(state, 1);
     // Keep the attacker's war going (the defender may sue for peace).
     if (h % 24 === 0 && !combat.atWar(A, D) && combat.truceUntil(A, D) == null) sim.diplomacy.declareWar(A, D);
   }

@@ -1459,6 +1459,10 @@ body:not([data-screen="era"]):not([data-screen="nation"]):not([data-screen="sett
 .tech.st-done { border-color: rgba(127, 220, 143, 0.6); background: rgba(40, 70, 46, 0.55); }
 .tech.st-done .tech-ico { color: var(--green); }
 .tech.sel { outline: 2px solid #f0ead8; outline-offset: 1px; z-index: 2; }
+/* Era signature techs: a gold corner and a starred effect line. */
+.tech.sig { background-image: linear-gradient(135deg, rgba(255, 196, 71, 0.22) 0 14px, transparent 14px); }
+.tech.sig .tech-name::before { content: '★ '; color: var(--accent); }
+.tech.sig .tech-fx { color: var(--accent); }
 .tech:hover { filter: brightness(1.15); }
 
 .tech-detail { position: sticky; bottom: 0; margin: 10px -16px 0; padding: 10px 16px 12px; background: rgba(6, 10, 13, 0.97); border-top: 1px solid var(--line-strong); }
@@ -2284,3 +2288,45 @@ body[data-mode="sandbox"] .victory-row { display: none; }
 }
 /* Mid widths: the command bar spans the screen, so the province panel ends above it. */
 @media (min-width: 761px) and (max-width: 1100px) { .panel { bottom: calc(var(--status-h) + var(--safe-bottom) + 100px); } }
+
+/* ---- Step 10: peace window -------------------------------------------------------------- */
+.peace-window { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(2, 5, 8, 0.6); padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left)); }
+.peace-window[hidden] { display: none; }
+.peace-card { width: min(560px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; background: var(--panel-solid); border: 1px solid var(--line-strong); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); color: var(--text); }
+.peace-head { display: flex; align-items: center; gap: 10px; }
+.peace-head h2 { margin: 2px 0 0; font-size: 22px; }
+.peace-head > div { flex: 1; min-width: 0; }
+.peace-head .pf { width: 36px; height: 24px; }
+.peace-vs { font-family: var(--font-mono); font-size: max(10px, var(--min-text)); color: var(--text-dim); }
+.peace-score { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: center; }
+.ps-total { display: flex; flex-direction: column; align-items: center; min-width: 76px; }
+.ps-total b { font-size: 32px; line-height: 1; }
+.ps-total.pos b { color: var(--green); } .ps-total.neg b { color: var(--red); }
+.ps-total small, .peace-chance small, .ps-parts small { color: var(--text-dim); font-size: 12px; }
+.ps-bar { position: relative; height: 10px; background: rgba(255, 255, 255, 0.08); border-radius: 5px; }
+.ps-bar i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.ps-bar i.pos { background: var(--green); } .ps-bar i.neg { background: var(--red); }
+.ps-bar span { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--text-dim); }
+.ps-parts { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 14px; }
+.ps-parts dt { color: var(--text-dim); }
+.ps-parts dd { margin: 0; }
+.peace-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow: auto; }
+.peace-list li { display: flex; align-items: center; gap: 8px; }
+.peace-prov { flex: 1; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); cursor: pointer; }
+.peace-prov:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.peace-prov input { width: 18px; height: 18px; }
+.pp-name { flex: 1; font-weight: 700; }
+.pp-kind { color: var(--text-dim); font-size: 12px; }
+.pp-cost { font-family: var(--font-mono); color: var(--red); }
+.peace-rule, .peace-terms .hint { color: var(--text-dim); font-size: 12px; margin: 6px 0 0; }
+.peace-chance { display: flex; align-items: baseline; gap: 10px; }
+.peace-chance b { font-size: 28px; }
+.peace-chance.good b { color: var(--green); } .peace-chance.mid b { color: var(--accent); } .peace-chance.bad b { color: var(--red); }
+.peace-msg { min-height: 1em; margin: 4px 0; color: #ffc9a8; }
+.peace-foot .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 760px) { .peace-window { padding: var(--safe-top) 0 var(--safe-bottom); place-items: stretch; } .peace-card { width: 100%; height: 100%; } }
+@media (pointer: coarse) { .peace-prov { min-height: 44px; } }
+/* Integration in the province panel. */
+dd.integ { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.integ-bar { width: 70px; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; }
+.integ-bar i { display: block; height: 100%; background: var(--accent); }
