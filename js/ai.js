@@ -56,7 +56,7 @@ const ERA_PERSONALITY = {
   coldwar: { 'Soviet Union': 'expansionist', 'United States': 'balanced' },
 };
 /** How warlike each era is overall (the 20th-century world wars more, the nuclear age less). */
-const ERA_WAR_RATE = { rome: 1, medieval: 1, ww1: 1.2, ww2: 1.2, coldwar: 0.6, modern: 0.4, fictional: 2 };
+const ERA_WAR_RATE = { rome: 1.4, medieval: 1, ww1: 1.2, ww2: 1.2, coldwar: 0.6, modern: 0.4, fictional: 2 };
 const RANDOM_MIX = [['aggressive', 0.15], ['balanced', 0.4], ['defensive', 0.35], ['expansionist', 0.1]];
 
 const MIN_ATTACK_UNITS = 3;
@@ -605,6 +605,8 @@ export class AI {
     }
     this.doTreaties({ n, P, b });
     this.doCoalition({ n, P });
+    // Days at peace (restlessness, below).
+    b.calm = enemies.length ? 0 : (b.calm ?? 0) + b.every / 24;
     // New wars.
     if (enemies.length >= P.maxWars) return;
     // warChance is per month; minor nations start wars far less often.
@@ -671,6 +673,9 @@ export class AI {
    */
   warTarget(n, P, b, power) {
     const C = this.sim.combat, Dp = this.sim.diplomacy, D = this.D;
+    // Restlessness (Fictional World): a long peace lowers the edge a nation wants,
+    // by up to a quarter after a year, so evenly matched worlds still see war.
+    const restless = this.state.map.era?.fictional ? Math.max(0.75, 1 - (b.calm ?? 0) / 1460) : 1;
     let best = -1, bs = 0;
     for (const o of this.neighborsOf(n)) {
       if (C.atWar(n, o)) continue;
@@ -683,7 +688,7 @@ export class AI {
       const ratio = power / Math.max(1, theirs);
       const lost = this.state.provinces.some((p) => p.homeOf === n && p.owner === o);
       // A nuclear (or doomsday) deterrent makes attackers want a bigger edge.
-      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1) * (1 + this.sim.research.fx(o, 'deterrence') / 100);
+      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1) * (1 + this.sim.research.fx(o, 'deterrence') / 100) * restless;
       if (ratio < need) continue;
       // Value: their cities and capital near us; prefer smaller wars.
       const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1) * (1 + Math.max(0, -op) / 50);
