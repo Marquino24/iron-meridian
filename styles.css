@@ -1459,6 +1459,10 @@ body:not([data-screen="era"]):not([data-screen="nation"]):not([data-screen="sett
 .tech.st-done { border-color: rgba(127, 220, 143, 0.6); background: rgba(40, 70, 46, 0.55); }
 .tech.st-done .tech-ico { color: var(--green); }
 .tech.sel { outline: 2px solid #f0ead8; outline-offset: 1px; z-index: 2; }
+/* Era signature techs: a gold corner and a starred effect line. */
+.tech.sig { background-image: linear-gradient(135deg, rgba(255, 196, 71, 0.22) 0 14px, transparent 14px); }
+.tech.sig .tech-name::before { content: '★ '; color: var(--accent); }
+.tech.sig .tech-fx { color: var(--accent); }
 .tech:hover { filter: brightness(1.15); }
 
 .tech-detail { position: sticky; bottom: 0; margin: 10px -16px 0; padding: 10px 16px 12px; background: rgba(6, 10, 13, 0.97); border-top: 1px solid var(--line-strong); }

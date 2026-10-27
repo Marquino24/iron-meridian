@@ -13,7 +13,7 @@
  * a slot is free.
  */
 
-import { techTree } from './tech.js';
+import { techTree, legacyMap, LEGACY, LEGACY_COST, SIGNATURES } from './tech.js';
 import { resourceSet } from './resources.js';
 
 export const BASE_SLOTS = 1;
@@ -41,6 +41,7 @@ export class Research {
     const era = this.state.map?.era?.id ?? 'modern';
     this.tree = techTree(era, resourceSet(era).keys);
     this.byId = Object.fromEntries(this.tree.map((t) => [t.id, t]));
+    this.era = era;
     this.nations = new Map(); // nation → { done, active: [{ id, done, total }], fx }
   }
 
@@ -217,7 +218,8 @@ export class Research {
         else if (e.synth) add(`synth:${e.to}`, e.synth, e.pct, t.name); // label = source resource
         else if (e.attack) add(`attack:${e.attack}`, e.attack, e.pct, t.name);
         else if (e.slots) add('slots', 'slots', e.slots, t.name);
-        else for (const k of ['move', 'defense', 'buildTime', 'buildCost', 'trainTime']) if (e[k]) add(k, k, e[k], t.name);
+        else if (['move', 'defense', 'buildTime', 'buildCost', 'trainTime'].some((k) => e[k])) { for (const k of ['move', 'defense', 'buildTime', 'buildCost', 'trainTime']) if (e[k]) add(k, k, e[k], t.name); }
+        else for (const [k, v] of Object.entries(e)) add(k, k, v, t.name); // integration and era signatures
       }
     }
     return [...rows.values()];
@@ -230,6 +232,50 @@ export class Research {
       buildingName: (k) => this.buildings?.name(k) ?? k,
       label: (k) => this.economy.label(k),
     });
+  }
+
+  /**
+   * Old saves (before step 10) name techs of the shared 28-tech skeleton
+   * (m1…i9). Each finished one becomes the new tech with the same effect
+   * (with that tech's requirements, so the tree stays whole); one with no
+   * match is refunded at its old cost, as is research that was in progress.
+   * Old queue entries are dropped. Returns what happened, per nation and in total.
+   */
+  migrate() {
+    const map = legacyMap(this.era, this.tree);
+    const tierOf = Object.fromEntries(LEGACY.map((t) => [t.id, t.tier]));
+    const keys = new Set(this.economy.keys ?? Object.keys(LEGACY_COST[3]));
+    const total = { nations: 0, mapped: 0, refunded: 0, dropped: 0, money: 0, of: {} };
+    const mine = (nation) => (total.of[nation] ??= { mapped: 0, refunded: 0, dropped: 0, techs: 0 });
+    const refund = (nation, oldId) => {
+      mine(nation).refunded++;
+      const cost = {};
+      for (const [k, v] of Object.entries(LEGACY_COST[tierOf[oldId]] ?? {})) if (keys.has(k)) cost[k] = v;
+      this.economy.spend(nation, cost, -1);
+      total.refunded++;
+      total.money += cost.money ?? 0;
+    };
+    for (const [nation, r] of this.nations) {
+      const old = [...r.done].filter((id) => !this.byId[id]);
+      const oldActive = r.active.filter((a) => !this.byId[a.id]);
+      const oldQueue = r.queue.filter((id) => !this.byId[id]);
+      if (!old.length && !oldActive.length && !oldQueue.length) continue;
+      total.nations++;
+      const done = new Set([...r.done].filter((id) => this.byId[id]));
+      const give = (id) => { if (done.has(id)) return; done.add(id); for (const q of this.byId[id].req) give(q); };
+      for (const id of old) {
+        if (map[id]) { give(map[id]); total.mapped++; mine(nation).mapped++; } else if (id in tierOf) refund(nation, id);
+      }
+      for (const a of oldActive) if (a.id in tierOf) refund(nation, a.id);
+      total.dropped += oldQueue.length;
+      mine(nation).dropped += oldQueue.length;
+      mine(nation).techs = done.size;
+      r.done = done;
+      r.active = r.active.filter((a) => this.byId[a.id]);
+      r.queue = r.queue.filter((id) => this.byId[id]);
+      r.fx = null;
+    }
+    return total;
   }
 
   /** Mark a tech done without paying (tests, scenarios). */
@@ -245,8 +291,9 @@ export class Research {
   update(state, hours) {
     if (!hours || state.phase !== 'playing') return;
     for (const [nation, r] of this.nations) {
+      const speed = 1 + this.fx(nation, 'researchSpeed') / 100;
       for (const a of [...r.active]) {
-        a.done += hours;
+        a.done += hours * speed;
         if (a.done < a.total) continue;
         this.grant(nation, a.id);
         if (nation === state.playerNationId) {
@@ -279,6 +326,9 @@ export function describeEffects(effects, ctx = {}) {
     if (e.trainTime) return `Recruitment ${e.trainTime}% faster`;
     if (e.slots) return `+${e.slots} research slot`;
     if (e.synth) return `Synthetic ${label(e.to).toLowerCase()}: +${e.pct}% of your ${label(e.synth).toLowerCase()} output`;
+    if (e.integration) return `Conquered land integrates ${e.integration}% faster`;
+    const [k, v] = Object.entries(e)[0] ?? [];
+    if (SIGNATURES[k]) return `★ ${SIGNATURES[k](v)}`;
     return '';
   }).filter(Boolean);
 }

@@ -40,6 +40,8 @@ export class Economy {
     // Multiplied totals per nation, cached until something changes them.
     this.totalsCache = new Map();
     state.events.on('research', (e) => { if (e.done) this.totalsCache.delete(e.nation); });
+    // Cyber warfare (modern era) hits the money of whoever is at war with its owner.
+    state.events.on('war', ({ a, b }) => { this.totalsCache.delete(a); this.totalsCache.delete(b); });
   }
 
   get keys() { return this.set.keys; }
@@ -159,6 +161,8 @@ export class Economy {
         tech[k] = total[k] * (m - 1);
         total[k] *= m;
       }
+      const cyber = this.cyberHit(nationId);
+      if (cyber && keys.includes('money')) { tech.money -= total.money * cyber; total.money *= 1 - cyber; }
       // Synthetic production (e.g. fuel from steel).
       for (const e of this.research.effects(nationId).synth) {
         if (!keys.includes(e.to) || !keys.includes(e.synth)) continue;
@@ -168,6 +172,15 @@ export class Economy {
       }
     }
     return { total, tech };
+  }
+
+  /** Share of money lost to enemies' cyber warfare (the strongest one at war with this nation). */
+  cyberHit(nationId) {
+    const C = this.research?.armies?.combat;
+    if (!C) return 0;
+    let worst = 0;
+    for (const e of C.enemiesOf(nationId)) worst = Math.max(worst, this.research.fx(e, 'cyber'));
+    return worst / 100;
   }
 
   capitalLost(nationId) {

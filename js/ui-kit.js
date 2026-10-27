@@ -24,7 +24,7 @@ export function fmtNum(v) {
   return n.toLocaleString('en-US');
 }
 
-export const ROMAN = ['0', 'I', 'II', 'III'];
+export const ROMAN = ['0', 'I', 'II', 'III', 'IV'];
 export const ROLE_LABEL = { inf: 'Infantry', mob: 'Mobile', rng: 'Ranged', nav: 'Naval' };
 /** Unit-role pictures for the current era (inline SVG), read like a map: ROLE_GLYPH.inf. */
 export const ROLE_GLYPH = new Proxy({}, { get: (_, role) => roleIcon(role) });

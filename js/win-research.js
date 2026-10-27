@@ -3,8 +3,8 @@
  *
  * Top: research slots (progress, time left) and the queue (up to 5; the
  * next one starts by itself when a slot frees up).
- * Tree tab: three bands (Military, Economy, Infrastructure) × three tier
- * columns, with lines from each requirement to the techs it opens. A tech is
+ * Tree tab: three bands (Military, Economy, Infrastructure) × one column per
+ * tier (three or four, depending on the era), signature techs starred, with lines from each requirement to the techs it opens. A tech is
  * locked, available, researching (progress bar + time left) or done. Tap one
  * for its cost, time, requirements and exact effects; research it now, queue
  * it, or cancel it.
@@ -12,10 +12,19 @@
  */
 
 import { esc, fmtHours, costHtml, bar, ROMAN } from './ui-kit.js';
-import { BRANCHES } from './tech.js';
+import { BRANCHES, SIGNATURES } from './tech.js';
 import { QUEUE_MAX } from './research.js';
 
 const COL_W = 196, CARD_W = 172, CARD_H = 58, ROW_H = 68, BAND_HEAD = 26, BAND_GAP = 14, PAD = 10;
+/** Card labels for the era signatures (the full text is in the detail panel). */
+const SIGNATURE_SHORT = {
+  testudo: 'testudo', roadSpeed: 'faster on roads', heal: 'faster healing', noRevolt: 'no revolts',
+  fortStrength: 'stronger forts', levies: 'feudal levies', siege: 'faster sieges', zeal: 'less exhaustion',
+  entrench: 'entrenchment', gas: 'gas attacks', recon: 'first-day strike', railMob: 'rail movement',
+  radar: 'coastal radar', carriers: 'carrier escort', blitz: 'blitzkrieg', airmobile: 'air assault',
+  interdict: 'interdiction', deterrence: 'deterrence', drones: 'drone defense', precision: 'precision',
+  cyber: 'cyber attacks', researchSpeed: 'faster research',
+};
 const STATUS_LABEL = { done: 'Researched', active: 'Researching', available: 'Available', locked: 'Locked' };
 const STATUS_ICON = { done: '✓', active: '◔', available: '◇', locked: '🔒' };
 
@@ -51,6 +60,9 @@ export class ResearchWindow {
     if (e.buildCost) return `build −${e.buildCost}% cost`;
     if (e.trainTime) return `train −${e.trainTime}% time`;
     if (e.slots) return '+1 research slot';
+    if (e.integration) return `integration +${e.integration}%`;
+    const k = Object.keys(e)[0];
+    if (SIGNATURES[k]) return `★ ${SIGNATURE_SHORT[k] ?? k}`;
     return '';
   }
 
@@ -61,17 +73,20 @@ export class ResearchWindow {
     const bands = [];
     for (const b of BRANCHES) {
       const techs = this.R.tree.filter((t) => t.branch === b.id);
-      const rows = Math.max(...[1, 2, 3].map((tier) => techs.filter((t) => t.tier === tier).length));
+      const rows = Math.max(...this.tiers().map((tier) => techs.filter((t) => t.tier === tier).length));
       bands.push({ ...b, top: y, height: BAND_HEAD + rows * ROW_H });
-      for (const tier of [1, 2, 3]) {
+      for (const tier of this.tiers()) {
         techs.filter((t) => t.tier === tier).forEach((t, i) => {
           pos[t.id] = { x: PAD + (tier - 1) * COL_W, y: y + BAND_HEAD + i * ROW_H };
         });
       }
       y += BAND_HEAD + rows * ROW_H + BAND_GAP;
     }
-    return { pos, bands, width: PAD * 2 + 2 * COL_W + CARD_W, height: y - BAND_GAP + PAD };
+    return { pos, bands, width: PAD * 2 + (this.tiers().length - 1) * COL_W + CARD_W, height: y - BAND_GAP + PAD };
   }
+
+  /** The era's tiers, 1 to 3 or 4. */
+  tiers() { const n = Math.max(...this.R.tree.map((t) => t.tier)); return Array.from({ length: n }, (_, i) => i + 1); }
 
   signature() {
     const R = this.R, me = this.me;
@@ -135,8 +150,8 @@ export class ResearchWindow {
       const p = pos[t.id];
       const act = r.active.find((a) => a.id === t.id);
       const qi = r.queue.indexOf(t.id);
-      return `<button type="button" class="tech st-${st} ${this.selected === t.id ? 'sel' : ''} ${qi >= 0 ? 'queued' : ''}" data-tech="${t.id}"
-          style="left:${p.x}px;top:${p.y}px;width:${CARD_W}px;height:${CARD_H}px" aria-label="${esc(t.name)}: ${STATUS_LABEL[st]}${qi >= 0 ? `, queued ${qi + 1}` : ''}">
+      return `<button type="button" class="tech st-${st} ${t.signature ? 'sig' : ''} ${this.selected === t.id ? 'sel' : ''} ${qi >= 0 ? 'queued' : ''}" data-tech="${t.id}"
+          style="left:${p.x}px;top:${p.y}px;width:${CARD_W}px;height:${CARD_H}px" aria-label="${esc(t.name)}${t.signature ? ' (era signature)' : ''}: ${STATUS_LABEL[st]}${qi >= 0 ? `, queued ${qi + 1}` : ''}">
         <span class="tech-name">${esc(t.name)}</span>
         <span class="tech-fx">${act ? `<span data-r-left="${t.id}">${fmtHours(act.total - act.done)} left</span>` : esc(t.effects.map((e) => this.short(e)).join(' · '))}</span>
         <span class="tech-ico" aria-hidden="true">${qi >= 0 ? `Q${qi + 1}` : STATUS_ICON[st]}</span>
@@ -146,7 +161,7 @@ export class ResearchWindow {
     return `<div class="tree-wrap">
         <div class="tree" style="width:${width}px;height:${height}px">
           ${bands.map((b) => `<div class="band band-${b.id}" style="top:${b.top}px;height:${b.height}px"><span>${esc(b.label)}</span></div>`).join('')}
-          ${[1, 2, 3].map((tier) => `<div class="tier-label" style="left:${PAD + (tier - 1) * COL_W}px;width:${CARD_W}px">Tier ${ROMAN[tier]}</div>`).join('')}
+          ${this.tiers().map((tier) => `<div class="tier-label" style="left:${PAD + (tier - 1) * COL_W}px;width:${CARD_W}px">Tier ${ROMAN[tier]}</div>`).join('')}
           <svg class="tree-lines" width="${width}" height="${height}" aria-hidden="true">${lines.join('')}</svg>
           ${cards}
         </div>
@@ -175,7 +190,7 @@ export class ResearchWindow {
     }
     return `<div class="tech-detail">
       <div class="td-head">
-        <div><div class="eyebrow">${esc(branch.toUpperCase())} · TIER ${ROMAN[t.tier]}</div><h3>${esc(t.name)}</h3></div>
+        <div><div class="eyebrow">${esc(branch.toUpperCase())} · TIER ${ROMAN[t.tier]}${t.signature ? ' · ★ ERA SIGNATURE' : ''}</div><h3>${esc(t.name)}</h3></div>
         <span class="td-status st-${st}">${STATUS_LABEL[st]}</span>
       </div>
       <ul class="td-fx">${R.describe(t).map((d) => `<li>${esc(d)}</li>`).join('')}</ul>
@@ -221,6 +236,9 @@ export class ResearchWindow {
       ['buildCost', 'Construction cost', (v) => `−${v}%`],
     ].map(([k, label, fmt]) => { const r = pick(k); return r ? line(label, fmt(r.value), r) : ''; }).join('')
       + by('attack:').map((r) => line(`${esc(A.roster.byRole[r.label]?.name ?? r.label)} attack`, `+${r.value}%`, r)).join('');
+    const integ = pick('integration');
+    const sigs = rows.filter((r) => SIGNATURES[r.key]).map((r) => line(`★ ${esc(r.sources.join(', '))}`, '', null).replace('<b></b>', `<small>${esc(SIGNATURES[r.key](r.value))}</small>`)).join('')
+      + (integ ? line('Integration of conquered land', `+${integ.value}%`, integ) : '');
     const bld = B.types.map((k) => {
       const r = pick(`b:${k}`);
       return `<li><span>${esc(B.name(k))}</span><b class="${r ? '' : 'dim'}">${r ? 'Level III unlocked' : 'Up to level II'}</b>${r ? src(r) : `<small>needs ${esc(R.unlockerOf(k)?.name ?? '—')}</small>`}</li>`;
@@ -231,6 +249,7 @@ export class ResearchWindow {
         <p class="hint-line">New recruits come at these levels. Existing units upgrade in a city with ${esc(B.name('barracks'))} (ships next to a ${esc(B.name('port'))}) for 20% of their price per level.</p></section>
       <section><h4>Production</h4><ul>${prod || '<li class="dim">No production bonuses yet.</li>'}</ul></section>
       <section><h4>Armies and logistics</h4><ul>${misc || `<li><span>Research slots</span><b>${R.slots(me)}</b></li>`}</ul></section>
+      <section><h4>Era doctrines</h4><ul>${sigs || `<li class="dim">None yet: the starred techs are this era's own.</li>`}</ul></section>
       <section><h4>Buildings</h4><ul>${bld}</ul></section>
     </div>`;
   }

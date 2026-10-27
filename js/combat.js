@@ -359,11 +359,14 @@ export class Combat {
     for (const [n, gone] of lost) {
       if (!this.enemiesOf(n).length) continue;
       const share = gone / home.get(n);
-      if (share < LEVY_FROM) continue;
+      // Feudal levies (Middle Ages) rise sooner and bring one more unit.
+      const feudal = this.armies.research?.fx(n, 'levies') ?? 0;
+      const from = LEVY_FROM * (1 - feudal / 100);
+      if (share < from) continue;
       const cap = st.provinces[st.getNation(n)?.capitalId];
       const city = cap?.owner === n ? cap : st.provinces.find((p) => p.owner === n && p.isCity);
       if (!city) continue;
-      for (let i = 0; i < (share >= 2 * LEVY_FROM ? 2 : 1); i++) A.finishUnit(city.id, inf.key, { levy: true });
+      for (let i = 0; i < (share >= 2 * from ? 2 : 1) + (feudal ? 1 : 0); i++) A.finishUnit(city.id, inf.key, { levy: true });
     }
   }
 
@@ -376,8 +379,14 @@ export class Combat {
       return list;
     });
     if (!units[0].length || !units[1].length) { this.checkEnd(b); return; }
-    // Fortifications add to the terrain bonus of whoever holds the ground.
-    const terrainDef = b.sea ? 1 : TERRAIN[b.terrain].defense * (A.buildings?.fortBonus(b.node) ?? 1);
+    // Fortifications add to the terrain bonus of whoever holds the ground (side 1 defends).
+    const R = A.research, fx = (n, k) => R?.fx(n, k) ?? 0;
+    const atk = b.sides[0].nation, def = b.sides[1].nation;
+    const fort = A.buildings?.fortBonus(b.node) ?? 1;
+    let terrainDef = b.sea ? 1 : TERRAIN[b.terrain].defense * (1 + (fort - 1) * (1 + fx(def, 'fortStrength') / 100));
+    // Chemical warfare (WWI): the attacker cuts through terrain and forts.
+    if (fx(atk, 'gas')) terrainDef = 1 + (terrainDef - 1) * (1 - fx(atk, 'gas') / 100);
+    const owner = b.sea ? -1 : this.state.provinces[b.node]?.owner;
     const hits = [];
     for (let i = 0; i < 2; i++) {
       const foes = units[1 - i];
@@ -385,10 +394,14 @@ export class Combat {
         const target = foes[Math.floor(Math.random() * foes.length)];
         const embarked = army.kind === 'land' && b.sea;
         const targetEmbarked = target.army.kind === 'land' && b.sea;
-        const R = A.research;
-        const attack = t.attack * (embarked ? 0.25 : 1) * (0.5 + 0.5 * u.hp / t.hp) * (R ? R.attackMult(army.nation, t.role) : 1);
-        const defense = target.t.defense * (i === 0 ? terrainDef : 1) * (targetEmbarked ? 0.5 : 1) * (R ? R.defenseMult(target.army.nation) : 1);
-        const dmg = DAMAGE_BASE * attack * MATCHUP[t.role][target.t.role] / defense * (0.75 + Math.random() * 0.5);
+        let attack = t.attack * (embarked ? 0.25 : 1) * (0.5 + 0.5 * u.hp / t.hp) * (R ? R.attackMult(army.nation, t.role) : 1);
+        let defense = target.t.defense * (i === 0 ? terrainDef : 1) * (targetEmbarked ? 0.5 + 0.5 * fx(target.army.nation, 'carriers') / 100 : 1) * (R ? R.defenseMult(target.army.nation) : 1);
+        // Era signatures: reconnaissance, radar against landings, entrenchment, the testudo.
+        if (b.hours <= 24 && fx(army.nation, 'recon')) attack *= 1 + fx(army.nation, 'recon') / 100;
+        if (i === 0 && !b.sea && fx(def, 'radar') && army.prev != null && A.isSea(army.prev)) attack *= 1 - fx(def, 'radar') / 100;
+        if (i === 0 && target.army.nation === owner && fx(owner, 'entrench')) defense *= 1 + fx(owner, 'entrench') / 100;
+        let dmg = DAMAGE_BASE * attack * MATCHUP[t.role][target.t.role] / defense * (0.75 + Math.random() * 0.5);
+        if (t.role === 'rng' && target.t.role === 'inf') dmg *= 1 - fx(target.army.nation, 'testudo') / 100;
         hits.push([target.u, dmg]);
       }
     }
@@ -469,6 +482,16 @@ export class Combat {
 
   occupyHours(p) { return p.isCapital ? OCCUPY_HOURS.capital : p.isCity ? OCCUPY_HOURS.city : OCCUPY_HOURS.land; }
 
+  /** Era signatures on occupation time: siege engines (cities), blitzkrieg, drones over a homeland. */
+  occupyMult(nation, p) {
+    const fx = (n, k) => this.armies.research?.fx(n, k) ?? 0;
+    let m = 1;
+    if (p.isCity || p.isCapital) m *= 1 - fx(nation, 'siege') / 100;
+    m /= 1 + fx(nation, 'blitz') / 100;
+    if (p.owner >= 0 && p.homeOf === p.owner) m *= 1 + fx(p.owner, 'drones') / 100;
+    return m;
+  }
+
   updateOccupation(hours) {
     const A = this.armies;
     const seen = new Set();
@@ -480,7 +503,7 @@ export class Combat {
       seen.add(army.node);
       let occ = this.occupations.get(p.id);
       if (!occ || occ.nation !== army.nation) {
-        occ = { nation: army.nation, done: 0, total: this.occupyHours(p) };
+        occ = { nation: army.nation, done: 0, total: this.occupyHours(p) * this.occupyMult(army.nation, p) };
         this.occupations.set(p.id, occ);
       }
       occ.done += hours;

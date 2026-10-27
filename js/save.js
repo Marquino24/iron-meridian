@@ -15,7 +15,8 @@
  * are stored by id (battles point at the same army objects as the army list).
  */
 
-export const SAVE_VERSION = 1;
+/** 2: era tech trees (step 10); version-1 saves are migrated when loaded. */
+export const SAVE_VERSION = 2;
 export const SLOTS = ['1', '2', '3', '4', '5', '6', '7', '8'];
 export const AUTO_SLOT = 'auto';
 const FORMAT = 'iron-meridian-save';
@@ -147,6 +148,9 @@ export function restore({ state, sim, feed }, save) {
   combat.levyHours ??= 0; // saves from before step 9
 
   research.nations = new Map(d.research.map(([n, r]) => [n, { ...r, fx: null }]));
+  // Saves from before step 10 name the old shared tree's techs: move them onto this era's tree.
+  research.migration = save.version < 2 ? research.migrate() : null;
+  const moved = research.migration?.of[d.player];
 
   ai.reset();
   Object.assign(ai, d.ai);
@@ -164,6 +168,12 @@ export function restore({ state, sim, feed }, save) {
 
   st.clock.time = d.clock.time;
   st.clock.start = d.clock.start;
+  if (moved) {
+    st.events.emit('feed', {
+      kind: 'research', tone: 'good',
+      text: `Saved before the era tech trees: your research moved to the ${map.era.label} tree (${moved.techs} techs researched${moved.refunded ? `, ${moved.refunded} refunded` : ''}${moved.dropped ? `, queue cleared` : ''})`,
+    });
+  }
 
   // Caches that depend on all of the above.
   economy.totalsCache?.clear();

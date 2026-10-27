@@ -32,6 +32,15 @@ export const PERSONALITIES = {
   expansionist: { label: 'Expansionist', warRatio: 1.5, warChance: 0.18, military: 0.55, maxWars: 2, branches: ['eco', 'inf', 'mil'], fort: 0.1, expand: 1 },
 };
 
+/** How much each personality wants techs for attack, defense, growth and holding conquests. */
+export const TECH_TASTE = {
+  aggressive: { attack: 3, hold: 1.5, grow: 1, defend: 0.5 },
+  balanced: { grow: 2, attack: 1, defend: 1, hold: 1 },
+  defensive: { defend: 3, grow: 1.5, hold: 0.5, attack: 0.5 },
+  conqueror: { attack: 3, hold: 2.5, grow: 1, defend: 0.3 },
+  expansionist: { hold: 3, grow: 2, attack: 1.5, defend: 0.5 },
+};
+
 export const DIFFICULTY = {
   easy: { label: 'Easy', think: 1.6, warRatio: 1.35, chance: 0.5, prod: 0.9, attackRatio: 1.0, smart: false },
   normal: { label: 'Normal', think: 1, warRatio: 1, chance: 1, prod: 1, attackRatio: 1.2, smart: false },
@@ -262,12 +271,17 @@ export class AI {
     this.doDiplomacy(ctx);
   }
 
-  // Research: keep two techs queued, branches in personality order.
-  doResearch({ n, P }) {
+  // Research: keep two techs queued. Lower tiers first, branches in personality
+  // order, and what the tech is for (TECH_TASTE): an aggressive nation reaches
+  // for siege engines and blitzkrieg, a defensive one for castles and the deterrent.
+  doResearch({ n, P, b }) {
     const R = this.sim.research;
     const r = R.of(n);
     if (r.queue.length >= 2) return;
-    const order = [...R.tree].sort((a, b) => a.tier - b.tier || P.branches.indexOf(a.branch) - P.branches.indexOf(b.branch));
+    const taste = TECH_TASTE[b.personality] ?? TECH_TASTE.balanced;
+    const value = (t) => -10 * t.tier + 2 * (3 - P.branches.indexOf(t.branch)) + 3 * (taste[t.ai] ?? 1)
+      + (t.signature ? 4 * (taste[t.ai] ?? 1) - 4 : 0) + (t.effects.some((e) => e.slots) ? 6 : 0);
+    const order = [...R.tree].sort((x, y) => value(y) - value(x));
     for (const t of order) {
       if (r.queue.length >= 2) break;
       if (R.canQueue(n, t.id).ok) R.enqueue(n, t.id);
@@ -600,23 +614,7 @@ export class AI {
     const perHour = (P.warChance * D.chance * (major ? 1 : 0.3) * restraint * (ERA_WAR_RATE[this.state.map.era?.id] ?? 1)) / 730;
     if (Math.random() > perHour * b.every) return;
     const Dp = this.sim.diplomacy;
-    let best = -1, bs = 0;
-    for (const o of this.neighborsOf(n)) {
-      if (C.atWar(n, o)) continue;
-      const op = Dp?.opinion(n, o).value ?? 0;
-      // Friends are safe; pacts and truces hold, except for a furious aggressor (rarely).
-      if (op >= 25 || Dp?.has(n, o, 'alliance')) continue;
-      const bound = C.truceUntil(n, o) != null || Dp?.has(n, o, 'nap') || Dp?.has(n, o, 'passage');
-      if (bound && !(b.personality === 'aggressive' && op < -60 && Math.random() < 0.15)) continue;
-      const theirs = this.powerOf(o) + 0.5 * C.enemiesOf(o).length; // allies don't exist yet
-      const ratio = me / Math.max(1, theirs);
-      const lost = this.state.provinces.some((p) => p.homeOf === n && p.owner === o);
-      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1);
-      if (ratio < need) continue;
-      // Value: their cities and capital near us; prefer smaller wars.
-      const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1) * (1 + Math.max(0, -op) / 50);
-      if (score > bs) { bs = score; best = o; }
-    }
+    const best = this.warTarget(n, P, b, me);
     if (best >= 0 && (Dp ? Dp.declareWar(n, best) : C.declareWar(n, best))) {
       this.state.events.emit('war:declared', { a: n, b: best, ai: true });
       // Call the allies: AI allies decide at once, the player gets asked.
@@ -664,6 +662,34 @@ export class AI {
     }
     // Ditch an ally it has come to dislike.
     for (const a of Dp.allies(n)) if (Dp.opinion(n, a).value < -10 && Math.random() < 0.3) { Dp.cancel(n, a, 'alliance'); break; }
+  }
+
+  /**
+   * The neighbour nation n would attack now (or -1): weak enough by its
+   * personality's ratio (more so if it holds n's land), not a friend, ally or
+   * bound by a truce or pact, ranked by strength ratio and enmity.
+   */
+  warTarget(n, P, b, power) {
+    const C = this.sim.combat, Dp = this.sim.diplomacy, D = this.D;
+    let best = -1, bs = 0;
+    for (const o of this.neighborsOf(n)) {
+      if (C.atWar(n, o)) continue;
+      const op = Dp?.opinion(n, o).value ?? 0;
+      // Friends are safe; pacts and truces hold, except for a furious aggressor (rarely).
+      if (op >= 25 || Dp?.has(n, o, 'alliance')) continue;
+      const bound = C.truceUntil(n, o) != null || Dp?.has(n, o, 'nap') || Dp?.has(n, o, 'passage');
+      if (bound && !(b.personality === 'aggressive' && op < -60 && Math.random() < 0.15)) continue;
+      const theirs = this.powerOf(o) + 0.5 * C.enemiesOf(o).length; // allies don't exist yet
+      const ratio = power / Math.max(1, theirs);
+      const lost = this.state.provinces.some((p) => p.homeOf === n && p.owner === o);
+      // A nuclear (or doomsday) deterrent makes attackers want a bigger edge.
+      const need = P.warRatio * D.warRatio * (lost ? 0.8 : 1) * (1 + this.sim.research.fx(o, 'deterrence') / 100);
+      if (ratio < need) continue;
+      // Value: their cities and capital near us; prefer smaller wars.
+      const score = ratio * (lost ? 1.6 : 1) * (this.state.getNation(o).major ? 1.2 : 1) * (1 + Math.max(0, -op) / 50);
+      if (score > bs) { bs = score; best = o; }
+    }
+    return best;
   }
 
   /** Would AI nation `n` accept a white peace from `other`? */

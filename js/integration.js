@@ -45,7 +45,7 @@ export class Integration {
     const p = this.state.provinces[pid];
     if (!p) return;
     if (p.homeOf == null || p.homeOf < 0 || p.homeOf === to || to < 0) delete p.integ;
-    else p.integ = CONQUERED_YIELD;
+    else p.integ = Math.min(1, CONQUERED_YIELD + (this.sim.research?.fx(to, 'precision') ?? 0) / 100); // precision strikes (modern) wreck less
     this.warned.delete(pid);
     this.sim.economy?.refreshProvince(pid);
   }
