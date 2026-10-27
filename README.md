@@ -243,6 +243,24 @@ Flags are rendered into one small WebP sheet per era (`assets/flags-<era>.webp`,
 
 Every nation picker has a target button to pick a nation by tapping the map (on phones the panel folds out of the way; the ▾ button folds it by hand too). Time goes up to 16×. Starting a normal game afterwards clears all of it.
 
+## Multiplayer (in progress: owners only)
+
+Persistent games in the style of Conflict of Nations are being built. The architecture decision, with the measured numbers and the Supabase free-tier limits, is in `docs/MULTIPLAYER.md`.
+
+**Chosen design.** Supabase Edge Functions run the world on a schedule: each tick loads the game, applies orders and saves it. Clients predict between ticks.
+
+**Built so far (step 11A):**
+- **Tables:** `docs/supabase-multiplayer.sql`, to run in the Supabase SQL editor after `docs/supabase-setup.sql`. It creates games, players, saved state and orders, with row-level security. `npm run test:policies` tests the policies.
+- **Commands:** every order a player gives goes through `js/commands.js` as a JSON command record, in single-player too. `node tools/check-commands.mjs` is part of `npm test`.
+- **Lobby:** create, list, join (pick a nation) and leave games. It's behind `MULTIPLAYER_PREVIEW` in `js/config.js`:
+  - `'owners'` (now): only owners see it; everyone else keeps "Multiplayer · Coming soon";
+  - `'off'`: nobody sees it;
+  - `'everyone'`: approved testers see it too.
+
+  The claude.ai preview and localhost use an in-browser demo lobby with sample games. `tools/e2e/lobby.test.mjs` tests it.
+
+Games can't be played yet: the game server comes next.
+
 ## Phones, tablets and Safari
 
 - **Safe areas:** the page uses `viewport-fit=cover`, and the top bar, status bar, resource strip, command bar and side panels keep their content out of the notch / Dynamic Island, the home bar and (in landscape) the side notches.
@@ -303,13 +321,17 @@ tools/
   check-eras.mjs  Era map checks
   build-imagery.py  Reprojects Blue Marble and Natural Earth rasters into assets/
   bundle.mjs      Inlines everything (code, CSS, gzip'd era data, imagery) into one HTML file (dist/)
-docs/             SETUP.md (going live), TESTERS.md, supabase-setup.sql (paste into Supabase), FLAGS.md
+  check-commands.mjs, check-tech.mjs, check-zero-wars.mjs (part of npm test); check-deterrence.mjs (npm run test:sim)
+  spike/          Step 11A measurement of a server tick (server-tick.mjs) and its Edge Function packager
+docs/             SETUP.md (going live), TESTERS.md, supabase-setup.sql and supabase-multiplayer.sql (paste into Supabase),
+                  MULTIPLAYER.md (architecture decision), FLAGS.md, TECH.md
 supabase/
-  test/           Policy tests for docs/supabase-setup.sql on plain PostgreSQL with a mock auth schema
+  test/           Policy tests for docs/supabase-setup.sql and supabase-multiplayer.sql on plain PostgreSQL with a mock auth schema
+  functions/tick-spike/  Deployable Edge Function version of the tick measurement (not used by the game)
 vendor/           @supabase/supabase-js 2.117.3 (UMD, MIT), loaded only when sign-in is on
 privacy.html, terms.html   Linked from the sign-in screen and provider consent screens
 js/
-  config.js       Supabase URL + publishable key, provider list
+  config.js       Supabase URL + publishable key, provider list, multiplayer preview switch
   auth.js         Supabase client wrapper: sign-in, beta row, realtime, admin queries
   launcher.js     Sign-in screen (incl. preview demo sign-in), beta gate screens, admin panel
   menu.js         Main menu, era/nation/settings screens, Back navigation
@@ -364,6 +386,9 @@ js/
                   coalitions, war exhaustion
   diplomacy-ui.js War alerts, peace offers and AI land demands
   peace-ui.js     Peace window: war score, provinces to keep, acceptance chance
+  commands.js     Player orders as JSON command records: checked and applied in one place
+  lobby.js        Multiplayer lobby data: Supabase tables, or a demo lobby in this browser
+  lobby-ui.js     Multiplayer lobby screen (owners only for now)
   integration.js  Conquered land settling in (45% → 100%), unrest and revolts
   save.js         Saved games: snapshot/restore of every system, gzip, IndexedDB slots, export files
   save-ui.js      Continue, save/load screen with thumbnails, weekly autosave, export/import

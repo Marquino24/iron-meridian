@@ -234,6 +234,19 @@
     </div>
   </section>
 
+  <!-- Multiplayer lobby (owners only for now: config MULTIPLAYER_PREVIEW). -->
+  <section id="lobby-screen" class="screen side" hidden aria-label="Multiplayer lobby">
+    <div class="side-panel screen-left lobby-panel">
+      <div class="screen-head">
+        <button type="button" class="back-btn" data-back>‹ Back</button>
+        <div class="eyebrow">MULTIPLAYER · OWNER PREVIEW</div>
+      </div>
+      <h2 class="screen-title">Persistent games</h2>
+      <div id="lobby-body" class="lobby-body"></div>
+    </div>
+  </section>
+
+
   <!-- Sign-in and beta gate. Without Supabase settings (dev preview) it offers a demo sign-in. -->
   <section id="launcher" class="launcher" hidden aria-label="Sign in">
     <div class="launcher-hero">

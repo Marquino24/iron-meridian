@@ -5,6 +5,7 @@
  *             → Sandbox       → ERA → NATION → sandbox game (free tools)
  *             → Continue / Load Game → saved games (Save Game too while a game is paused)
  *             → Settings
+ *             → Multiplayer   → lobby (owners only for now, see lobby-ui.js)
  *
  * Exactly one screen is visible at a time; Back always goes one step up.
  * The map keeps running behind every screen (it pans slowly on the menu).
@@ -12,8 +13,8 @@
 
 import { QUALITIES, deviceClass } from './settings.js';
 
-const SCREENS = { menu: '#main-menu', era: '#era-screen', nation: '#start-screen', settings: '#settings-screen', saves: '#saves-screen' };
-const PARENT = { era: 'menu', nation: 'era', settings: null, menu: null, saves: 'menu' };
+const SCREENS = { menu: '#main-menu', era: '#era-screen', nation: '#start-screen', settings: '#settings-screen', saves: '#saves-screen', lobby: '#lobby-screen' };
+const PARENT = { era: 'menu', nation: 'era', settings: null, menu: null, saves: 'menu', lobby: 'menu' };
 
 export class Screens {
   /**
@@ -40,6 +41,7 @@ export class Screens {
       if (a === 'resume') this.actions.resume();
       if (a === 'continue') this.actions.continueGame?.();
       if (a === 'save' || a === 'load') this.actions.openSaves?.(a);
+      if (a === 'multi') this.actions.openLobby?.();
       if (a === 'signout') this.actions.signOut();
     });
     for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => this.back());

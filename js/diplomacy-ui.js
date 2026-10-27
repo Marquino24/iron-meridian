@@ -25,8 +25,9 @@ export class DiplomacyUI {
     this.resumeSpeed = null;
 
     state.events.on('war:declared', ({ a, b }) => { if (b === state.playerNationId) this.push({ kind: 'war', from: a }); });
-    state.events.on('peace:offer', ({ from, to }) => { if (to === state.playerNationId) this.push({ kind: 'peace', from }); });
-    state.events.on('peace:demand', ({ from, to, provinces, score }) => { if (to === state.playerNationId) this.push({ kind: 'demand', from, provinces, score }); });
+    // offerId: set by commands.js (created first), the id an answer refers to.
+    state.events.on('peace:offer', ({ from, to, offerId }) => { if (to === state.playerNationId) this.push({ kind: 'peace', from, offerId }); });
+    state.events.on('peace:demand', ({ from, to, provinces, score, offerId }) => { if (to === state.playerNationId) this.push({ kind: 'demand', from, provinces, score, offerId }); });
     state.events.on('diplomacy:proposal', (p) => { if (p.to === state.playerNationId) this.push({ kind: 'proposal', from: p.from, p }); });
     state.events.on('diplomacy:called', ({ leader, enemy }) => this.push({ kind: 'called', from: leader, enemy }));
     state.events.on('map:loaded', () => { this.queue = []; this.close(); });
@@ -142,18 +143,14 @@ export class DiplomacyUI {
   answer(yes) {
     const item = this.open;
     if (!item) return;
+    const C = this.sim.commands;
     if (item.kind === 'proposal') {
-      const r = this.sim.diplomacy.answer(item.p, yes);
-      if (yes && !r.ok) this.actions.notice(r.reason ?? 'That is no longer possible.');
+      const r = C.issue('proposal.answer', { id: item.p.offerId, yes });
+      if (yes && !r.ok) this.actions.notice(r.error ?? 'That is no longer possible.');
     }
-    if (item.kind === 'demand') {
-      const me = this.state.playerNationId;
-      if (yes) this.sim.combat.makePeace(item.from, me, { cede: item.from, keep: item.provinces });
-      else this.state.events.emit('feed', { kind: 'peace', tone: 'war', text: `You rejected ${this.state.getNation(item.from).shortName}'s peace terms` });
-    }
-    if (item.kind === 'peace') {
-      if (yes) this.sim.combat.makePeace(item.from, this.state.playerNationId);
-      else this.state.events.emit('feed', { kind: 'peace', tone: 'war', text: `You declined ${this.state.getNation(item.from).shortName}'s peace offer` });
+    if (item.kind === 'demand' || item.kind === 'peace') {
+      const r = C.issue('peace.answer', { id: item.offerId, yes });
+      if (yes && !r.ok) this.actions.notice(r.error ?? 'That is no longer possible.');
     }
     this.next();
   }

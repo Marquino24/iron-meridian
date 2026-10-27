@@ -32,6 +32,13 @@ export const OWNER_EMAILS = [
   'marcoferreirag3@gmail.com',
 ];
 
+/**
+ * Multiplayer lobby (step 11A): 'off' (nobody sees it), 'owners' (only owners
+ * see it: everyone else keeps "Multiplayer · Coming soon") or 'everyone'
+ * (approved testers too; the database still lets only approved users in).
+ */
+export const MULTIPLAYER_PREVIEW = 'owners';
+
 /** Sign-in options in the order they appear. `id` is the Supabase provider name. */
 export const PROVIDERS = [
   { id: 'google', label: 'Google' },

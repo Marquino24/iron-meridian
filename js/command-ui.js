@@ -367,7 +367,8 @@ export class CommandUI {
   handleClick(e) {
     const b = e.target.closest('[data-cmd]');
     if (!b || b.disabled) return false;
-    const st = this.state, A = this.sim.armies, C = this.sim.combat;
+    const st = this.state, A = this.sim.armies;
+    const issue = (kind, payload) => this.sim.commands.issue(kind, payload);
     const cmd = b.dataset.cmd;
     const armyId = st.selectedArmyId;
     switch (cmd) {
@@ -375,38 +376,38 @@ export class CommandUI {
       case 'select-army': st.setSelected(-1); st.setSelectedArmy(Number(b.dataset.army)); break;
       case 'goto': this.actions.focusNode(Number(b.dataset.node)); break;
       case 'battle': this.actions.openBattle(Number(b.dataset.battle)); break;
-      case 'stop': A.stop(armyId); break;
+      case 'stop': issue('army.stop', { army: armyId }); break;
       case 'split': {
         const army = A.list.get(armyId);
         const idx = army.units.map((u, i) => (this.checked.has(u) ? i : -1)).filter((i) => i >= 0);
-        const other = A.split(armyId, idx);
+        const r = issue('army.split', { army: armyId, units: idx });
         this.checked.clear();
-        if (other) this.actions.notice(`${other.name} formed with ${other.units.length} units`);
+        if (r.ok) this.actions.notice(`${r.name} formed with ${r.units} units`);
         break;
       }
       case 'split-half': {
-        const other = A.splitHalf(armyId);
+        const r = issue('army.split-half', { army: armyId });
         this.checked.clear();
-        if (other) this.actions.notice(`${other.name} formed with ${other.units.length} units`);
+        if (r.ok) this.actions.notice(`${r.name} formed with ${r.units} units`);
         break;
       }
-      case 'merge': A.merge(armyId, Number(b.dataset.army)); break;
+      case 'merge': issue('army.merge', { into: armyId, from: Number(b.dataset.army) }); break;
       case 'recruit': {
-        const r = A.recruit(st.selectedProvinceId, b.dataset.type);
+        const r = issue('unit.recruit', { province: st.selectedProvinceId, type: b.dataset.type });
         if (r.error) this.actions.notice(r.error);
         break;
       }
-      case 'cancel': A.cancel(st.selectedProvinceId, Number(b.dataset.index)); break;
+      case 'cancel': issue('unit.cancel', { province: st.selectedProvinceId, index: Number(b.dataset.index) }); break;
       case 'city-tab': this.cityTab = b.dataset.tab; break;
       case 'build': {
-        const r = this.sim.buildings.build(st.selectedProvinceId, b.dataset.type);
+        const r = issue('building.build', { province: st.selectedProvinceId, type: b.dataset.type });
         if (r.error) this.actions.notice(r.error);
         break;
       }
-      case 'cancel-build': this.sim.buildings.cancel(st.selectedProvinceId); break;
+      case 'cancel-build': issue('building.cancel', { province: st.selectedProvinceId }); break;
       case 'war': this.confirmWar = Number(b.dataset.nation); break;
       case 'war-cancel': this.confirmWar = -1; break;
-      case 'war-confirm': (this.sim.diplomacy ?? C).declareWar(st.playerNationId, Number(b.dataset.nation)); this.confirmWar = -1; break;
+      case 'war-confirm': issue('war.declare', { target: Number(b.dataset.nation) }); this.confirmWar = -1; break;
       case 'offer-peace': this.actions.openPeace?.(Number(b.dataset.nation)); break;
       default: return false;
     }
