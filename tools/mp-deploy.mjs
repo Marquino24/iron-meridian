@@ -85,15 +85,19 @@ try {
     const body = await res.json();
     if (!res.ok || body.error) throw new Error(`tick ${i} failed: ${res.status} ${JSON.stringify(body)}`);
     ticks.push({ ...body, roundTrip: Date.now() - t0 });
-    console.log(`   tick ${body.tick}: ${body.hours} game h · server ${body.cpuMs} ms (simulation ${body.ms} ms) · round trip ${Date.now() - t0} ms · state ${(body.bytes / 1024).toFixed(0)} KB`);
+    console.log(`   tick ${body.tick}: ${body.hours} game h · server ${body.cpuMs} ms, of which computation ${body.computeMs} ms (${Object.entries(body.phase ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}) · round trip ${Date.now() - t0} ms · state ${(body.bytes / 1024).toFixed(0)} KB`);
   }
 } finally {
   await sql(`delete from public.games where id = ${lit(gid)}`);
 }
-const thirty = ticks.filter((t) => Math.abs(t.hours - 30) < 0.5).map((t) => t.ms).sort((a, b) => a - b);
+// The 2 s limit is CPU time: decide on the computation (the database waits don't count), shown with the totals.
+const thirtyTicks = ticks.filter((t) => Math.abs(t.hours - 30) < 0.5);
+const thirty = thirtyTicks.map((t) => t.computeMs ?? t.ms).sort((a, b) => a - b);
+const totals = thirtyTicks.map((t) => t.ms).sort((a, b) => a - b);
+console.log(`   30-game-hour ticks, whole tick (with database waits): median ${totals[Math.floor(totals.length / 2)]} ms, worst ${totals.at(-1)} ms`);
 const median = thirty[Math.floor(thirty.length / 2)], worst = thirty.at(-1);
 const interval = opt('interval', 'auto') !== 'auto' ? Number(opt('interval')) : worst < 1200 ? 5 : worst < 1800 ? 3 : 2;
-console.log(`   30-game-hour ticks: median ${median} ms, worst ${worst} ms → tick every ${interval} min`);
+console.log(`   30-game-hour ticks, computation: median ${median} ms, worst ${worst} ms → tick every ${interval} min`);
 
 if (!args.includes('--measure-only')) {
   console.log(`5. schedule: every ${interval} min`);

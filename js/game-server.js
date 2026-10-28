@@ -110,10 +110,16 @@ export async function tickGame(store, gameId, { now = Date.now(), maxHours = MAX
   if (!game) return { skipped: 'no such game' };
   if (game.status !== 'running') return { skipped: `game is ${game.status}` };
 
+  const phase = {};
+  let tp = performance.now();
+  const lap = (k) => { const t = performance.now(); phase[k] = Math.round(t - tp); tp = t; };
+  lap('readGame');
   const g = makeSim(await buildMap(game, store));
+  lap('buildMap');
   const { state, sim } = g;
   const saved = await store.state(gameId);
   const players = await store.players(gameId);
+  lap('readState');
   const inactiveMs = (game.inactive_days ?? 7) * DAY_MS;
   const quiet = players.filter((p) => !p.ai_controlled && now - Date.parse(p.last_seen) > inactiveMs);
   const humans = new Set(players.filter((p) => !p.ai_controlled && !quiet.includes(p)).map((p) => p.nation_id));
@@ -131,6 +137,7 @@ export async function tickGame(store, gameId, { now = Date.now(), maxHours = MAX
     sim.ai.start(-1, game.difficulty ?? 'normal');
     sim.victory.start({ mode: game.win_mode ?? 'points', timeLimit: game.time_limit ?? 0, dominationPct: 40 });
   }
+  lap('restore');
   state.playerNationId = -1;
   state.setPhase('playing');
   // Hand nations between people and the computer: a new player takes over a
@@ -143,6 +150,7 @@ export async function tickGame(store, gameId, { now = Date.now(), maxHours = MAX
 
   // Orders, oldest first; each from a player still seated on that nation.
   const pending = await store.pending(gameId);
+  lap('readOrders');
   const seat = new Map(players.map((p) => [p.user_id, p.nation_id]));
   const results = [];
   for (const c of pending) {
@@ -158,7 +166,9 @@ export async function tickGame(store, gameId, { now = Date.now(), maxHours = MAX
   const hoursPerMs = 24 / (Number(game.minutes_per_day) * 60000);
   const owed = Math.max(0, (now - last) * hoursPerMs);
   const hours = Math.min(owed, maxHours);
+  lap('orders');
   advance(g, hours);
+  lap('simulate');
   // A capped tick only moves the tick clock as far as it simulated, so the next one catches up.
   const tickedAt = hours < owed ? new Date(last + hours / hoursPerMs) : new Date(now);
 
@@ -173,12 +183,16 @@ export async function tickGame(store, gameId, { now = Date.now(), maxHours = MAX
     const v = { ...snap, meta: { ...snap.meta, nation: n }, state: encode(viewFor(state.map, data, n)) };
     views.push({ nation: n, state: toB64(await pack(v)) });
   }
+  lap('pack');
   const gameCols = { tick: (game.tick ?? 0) + 1, game_time: state.clock.time, ticked_at: tickedAt.toISOString() };
   if (over) Object.assign(gameCols, { status: 'finished', ended_at: new Date(now).toISOString(), winner: over.winner, end_reason: over.reason });
   await store.save(gameId, { state: full, tick: gameCols.tick, views, game: gameCols, commands: results, aiPlayers: quiet.map((p) => p.user_id) });
+  lap('write');
   return {
     status: over ? 'finished' : 'running', tick: gameCols.tick, hours: Math.round(hours * 100) / 100, owed: Math.round(owed * 100) / 100,
     applied: results.filter((r) => r.status === 'applied').length, rejected: results.filter((r) => r.status === 'rejected').length,
     humans: [...humans], handedToAi: quiet.map((p) => p.nation_id), bytes: full.length, ms: Math.round(performance.now() - t0),
+    // Time per phase (ms): reads and writes wait on the database (not CPU); the rest is computation.
+    phase, computeMs: phase.buildMap + phase.restore + phase.orders + phase.simulate + phase.pack,
   };
 }
