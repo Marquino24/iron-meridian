@@ -311,7 +311,7 @@ export class Diplomacy {
     if (!this.has(asker, ally, 'alliance')) return { ok: false, reason: 'Only allies can be asked.' };
     if (!C.atWar(asker, target)) return { ok: false, reason: 'You are not at war with them.' };
     if (C.atWar(ally, target)) return { ok: false, reason: 'Already fighting them.' };
-    if (ally === this.state.playerNationId) return { ok: false, reason: 'Ask the player.' };
+    if (this.state.isHuman(ally)) return { ok: false, reason: 'Ask the player.' };
     const r = this.acceptsJoin(ally, asker, target);
     if (r.ok) this.joinWar(ally, target, asker, 'join');
     else this.remember(asker, ally, 'refused', 'Refused to join our war', -8, 180);
@@ -494,7 +494,7 @@ export class Diplomacy {
    * At most one every 10 days overall and one per nation every 60 days.
    */
   propose(from, to, payload) {
-    if (to !== this.state.playerNationId || this.state.sandbox && !this.sim.ai.controls(from)) return false;
+    if (!this.state.isHuman(to) || this.state.sandbox && !this.sim.ai.controls(from)) return false;
     const now = this.state.clock.time;
     this.lastFrom ??= new Map();
     if (now - (this.lastAny ?? -Infinity) < 10 * DAY || now - (this.lastFrom.get(from) ?? -Infinity) < 60 * DAY) return false;

@@ -55,6 +55,7 @@ export class GameState {
     this.map = null;
     this.phase = 'setup';
     this.playerNationId = -1;
+    this.humans = new Set();      // multiplayer: every nation a person plays (the server's view; playerNationId is this browser's)
     this.hoveredProvinceId = -1;
     this.selectedProvinceId = -1;
     this.focusedNationId = -1;
@@ -72,6 +73,10 @@ export class GameState {
   getNation(id) { return id >= 0 ? this.nations[id] ?? null : null; }
   get era() { return this.map?.era ?? null; }
   get playerNation() { return this.getNation(this.playerNationId); }
+  /** Is this nation played by a person (this browser's player, or another player in a multiplayer game)? */
+  isHuman(id) { return id >= 0 && (id === this.playerNationId || this.humans.has(id)); }
+  /** Every nation played by a person. */
+  humanNations() { return [...new Set([...(this.playerNationId >= 0 ? [this.playerNationId] : []), ...this.humans])]; }
 
   provincesOf(nationId) { return this.provinces.filter((p) => p.owner === nationId); }
 

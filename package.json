@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "npx --yes serve -l 3000 .",
-    "test": "node tools/check-secrets.mjs && node tools/check-config.mjs && node tools/check-map.mjs && node tools/check-eras.mjs && node tools/check-war.mjs && node tools/check-save.mjs ww2 && node tools/check-tech.mjs && node tools/check-commands.mjs && node tools/check-fictional.mjs && node tools/check-zero-wars.mjs",
+    "test": "node tools/check-secrets.mjs && node tools/check-config.mjs && node tools/check-map.mjs && node tools/check-eras.mjs && node tools/check-war.mjs && node tools/check-save.mjs ww2 && node tools/check-tech.mjs && node tools/check-commands.mjs && node tools/check-mp-server.mjs && node tools/check-fictional.mjs && node tools/check-zero-wars.mjs",
     "sim:ai": "node tools/sim-ai.mjs 6 normal",
     "bundle": "node tools/bundle.mjs && node tools/bundle.mjs --fragment",
     "build:eras": "node tools/build-eras.mjs",
@@ -15,7 +15,9 @@
     "build:flags": "python3 tools/fetch-commons-flags.py && node tools/build-flags.mjs",
     "test:devices": "node tools/e2e/devices.test.mjs",
     "balance": "node tools/balance.mjs all",
-    "test:sim": "node tools/check-deterrence.mjs"
+    "test:sim": "node tools/check-deterrence.mjs",
+    "build:functions": "node tools/build-functions.mjs",
+    "test:functions": "node tools/build-functions.mjs && npx --yes deno@2.1.4 run -A --import-map=tools/tick-test-import-map.json tools/check-tick-function.mjs"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.117.3",

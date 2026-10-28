@@ -435,8 +435,10 @@ export class Armies {
         this.create(n.id, 'land', c.id, this.makeUnits({ inf: 1, rng: big ? 1 : 0 }), { name: `${c.cityName ?? c.name} Garrison`, garrison: true });
       }
       const port = capOk && cap.seaNeighbors.length ? cap : provs.find((p) => p.isCity && p.seaNeighbors.length);
-      if (port && (n.major || n.id === playerId) && size > 3) {
-        this.create(n.id, 'naval', this.P + port.seaNeighbors[0], this.makeUnits({ nav: n.id === playerId || big ? 2 : 1 }));
+      // Players (every person, in multiplayer) get a fleet and field armies like the player.
+      const human = n.id === playerId || st.isHuman(n.id);
+      if (port && (n.major || human) && size > 3) {
+        this.create(n.id, 'naval', this.P + port.seaNeighbors[0], this.makeUnits({ nav: human || big ? 2 : 1 }));
       }
     }
 
@@ -444,7 +446,7 @@ export class Armies {
     // get the same (they now play), smaller ones rely on their garrisons.
     for (const n of map.nations) {
       const provs = owned[n.id];
-      if (n.id !== playerId && provs.length < 10) continue;
+      if (n.id !== playerId && !st.isHuman(n.id) && provs.length < 10) continue;
       if (!provs.length || map.provinces[n.capitalId]?.owner !== n.id) continue;
       this.spawnField(n.id, provs);
     }
