@@ -194,3 +194,34 @@ The response gives the time of each phase on Supabase's hardware. If 30 game hou
 | `npm run test:functions` | The real Edge Function under Deno with an in-memory supabase-js: who may call it, leases, the on-demand cooldown, a tick through the Supabase store |
 | `npm run test:policies` | The 11B SQL on Postgres 16: lifecycle, views, limits, tick leases |
 | `tools/e2e/multiplayer.test.mjs` | Two accounts in two tabs, one game, through the UI, with the real game server inside the fake client |
+
+### Live on Supabase (deployed 2026-10-28)
+`tools/mp-deploy.mjs` deployed the `tick` function, ran the 11A and 11B SQL, stored the tick secret (function secret + Vault, never printed) and scheduled the job.
+
+**Real ticks on Supabase** (WWII map, 30 game hours each):
+
+| | Median | Range |
+|---|---|---|
+| Whole tick | ~1.1 s | 0.9–1.3 s |
+| Database reads and writes, of which | ~0.6–0.7 s | |
+| Computation, of which (the part the 2 s CPU limit counts) | **381 ms** | 300–471 ms worst |
+
+Within the computation: building the map 75–140 ms, simulating 160–270 ms, restore and pack ~50 ms.
+
+**Interval: 5 minutes** (`private.mp_limits.tick_minutes`). The 30-game-hour computation is well under 1.2 s.
+
+**The schedule fires.** pg_cron runs every minute, and `due_games()` picks games whose last tick is 5 minutes old. Seen live with nobody signed in to the check game (`net._http_response`, all HTTP 200):
+
+| Time (UTC) | Tick | Game hours | Whole tick | Computation |
+|---|---|---|---|---|
+| 03:27 | 1 (sets up the world) | 0 | 720 ms | 188 ms |
+| 03:32 | 2 | 29.97 | 904 ms | 402 ms |
+| 03:37 | 3 | 30.02 | 1,039 ms | 457 ms |
+
+**Invocations:** 288 a day per running game from the schedule, plus on-demand ticks (at most 3 a minute per game) while players send orders.
+
+**Live two-account test:** `SUPABASE_ACCESS_TOKEN=… node tools/live-mp-test.mjs`. It does the following, then removes everything it created, also on failure:
+- creates two throwaway accounts and approves them;
+- adds them to the owner list for the test, since multiplayer is owner-only;
+- plays the two-player flow on the live site;
+- waits for scheduled ticks with nobody online.
