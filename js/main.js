@@ -27,6 +27,7 @@ import { Launcher } from './launcher.js';
 import { MULTIPLAYER_PREVIEW } from './config.js';
 import { SupabaseLobby, DemoLobby } from './lobby.js';
 import { LobbyUI } from './lobby-ui.js';
+import { MultiplayerClient } from './mp-client.js';
 import { Economy } from './economy.js';
 import { Armies } from './armies.js';
 import { Combat } from './combat.js';
@@ -268,6 +269,7 @@ const ui = new UI(state, {
   },
   // In-game MENU: pause and go to the main menu (Resume brings you back).
   returnToMenu() {
+    if (mpClient?.active) { mpClient.leave(); return; }
     state.setSelected(-1);
     state.setSelectedArmy(-1);
     pausedSpeed = state.clock.speed;
@@ -742,10 +744,42 @@ launcher.run().then(() => {
  * now. For everyone else the menu keeps "Multiplayer · Coming soon".
  */
 let lobbyUI = null;
+let mpClient = null;
 function setupMultiplayer() {
   const allowed = MULTIPLAYER_PREVIEW === 'everyone' || (MULTIPLAYER_PREVIEW === 'owners' && launcher.isOwner);
   if (!allowed) return;
-  lobbyUI = new LobbyUI(launcher.auth.demo ? new DemoLobby() : new SupabaseLobby(launcher.auth));
+  const net = launcher.auth.demo ? new DemoLobby() : new SupabaseLobby(launcher.auth);
+  mpClient = new MultiplayerClient({
+    state, sim, net, feed, notice,
+    // The game's map: era data, or the Fictional World from its seed.
+    async loadMapFor(game) {
+      state.setSpeed(0);
+      screens.setMode('single');
+      if (game.era === 'fictional') loadMap(game.map_seed); else await loadEra(game.era);
+      if (state.map?.era?.id !== game.era) throw new Error('Could not load the map for this game.');
+    },
+    onEnter() {
+      renderer.ownershipDirty = true;
+      state.setFocusedNation(-1);
+      screens.gameInProgress = false;
+      screens.show('game');
+      const cap = state.getProvince(state.playerNation?.capitalId);
+      const own = cap?.owner === state.playerNationId ? cap : state.provincesOf(state.playerNationId)[0];
+      if (own) { state.setSelected(own.id); focusOn(own.center.x, own.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.0); }
+      notice(`${state.playerNation?.name ?? 'Your nation'}: ${mpClient.game.name}. Orders go to the server.`);
+      renderer.requestRender();
+    },
+    onLeave() {
+      state.setSelected(-1);
+      state.setSelectedArmy(-1);
+      state.setSpeed(0);
+      state.setPhase('setup');
+      screens.show('lobby');
+      lobbyUI.open();
+      menuCamera();
+    },
+  });
+  lobbyUI = new LobbyUI(net, { enter: (game, seat) => mpClient.enter(game, seat) });
   const item = document.querySelector('[data-menu="multi"]');
   item.disabled = false;
   item.innerHTML = '<span>Multiplayer</span><small>Owner preview · persistent games</small>';
@@ -787,4 +821,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { commands, state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame, peaceUI };
+window.ironMeridian = { get mpClient() { return mpClient; }, get lobbyUI() { return lobbyUI; }, commands, state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame, peaceUI };

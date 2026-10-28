@@ -251,10 +251,21 @@ export class Armies {
 
   /** Node position (an army mid-hop is drawn between its two nodes). */
   armyPos(army) {
-    if (!army.seg) return this.pos[army.node];
-    const a = this.pos[army.seg.from], b = this.pos[army.seg.to];
-    const t = Math.min(1, army.seg.done / army.seg.hours);
-    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    let p;
+    if (!army.seg) p = this.pos[army.node];
+    else {
+      const a = this.pos[army.seg.from], b = this.pos[army.seg.to];
+      const t = Math.min(1, army.seg.done / army.seg.hours);
+      p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+    // Multiplayer: after the server corrects a prediction, the marker glides
+    // from where it was drawn to where it is (smoothing set by mp-client.js).
+    const s = this.smoothing?.get(army.id);
+    if (!s) return p;
+    const k = 1 - Math.min(1, (performance.now() - s.t0) / s.ms);
+    if (k <= 0) { this.smoothing.delete(army.id); return p; }
+    const e = k * k; // ease out
+    return { x: p.x + s.dx * e, y: p.y + s.dy * e };
   }
 
   // --- Orders ----------------------------------------------------------------
@@ -435,8 +446,10 @@ export class Armies {
         this.create(n.id, 'land', c.id, this.makeUnits({ inf: 1, rng: big ? 1 : 0 }), { name: `${c.cityName ?? c.name} Garrison`, garrison: true });
       }
       const port = capOk && cap.seaNeighbors.length ? cap : provs.find((p) => p.isCity && p.seaNeighbors.length);
-      if (port && (n.major || n.id === playerId) && size > 3) {
-        this.create(n.id, 'naval', this.P + port.seaNeighbors[0], this.makeUnits({ nav: n.id === playerId || big ? 2 : 1 }));
+      // Players (every person, in multiplayer) get a fleet and field armies like the player.
+      const human = n.id === playerId || st.isHuman(n.id);
+      if (port && (n.major || human) && size > 3) {
+        this.create(n.id, 'naval', this.P + port.seaNeighbors[0], this.makeUnits({ nav: human || big ? 2 : 1 }));
       }
     }
 
@@ -444,7 +457,7 @@ export class Armies {
     // get the same (they now play), smaller ones rely on their garrisons.
     for (const n of map.nations) {
       const provs = owned[n.id];
-      if (n.id !== playerId && provs.length < 10) continue;
+      if (n.id !== playerId && !st.isHuman(n.id) && provs.length < 10) continue;
       if (!provs.length || map.provinces[n.capitalId]?.owner !== n.id) continue;
       this.spawnField(n.id, provs);
     }

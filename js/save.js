@@ -80,6 +80,8 @@ export function snapshot({ state, sim, feed }, extra = {}) {
     victory: pick(victory, ['config', 'over', 'continued', 'started', 'lastCheck', 'stats']),
     sandboxTools: { instant: sandbox.instant },
     feed: feed ? { items: feed.items.slice(0, 80), nextId: feed.nextId } : null,
+    // Offers waiting for an answer (commands.js): kept so they can still be answered after a load.
+    offers: sim.commands ? { pending: [...sim.commands.pending].map(([n, m]) => [n, [...m.values()]]), next: sim.commands.nextOffer } : null,
   };
   const nation = st.getNation(me);
   victory.refresh();
@@ -148,6 +150,13 @@ export function restore({ state, sim, feed }, save) {
   combat.levyHours ??= 0; // saves from before step 9
 
   research.nations = new Map(d.research.map(([n, r]) => [n, { ...r, fx: null }]));
+  if (sim.commands) {
+    sim.commands.reset();
+    if (d.offers) {
+      sim.commands.pending = new Map(d.offers.pending.map(([n, list]) => [n, new Map(list.map((o) => [o.id, o]))]));
+      sim.commands.nextOffer = d.offers.next;
+    }
+  }
   // Saves from before step 10 name the old shared tree's techs: move them onto this era's tree.
   research.migration = save.version < 2 ? research.migrate() : null;
   const moved = research.migration?.of[d.player];

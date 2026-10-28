@@ -121,6 +121,7 @@ export class PeaceUI {
     const name = st.getNation(o).shortName;
     const pids = [...this.picked];
     const r = this.sim.commands.issue('peace.propose', { nation: o, provinces: pids });
+    if (r.pending) { this.notice(`Peace terms sent to ${name}: the answer comes with the next server tick`); this.close(); return; }
     if (r.ok) {
       this.notice(pids.length ? `${name} accepts: you keep ${pids.length} province${pids.length === 1 ? '' : 's'}` : `${name} accepts a white peace`);
       this.close();

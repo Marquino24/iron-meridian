@@ -14,11 +14,15 @@
 import { esc } from './ui-kit.js';
 import { ERAS, getEra, loadEraData } from './eras.js';
 import { generateMap } from './map.js';
-import { SPEEDS } from './lobby.js';
+import { SPEEDS, INACTIVE_DAYS } from './lobby.js';
+
+const STATUS = { open: 'waiting for players', running: 'running', paused: 'paused', finished: 'ended' };
 
 export class LobbyUI {
-  constructor(lobby) {
+  /** @param {object} lobby  js/lobby.js backend   @param {{ enter(game, seat) }} actions */
+  constructor(lobby, actions = {}) {
     this.lobby = lobby;
+    this.actions = actions;
     this.el = document.getElementById('lobby-body');
     this.view = 'list';
     this.games = [];
@@ -58,7 +62,7 @@ export class LobbyUI {
     const rows = this.games.map((g) => `<li class="lobby-game">
         <button type="button" class="lobby-open" data-game="${esc(g.id)}">
           <span class="lg-name">${esc(g.name)}${g.mine ? ' <span class="lg-mine">JOINED</span>' : ''}</span>
-          <span class="lg-meta">${esc(getEra(g.era)?.label ?? g.era)}${g.map_seed ? ` · seed ${esc(g.map_seed)}` : ''} · 1 day per ${Number(g.minutes_per_day)} min</span>
+          <span class="lg-meta"><span class="lg-status st-${esc(g.status)}">${esc(STATUS[g.status] ?? g.status)}</span> · ${esc(getEra(g.era)?.label ?? g.era)}${g.map_seed ? ` · seed ${esc(g.map_seed)}` : ''} · 1 day per ${Number(g.minutes_per_day)} min</span>
           <span class="lg-seats" aria-label="${g.players} of ${g.max_players} players">${g.players}/${g.max_players}</span>
         </button></li>`).join('');
     this.el.innerHTML = `
@@ -68,7 +72,7 @@ export class LobbyUI {
       </div>
       ${this.message ? `<p class="lobby-msg bad" role="alert">${esc(this.message)}</p>` : ''}
       ${this.games.length ? `<ul class="lobby-list" aria-label="Open games">${rows}</ul>` : this.busy ? '' : '<p class="hint">No open games yet. Create one.</p>'}
-      <p class="lobby-note">Owner preview: games can be created and joined, but not played yet. The game server that runs them (even with everyone offline) comes in the next step.</p>`;
+      <p class="lobby-note">Owner preview. Games run on the server around the clock, also while everyone is offline; computer nations fill every seat without a player.${this.lobby.demo ? ' Demo: this browser plays the server, and only while the page is open.' : ''}</p>`;
   }
 
   renderCreate() {
@@ -80,12 +84,13 @@ export class LobbyUI {
       <label class="lobby-seed" hidden>Map seed <input name="seed" maxlength="40" value="${esc(`MP-${Math.random().toString(36).slice(2, 7).toUpperCase()}`)}"></label>
       <label>Speed <select name="speed">${speeds}</select></label>
       <label>Players <input name="players" type="number" min="2" max="20" value="10"></label>
+      <label>Hand a quiet player's nation to the computer after <select name="inactive">${INACTIVE_DAYS.map((d) => `<option value="${d}" ${d === 7 ? 'selected' : ''}>${d} day${d === 1 ? '' : 's'}</option>`).join('')}</select></label>
       ${this.message ? `<p class="lobby-msg bad" role="alert">${esc(this.message)}</p>` : ''}
       <div class="btn-row">
         <button type="submit" class="btn primary" ${this.busy ? 'disabled' : ''}>Create game</button>
         <button type="button" class="btn ghost" data-lobby="list">Cancel</button>
       </div>
-      <p class="lobby-note">Computer nations fill every nation without a player.</p>
+      <p class="lobby-note">Computer nations fill every nation without a player. The game starts when you start it, or by itself when every seat is taken.</p>
     </form>`;
   }
 
@@ -97,7 +102,7 @@ export class LobbyUI {
     if (!(players >= 2 && players <= 20)) { this.message = 'Players: 2 to 20.'; return this.render(); }
     this.busy = true;
     try {
-      const g = await this.lobby.create({ name, era: String(f.get('era')), mapSeed: String(f.get('seed') ?? '').trim() || 'MP-1', minutesPerDay: Number(f.get('speed')), maxPlayers: players });
+      const g = await this.lobby.create({ name, era: String(f.get('era')), mapSeed: String(f.get('seed') ?? '').trim() || 'MP-1', minutesPerDay: Number(f.get('speed')), maxPlayers: players, inactiveDays: Number(f.get('inactive') ?? 7) });
       this.message = '';
       this.busy = false;
       await this.openGame({ ...g, players: 0, mine: false });
@@ -109,6 +114,8 @@ export class LobbyUI {
   }
 
   async openGame(g) {
+    // Fresh lobby facts (a join can start the game by itself).
+    g = (await this.lobby.list().catch(() => [])).find((x) => x.id === g.id) ?? g;
     this.view = 'game';
     this.game = g;
     this.nations = null;
@@ -134,9 +141,17 @@ export class LobbyUI {
         <p class="lg-meta">${esc(getEra(g.era)?.label ?? g.era)}${g.map_seed ? ` · seed ${esc(g.map_seed)}` : ''} · 1 game day per ${Number(g.minutes_per_day)} real min · ${this.taken.length}/${g.max_players} players</p>
       </div>
       ${this.message ? `<p class="lobby-msg bad" role="alert">${esc(this.message)}</p>` : ''}
-      ${this.seat ? `<div class="lobby-seat"><span>You play <b>${esc(n(this.seat.nation_id))}</b>.</span>
-          <button type="button" class="btn ghost small" data-lobby="leave">Leave game</button></div>
-          <p class="lobby-note">The game starts once the game server is running (next step). Your seat is kept.</p>`
+      ${this.seat ? `<div class="lobby-seat"><span>You play <b>${esc(n(this.seat.nation_id))}</b>${this.seat.ai_controlled ? ' (handed to the computer while you were away)' : ''}.</span>
+          ${g.status !== 'finished' ? '<button type="button" class="btn ghost small" data-lobby="leave">Leave game</button>' : ''}</div>
+          <div class="btn-row">
+            ${g.status === 'running' || g.status === 'paused' || g.status === 'finished' ? `<button type="button" class="btn primary" data-lobby="enter">${g.status === 'finished' ? 'View final map' : 'Enter game'}</button>` : ''}
+            ${g.created_by_me && g.status === 'open' ? '<button type="button" class="btn primary" data-lobby="start">Start game</button>' : ''}
+            ${g.created_by_me && g.status === 'running' ? '<button type="button" class="btn ghost" data-lobby="pause">Pause</button>' : ''}
+            ${g.created_by_me && g.status === 'paused' ? '<button type="button" class="btn ghost" data-lobby="resume">Resume</button>' : ''}
+          </div>
+          <p class="lobby-note">${g.status === 'open' ? (g.created_by_me ? 'Start the game when you\'re ready (it also starts by itself once every seat is taken). Computer nations fill the empty seats.' : 'Waiting for the creator to start the game, or for every seat to be taken.')
+            : g.status === 'finished' ? `This game has ended${g.end_reason ? `: ${esc(g.end_reason)}` : '.'}`
+            : `Leaving hands your nation to the computer. Away for ${g.inactive_days ?? 7} days, it's handed over too.`}</p>`
         : `<div class="lobby-pick">
           <input id="lobby-filter" type="search" placeholder="Find a nation" aria-label="Find a nation" value="${esc(this.filter)}">
           <ul class="lobby-nations" role="listbox" aria-label="Nations"></ul>
@@ -165,6 +180,19 @@ export class LobbyUI {
     if (b.dataset.game) { const g = this.games.find((x) => x.id === b.dataset.game); if (g) this.openGame(g); return; }
     if (b.dataset.nation) { this.pick = Number(b.dataset.nation); this.renderGame(); return; }
     const a = b.dataset.lobby;
+    if (a === 'enter') {
+      this.busy = true;
+      try { await this.actions.enter?.(this.game, this.seat); this.busy = false; } catch (err) { this.busy = false; this.message = err.message; this.render(); }
+      return;
+    }
+    if (a === 'start' || a === 'pause' || a === 'resume') {
+      try {
+        this.game = { ...this.game, ...(await this.lobby.setStatus(this.game.id, a === 'start' || a === 'resume' ? 'running' : 'paused')) };
+        this.message = '';
+      } catch (err) { this.message = err.message; }
+      this.render();
+      return;
+    }
     if (a === 'create') { this.view = 'create'; this.message = ''; this.render(); }
     if (a === 'list') { this.view = 'list'; this.message = ''; await this.refresh(); }
     if (a === 'refresh') await this.refresh();

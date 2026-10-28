@@ -136,3 +136,61 @@ supabase functions delete tick-spike         # afterwards
 ```
 
 The response gives the time of each phase on Supabase's hardware. If 30 game hours take more than about 1.2 s there, tick every 2–3 minutes instead of 5.
+
+## Step 11B: playable games
+
+### How a game runs
+- **Server, scheduled.** pg_cron calls the `tick` Edge Function every minute for each running game that is due. A game is due every `tick_minutes` (5 by default, set from the measurements).
+  - Each tick loads the game, applies the queued orders oldest first, advances the clock, saves the full state and one fogged view per player, and marks each order applied or rejected with the reason.
+  - Orders are checked by `js/commands.js`, exactly as in single-player.
+  - The clock advances by the real time since the last tick at the game's speed, at most 36 game hours per tick. A longer gap catches up over the next ticks.
+  - The computer runs every nation without an active player.
+  - The tick code is `js/game-server.js`; the function itself is `supabase/functions/tick/index.ts` and `store.ts`.
+- **Server, on demand.** After sending an order, the client asks for a tick itself: signed in, seated in the game, at most once every 20 s per game. If the game ticked moments ago, the client retries when the cooldown has passed. Orders land within seconds while players are online.
+- **Client.** `js/mp-client.js` loads the player's view and runs the simulation without the computer players, so armies keep moving between ticks. It replaces its state with each new tick (Realtime on `games`, plus a 30 s poll). Markers glide to their corrected place instead of jumping.
+  - Simple orders (move, halt, recruit, build, research) apply locally at once and are re-checked by the server.
+  - The rest (split, merge, war, treaties, peace) wait for the server.
+  - The orders list shows each one as pending, applied or rejected, with the reason.
+- **Lifecycle.**
+  - **Start:** the creator starts the game, or it starts by itself when the last seat is taken. The first tick sets up the world.
+  - **Pause / resume:** creator or owner only. The paused time is not made up.
+  - **End:** a game ends by its win conditions (points, domination or time limit) and stays readable; "View final map".
+  - **Leaving:** a player who leaves, or isn't seen for the game's `inactive_days` (1–14, default 7), has their nation handed to the computer.
+- **Fog of war is real (server-side).** Players can't read `game_states`, only their own row of `game_views`. A view keeps:
+  - in full: their own and their allies' armies, recruitment, construction, research and stocks;
+  - only where visible: other armies, in or next to land they hold, off their coasts and around their armies, with their routes removed;
+  - no other nation's stocks, and none of the computer's plans.
+
+  What isn't fogged: borders, buildings and every nation's finished research (shown in diplomacy).
+- **Limits** (`private.mp_limits`, enforced in SQL; owners are exempt from the per-user ones):
+
+  | Limit | Default |
+  |---|---|
+  | Active games in total | 40 |
+  | Active games per creator | 2 |
+  | Seats per player | 3 |
+  | Orders per player per minute | 20 |
+  | Gap between on-demand ticks per game | 20 s |
+
+  Players see the reason when a limit is hit, e.g. "Too many orders: at most 20 a minute."
+
+### Going live (owner)
+1. In the SQL editor, run `docs/supabase-multiplayer-11b.sql` (after the 11A file).
+2. Deploy and schedule. Either:
+   - **One command,** with a Supabase personal access token in the environment (never in a file):
+     `SUPABASE_ACCESS_TOKEN=… node tools/mp-deploy.mjs`. It deploys the function, creates the shared secret (function secret + Vault), runs the 11B SQL, measures real ticks on a throwaway game, sets the interval and schedules the job; or
+   - **By hand:**
+     1. `node tools/build-functions.mjs`
+     2. `supabase functions deploy tick --project-ref kzdixrmlqcedgiqsrsdy --no-verify-jwt`
+     3. `supabase secrets set TICK_SECRET=<random>`
+     4. create the two Vault secrets named at the top of `docs/supabase-multiplayer-cron.sql`
+     5. run that file.
+3. Check: `select * from cron.job_run_details order by start_time desc limit 5;` and `select status_code, content from net._http_response order by created desc limit 5;`
+
+### Tests
+| Test | What it covers |
+|---|---|
+| `node tools/check-mp-server.mjs` (in `npm test`) | Two human nations on WWII: orders from both, rejections, 30 game days with nobody online, fog of war, an inactive player handed to the AI, catch-up after a gap, pause, a game ending by its win condition |
+| `npm run test:functions` | The real Edge Function under Deno with an in-memory supabase-js: who may call it, leases, the on-demand cooldown, a tick through the Supabase store |
+| `npm run test:policies` | The 11B SQL on Postgres 16: lifecycle, views, limits, tick leases |
+| `tools/e2e/multiplayer.test.mjs` | Two accounts in two tabs, one game, through the UI, with the real game server inside the fake client |

@@ -244,23 +244,24 @@ Flags are rendered into one small WebP sheet per era (`assets/flags-<era>.webp`,
 
 Every nation picker has a target button to pick a nation by tapping the map (on phones the panel folds out of the way; the ▾ button folds it by hand too). Time goes up to 16×. Starting a normal game afterwards clears all of it.
 
-## Multiplayer (in progress: owners only)
+## Multiplayer (owners only for now)
 
-Persistent games in the style of Conflict of Nations are being built. The architecture decision, with the measured numbers and the Supabase free-tier limits, is in `docs/MULTIPLAYER.md`.
+Persistent games in the style of Conflict of Nations. Up to 20 players per map, the computer fills every other nation, and the world keeps running with everyone offline.
 
-**Chosen design.** Supabase Edge Functions run the world on a schedule: each tick loads the game, applies orders and saves it. Clients predict between ticks.
+- **Server:** a Supabase Edge Function ticks each game every few minutes, and also right away when a player sends an order.
+- **Browser:** predicts between ticks so armies move smoothly, and corrects to the server's state without jumps.
+- **Fog of war** is applied on the server.
+- **Lifecycle:** start, pause and resume; the game ends by its win conditions; a player who leaves or goes quiet is handed to the computer.
+- **Limits** keep it inside the free tier.
 
-**Built so far (step 11A):**
-- **Tables:** `docs/supabase-multiplayer.sql`, to run in the Supabase SQL editor after `docs/supabase-setup.sql`. It creates games, players, saved state and orders, with row-level security. `npm run test:policies` tests the policies.
-- **Commands:** every order a player gives goes through `js/commands.js` as a JSON command record, in single-player too. `node tools/check-commands.mjs` is part of `npm test`.
-- **Lobby:** create, list, join (pick a nation) and leave games. It's behind `MULTIPLAYER_PREVIEW` in `js/config.js`:
-  - `'owners'` (now): only owners see it; everyone else keeps "Multiplayer · Coming soon";
-  - `'off'`: nobody sees it;
-  - `'everyone'`: approved testers see it too.
+Details, measurements, the go-live steps and the tests are in `docs/MULTIPLAYER.md`. The SQL is `docs/supabase-multiplayer.sql`, then `-11b.sql`, then `-cron.sql`.
 
-  The claude.ai preview and localhost use an in-browser demo lobby with sample games. `tools/e2e/lobby.test.mjs` tests it.
+`MULTIPLAYER_PREVIEW` in `js/config.js` decides who sees it:
+- `'owners'` (now): only owners;
+- `'off'`: nobody;
+- `'everyone'`: approved testers too.
 
-Games can't be played yet: the game server comes next.
+The claude.ai preview and localhost run the game server in the browser, with sample games.
 
 ## Phones, tablets and Safari
 
@@ -328,7 +329,8 @@ docs/             SETUP.md (going live), TESTERS.md, supabase-setup.sql and supa
                   MULTIPLAYER.md (architecture decision), FLAGS.md, TECH.md
 supabase/
   test/           Policy tests for docs/supabase-setup.sql and supabase-multiplayer.sql on plain PostgreSQL with a mock auth schema
-  functions/tick-spike/  Deployable Edge Function version of the tick measurement (not used by the game)
+  functions/tick/        The multiplayer tick Edge Function (game code copied in by tools/build-functions.mjs)
+  functions/tick-spike/  Step 11A's tick measurement as an Edge Function (not used by the game)
 vendor/           @supabase/supabase-js 2.117.3 (UMD, MIT), loaded only when sign-in is on
 privacy.html, terms.html   Linked from the sign-in screen and provider consent screens
 js/
@@ -388,6 +390,10 @@ js/
   diplomacy-ui.js War alerts, peace offers and AI land demands
   peace-ui.js     Peace window: war score, provinces to keep, acceptance chance
   commands.js     Player orders as JSON command records: checked and applied in one place
+  game-server.js  One tick of a multiplayer game (orders, AI, clock, win conditions, fogged views)
+  fog.js          Fog of war: what each player's view of the world keeps
+  mp-client.js    Playing a multiplayer game: views, prediction, smooth correction, orders list
+  mp-local-store.js  Game store in plain JSON (tests, demo lobby)
   lobby.js        Multiplayer lobby data: Supabase tables, or a demo lobby in this browser
   lobby-ui.js     Multiplayer lobby screen (owners only for now)
   integration.js  Conquered land settling in (45% → 100%), unrest and revolts

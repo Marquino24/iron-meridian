@@ -309,7 +309,8 @@ export class UI {
         if (this.state.selectedArmyId >= 0) this.state.setSelectedArmy(-1);
         else this.state.setSelected(-1);
       }
-      if (e.key === ' ' && this.state.phase === 'playing') {
+      // (Multiplayer games run on the server's clock: no pausing them here.)
+      if (e.key === ' ' && this.state.phase === 'playing' && !this.state.multiplayer) {
         e.preventDefault();
         this.state.setSpeed(this.state.clock.speed === 0 ? 1 : 0);
       }

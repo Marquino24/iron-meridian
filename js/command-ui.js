@@ -382,13 +382,15 @@ export class CommandUI {
         const idx = army.units.map((u, i) => (this.checked.has(u) ? i : -1)).filter((i) => i >= 0);
         const r = issue('army.split', { army: armyId, units: idx });
         this.checked.clear();
-        if (r.ok) this.actions.notice(`${r.name} formed with ${r.units} units`);
+        if (r.pending) this.actions.notice('Split order sent: the new army forms on the next server tick');
+        else if (r.ok) this.actions.notice(`${r.name} formed with ${r.units} units`);
         break;
       }
       case 'split-half': {
         const r = issue('army.split-half', { army: armyId });
         this.checked.clear();
-        if (r.ok) this.actions.notice(`${r.name} formed with ${r.units} units`);
+        if (r.pending) this.actions.notice('Split order sent: the new army forms on the next server tick');
+        else if (r.ok) this.actions.notice(`${r.name} formed with ${r.units} units`);
         break;
       }
       case 'merge': issue('army.merge', { into: armyId, from: Number(b.dataset.army) }); break;

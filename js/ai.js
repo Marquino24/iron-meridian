@@ -124,7 +124,7 @@ export class AI {
     for (const p of map.provinces) if (p.owner >= 0) sizes[p.owner]++;
     this.disabled.clear();
     for (const n of map.nations) {
-      if (n.id === playerId || !sizes[n.id]) continue;
+      if (n.id === playerId || this.state.isHuman(n.id) || !sizes[n.id]) continue;
       this.addBrain(n.id, sizes[n.id]);
     }
     // Remember original owners (to retake lost land) and refresh research bonuses.
@@ -134,7 +134,7 @@ export class AI {
 
   /** A brain for one nation (also used when the sandbox hands a nation back to the computer). */
   addBrain(id, size = null) {
-    if (this.brains.has(id) || id === this.state.playerNationId) return;
+    if (this.brains.has(id) || this.state.isHuman(id)) return;
     const n = this.state.getNation(id);
     size ??= this.state.provinces.filter((p) => p.owner === id).length;
     if (!n || !size) return;
@@ -583,7 +583,7 @@ export class AI {
       const stalemate = days > 150 && won <= lost;
       const tired = this.exhaustion(n, e) >= 1;
       const score = C.warScore(n, e);
-      const player = e === this.state.playerNationId;
+      const player = this.state.isHuman(e);
       // Winning against you: demand land (the provinces the rules allow), after a month of war.
       if (player && score >= DEMAND_SCORE && days > 30 && this.clockHours - b.lastPeaceOffer >= PEACE_COOLDOWN_H) {
         const pids = [...C.cession(info, n, e)];
@@ -622,7 +622,7 @@ export class AI {
       // Call the allies: AI allies decide at once, the player gets asked.
       for (const ally of Dp?.allies(n) ?? []) {
         if (C.atWar(ally, best)) continue;
-        if (ally === this.state.playerNationId) Dp.propose(n, ally, { kind: 'join', target: best });
+        if (this.state.isHuman(ally)) Dp.propose(n, ally, { kind: 'join', target: best });
         else Dp.askToJoin(n, ally, best);
       }
     }
@@ -637,7 +637,7 @@ export class AI {
   doTreaties({ n, b }) {
     const Dp = this.sim.diplomacy;
     if (!Dp || Math.random() > 0.35) return;
-    const C = this.sim.combat, me = this.state.playerNationId;
+    const C = this.sim.combat, st = this.state;
     const pool = [...new Set([...this.neighborsOf(n), ...Dp.met(n)])].filter((o) => o !== n && !C.atWar(n, o) && this.state.provinces.some((p) => p.owner === o));
     if (!pool.length) return;
     // Court the nations it likes best (a random one of its top three).
@@ -649,18 +649,20 @@ export class AI {
     if (ally && !Dp.has(n, o, 'alliance')) type = 'alliance';
     else if (!Dp.has(n, o, 'nap') && !Dp.has(n, o, 'alliance') && this.neighborsOf(n).has(o) && ratio > 1.5 && op >= -5) type = 'nap';
     if (type) {
-      if (o === me) Dp.propose(n, o, { kind: 'treaty', type });
+      if (st.isHuman(o)) Dp.propose(n, o, { kind: 'treaty', type });
       else if (Dp.accepts(o, n, type).ok) Dp.sign(n, o, type);
       return;
     }
-    // Ask the player for help in a war, or offer a trade.
-    if (Dp.has(n, me, 'alliance')) {
-      const target = C.enemiesOf(n).find((e) => !C.atWar(me, e) && !Dp.has(me, e, 'alliance'));
-      if (target != null) { Dp.propose(n, me, { kind: 'join', target }); return; }
-    }
-    if (Dp.met(n).has(me) && Dp.opinion(n, me).value >= 0) {
-      const offer = Dp.tradeIdea(n, me);
-      if (offer) Dp.propose(n, me, { kind: 'trade', ...offer });
+    // Ask a player (each person, in multiplayer) for help in a war, or offer a trade.
+    for (const me of st.humanNations()) {
+      if (Dp.has(n, me, 'alliance')) {
+        const target = C.enemiesOf(n).find((e) => !C.atWar(me, e) && !Dp.has(me, e, 'alliance'));
+        if (target != null) { Dp.propose(n, me, { kind: 'join', target }); return; }
+      }
+      if (Dp.met(n).has(me) && Dp.opinion(n, me).value >= 0) {
+        const offer = Dp.tradeIdea(n, me);
+        if (offer) Dp.propose(n, me, { kind: 'trade', ...offer });
+      }
     }
     // Ditch an ally it has come to dislike.
     for (const a of Dp.allies(n)) if (Dp.opinion(n, a).value < -10 && Math.random() < 0.3) { Dp.cancel(n, a, 'alliance'); break; }
@@ -815,7 +817,7 @@ export class AI {
     if (this.fearedBy(n) >= 2 && (this.state.clock.time - info.start) / 864e5 > 45) return true;
     // Holding as much as a peace would let it keep: take the terms.
     const keepable = Math.max(2, Math.floor(this.state.provinces.filter((p) => p.homeOf === other).length / 4));
-    if (other !== this.state.playerNationId && info.captured.filter((c) => c.from === other && c.to === n && this.state.provinces[c.pid].owner === n).length >= keepable) return true;
+    if (!this.state.isHuman(other) && info.captured.filter((c) => c.from === other && c.to === n && this.state.provinces[c.pid].owner === n).length >= keepable) return true;
     const won = info.captured.filter((c) => c.from === other && this.state.provinces[c.pid].owner === n).length;
     const lost = info.captured.filter((c) => c.from === n && this.state.provinces[c.pid].owner === other).length;
     const ratio = this.powerOf(n) / Math.max(1, this.powerOf(other));

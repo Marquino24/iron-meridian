@@ -108,8 +108,8 @@ export class Victory {
     if (!this.active) return;
     const me = state.playerNationId;
     const mine = this.scoreOf(me);
-    // Defeat: no city left.
-    if (mine.cities === 0) { this.finish('defeat', 'You have lost your capital and every city.', -1); return; }
+    // Defeat: no city left. (A multiplayer server has no player of its own: me = -1.)
+    if (me >= 0 && mine.cities === 0) { this.finish('defeat', 'You have lost your capital and every city.', -1); return; }
     const leader = this.scores[0];
     if (this.config.mode === 'points' && leader && leader.points >= this.target) {
       this.finish(leader.id === me ? 'victory' : 'defeat', `${state.getNation(leader.id).name} reached ${this.target} victory points.`, leader.id);
