@@ -37,7 +37,7 @@ export const OWNER_EMAILS = [
  * see it: everyone else keeps "Multiplayer · Coming soon") or 'everyone'
  * (approved testers too; the database still lets only approved users in).
  */
-export const MULTIPLAYER_PREVIEW = 'owners';
+export const MULTIPLAYER_PREVIEW = 'everyone';
 
 /** Sign-in options in the order they appear. `id` is the Supabase provider name. */
 export const PROVIDERS = [

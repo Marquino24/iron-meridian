@@ -740,8 +740,9 @@ launcher.run().then(() => {
 });
 
 /**
- * Multiplayer lobby, behind MULTIPLAYER_PREVIEW (config.js): owners only for
- * now. For everyone else the menu keeps "Multiplayer · Coming soon".
+ * Multiplayer lobby, behind MULTIPLAYER_PREVIEW (config.js): owners only
+ * before; now ('everyone') approved testers too, labelled as a beta. When it's
+ * off, the menu keeps "Multiplayer · Coming soon".
  */
 let lobbyUI = null;
 let mpClient = null;
@@ -782,7 +783,7 @@ function setupMultiplayer() {
   lobbyUI = new LobbyUI(net, { enter: (game, seat) => mpClient.enter(game, seat) });
   const item = document.querySelector('[data-menu="multi"]');
   item.disabled = false;
-  item.innerHTML = '<span>Multiplayer</span><small>Owner preview · persistent games</small>';
+  item.innerHTML = '<span>Multiplayer · Beta</span><small>Persistent games with friends</small>';
 }
 
 // --- Main loop ---
