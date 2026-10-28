@@ -39,7 +39,7 @@ const multi = (page) => page.locator('[data-menu="multi"]');
   const { ctx, page } = await newPage(mock);
   await signIn(page, 'owner@example.com', 'The Owner');
   await page.waitForSelector('#main-menu:not([hidden])');
-  check(!(await multi(page).isDisabled()) && /Owner preview/.test(await multi(page).textContent()), `owner: Multiplayer enabled ("${(await multi(page).textContent()).trim()}")`);
+  check(!(await multi(page).isDisabled()) && /Multiplayer · Beta/.test(await multi(page).textContent()), `owner: Multiplayer · Beta enabled ("${(await multi(page).textContent()).trim()}")`);
   await multi(page).click();
   await page.waitForSelector('#lobby-screen:not([hidden])');
   await page.waitForSelector('text=No open games yet');
@@ -94,15 +94,17 @@ const multi = (page) => page.locator('[data-menu="multi"]');
   await ctx.close();
 }
 
-// 2. An approved tester (not an owner): no multiplayer.
+// 2. An approved tester (not an owner): Multiplayer · Beta too (MULTIPLAYER_PREVIEW = 'everyone').
 {
   const { ctx, page } = await newPage(mock);
   await signIn(page, 'alice@example.com', 'Alice');
   await page.waitForSelector('text=Pending');
   await page.evaluate(() => window.__mockDecide('u-alice@example.com', 'approved'));
   await page.waitForSelector('#main-menu:not([hidden])');
-  check(await multi(page).isDisabled() && /Coming soon/.test(await multi(page).textContent()), 'approved tester: Multiplayer still "Coming soon"');
-  check(await page.locator('#lobby-screen').isHidden(), 'lobby hidden');
+  check(!(await multi(page).isDisabled()) && /Multiplayer · Beta/.test(await multi(page).textContent()), 'approved tester: Multiplayer · Beta enabled');
+  await multi(page).click();
+  await page.waitForSelector('#lobby-screen:not([hidden])');
+  check(/MULTIPLAYER · BETA/.test(await page.textContent('#lobby-screen .eyebrow')) && /Beta:/.test(await page.textContent('.lobby-note')), 'lobby labelled as a beta');
   await ctx.close();
 }
 

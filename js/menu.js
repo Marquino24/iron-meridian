@@ -5,7 +5,7 @@
  *             → Sandbox       → ERA → NATION → sandbox game (free tools)
  *             → Continue / Load Game → saved games (Save Game too while a game is paused)
  *             → Settings
- *             → Multiplayer   → lobby (owners only for now, see lobby-ui.js)
+ *             → Multiplayer   → lobby (beta, see lobby-ui.js)
  *
  * Exactly one screen is visible at a time; Back always goes one step up.
  * The map keeps running behind every screen (it pans slowly on the menu).

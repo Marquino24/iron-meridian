@@ -222,6 +222,6 @@ Within the computation: building the map 75–140 ms, simulating 160–270 ms, r
 
 **Live two-account test:** `SUPABASE_ACCESS_TOKEN=… node tools/live-mp-test.mjs`. It does the following, then removes everything it created, also on failure:
 - creates two throwaway accounts and approves them;
-- adds them to the owner list for the test, since multiplayer is owner-only;
+- adds them to the owner list for the test, (written while multiplayer was owner-only; with 'everyone' approval alone is enough);
 - plays the two-player flow on the live site;
 - waits for scheduled ticks with nobody online.

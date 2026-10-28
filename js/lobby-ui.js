@@ -1,5 +1,5 @@
 /**
- * lobby-ui.js — The multiplayer lobby screen (step 11A, owners only for now).
+ * lobby-ui.js — The multiplayer lobby screen (steps 11A–11B; a beta for approved testers).
  *
  * Shown only when config MULTIPLAYER_PREVIEW allows it (owners): everyone else
  * keeps the disabled "Multiplayer · Coming soon" menu item.
@@ -72,7 +72,7 @@ export class LobbyUI {
       </div>
       ${this.message ? `<p class="lobby-msg bad" role="alert">${esc(this.message)}</p>` : ''}
       ${this.games.length ? `<ul class="lobby-list" aria-label="Open games">${rows}</ul>` : this.busy ? '' : '<p class="hint">No open games yet. Create one.</p>'}
-      <p class="lobby-note">Owner preview. Games run on the server around the clock, also while everyone is offline; computer nations fill every seat without a player.${this.lobby.demo ? ' Demo: this browser plays the server, and only while the page is open.' : ''}</p>`;
+      <p class="lobby-note">Beta: expect rough edges, and games may be reset while multiplayer is tested. Games run on the server around the clock, also while everyone is offline; computer nations fill every seat without a player.${this.lobby.demo ? ' Demo: this browser plays the server, and only while the page is open.' : ''}</p>`;
   }
 
   renderCreate() {

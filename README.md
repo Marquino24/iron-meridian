@@ -244,7 +244,7 @@ Flags are rendered into one small WebP sheet per era (`assets/flags-<era>.webp`,
 
 Every nation picker has a target button to pick a nation by tapping the map (on phones the panel folds out of the way; the ▾ button folds it by hand too). Time goes up to 16×. Starting a normal game afterwards clears all of it.
 
-## Multiplayer (owners only for now)
+## Multiplayer (beta: approved testers)
 
 Persistent games in the style of Conflict of Nations. Up to 20 players per map, the computer fills every other nation, and the world keeps running with everyone offline.
 
@@ -257,9 +257,9 @@ Persistent games in the style of Conflict of Nations. Up to 20 players per map, 
 Details, measurements, the go-live steps and the tests are in `docs/MULTIPLAYER.md`. The SQL is `docs/supabase-multiplayer.sql`, then `-11b.sql`, then `-cron.sql`.
 
 `MULTIPLAYER_PREVIEW` in `js/config.js` decides who sees it:
-- `'owners'` (now): only owners;
-- `'off'`: nobody;
-- `'everyone'`: approved testers too.
+- `'everyone'` (now): approved testers, labelled "Multiplayer · Beta";
+- `'owners'`: only owners;
+- `'off'`: nobody.
 
 The claude.ai preview and localhost run the game server in the browser, with sample games.
 
@@ -395,7 +395,7 @@ js/
   mp-client.js    Playing a multiplayer game: views, prediction, smooth correction, orders list
   mp-local-store.js  Game store in plain JSON (tests, demo lobby)
   lobby.js        Multiplayer lobby data: Supabase tables, or a demo lobby in this browser
-  lobby-ui.js     Multiplayer lobby screen (owners only for now)
+  lobby-ui.js     Multiplayer lobby screen (beta)
   integration.js  Conquered land settling in (45% → 100%), unrest and revolts
   save.js         Saved games: snapshot/restore of every system, gzip, IndexedDB slots, export files
   save-ui.js      Continue, save/load screen with thumbnails, weekly autosave, export/import
