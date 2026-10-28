@@ -228,8 +228,15 @@ export class Commands {
 
   /** The player's order: stamped with their nation and applied (single-player) or sent (multiplayer, later). */
   issue(kind, payload = {}) {
-    return this.apply({ kind, nation: this.state.playerNationId, payload });
+    const cmd = { kind, nation: this.state.playerNationId, payload };
+    // Multiplayer (mp-client.js): the order goes to the game server; the result
+    // may be { ok: true, pending: true } until the server has applied it.
+    if (this.state.multiplayer && this.transport) return this.transport(cmd);
+    return this.apply(cmd);
   }
+
+  /** Apply a record here only (multiplayer prediction of an order also sent to the server). */
+  applyLocal(cmd) { return this.apply(cmd); }
 
   /**
    * Check and run one command record. The same function serves single-player

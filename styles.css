@@ -2365,3 +2365,41 @@ dd.integ { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justif
 .lobby-nation small { color: var(--text-dim); font-size: 11px; }
 .lobby-nation.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .lobby-nation:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- Step 11B: multiplayer game bar and orders ---------------------------------------------- */
+body.mp #speed-group { display: none; }
+.mp-bar {
+  position: fixed; z-index: 40; left: calc(var(--safe-left, 0px) + 12px); top: calc(var(--safe-top, 0px) + 64px);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(6, 10, 13, 0.88); color: var(--text); font-size: 13px;
+  max-width: calc(100vw - 32px);
+}
+.mp-bar[hidden], .mp-orders[hidden] { display: none; }
+.mp-name { font-weight: 700; }
+.mp-status { font-family: var(--font-mono); font-size: max(10px, var(--min-text)); letter-spacing: 0.1em; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-strong); }
+.mp-status.st-running { color: var(--green); border-color: var(--green); }
+.mp-status.st-paused { color: var(--accent); border-color: var(--accent); }
+.mp-status.st-finished { color: var(--text-dim); }
+.mp-tick { font-family: var(--font-mono); font-size: max(11px, var(--min-text)); color: var(--text-dim); }
+.mp-orders {
+  position: fixed; z-index: 39; left: calc(var(--safe-left, 0px) + 12px); top: calc(var(--safe-top, 0px) + 112px);
+  width: min(320px, calc(100vw - 32px)); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(6, 10, 13, 0.85);
+}
+.mpo-title { font-family: var(--font-mono); font-size: max(10px, var(--min-text)); letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 4px; }
+.mp-orders ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.mpo { display: grid; grid-template-columns: 10px 1fr auto; gap: 6px; align-items: center; font-size: 12px; }
+.mpo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+.mpo.st-pending .mpo-dot, .mpo.st-sending .mpo-dot { background: var(--accent); animation: mpo-pulse 1.2s ease-in-out infinite; }
+.mpo.st-applied .mpo-dot { background: var(--green); }
+.mpo.st-rejected .mpo-dot { background: var(--red, #e5534b); }
+.mpo-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpo-status { font-family: var(--font-mono); font-size: max(10px, var(--min-text)); color: var(--text-dim); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpo.st-rejected .mpo-status { color: #ffc9a8; white-space: normal; }
+@keyframes mpo-pulse { 50% { opacity: 0.35; } }
+.lg-status { font-family: var(--font-mono); font-size: max(10px, var(--min-text)); text-transform: uppercase; letter-spacing: 0.08em; }
+.lg-status.st-running { color: var(--green); }
+.lg-status.st-paused { color: var(--accent); }
+@media (max-width: 760px) {
+  .mp-bar { top: calc(var(--safe-top, 0px) + 54px); left: 8px; right: 8px; max-width: none; font-size: 12px; gap: 6px; padding: 5px 8px; }
+  .mp-orders { top: auto; bottom: calc(var(--safe-bottom, 0px) + 140px); right: 8px; left: 8px; width: auto; }
+}

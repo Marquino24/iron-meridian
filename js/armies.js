@@ -251,10 +251,21 @@ export class Armies {
 
   /** Node position (an army mid-hop is drawn between its two nodes). */
   armyPos(army) {
-    if (!army.seg) return this.pos[army.node];
-    const a = this.pos[army.seg.from], b = this.pos[army.seg.to];
-    const t = Math.min(1, army.seg.done / army.seg.hours);
-    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    let p;
+    if (!army.seg) p = this.pos[army.node];
+    else {
+      const a = this.pos[army.seg.from], b = this.pos[army.seg.to];
+      const t = Math.min(1, army.seg.done / army.seg.hours);
+      p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+    // Multiplayer: after the server corrects a prediction, the marker glides
+    // from where it was drawn to where it is (smoothing set by mp-client.js).
+    const s = this.smoothing?.get(army.id);
+    if (!s) return p;
+    const k = 1 - Math.min(1, (performance.now() - s.t0) / s.ms);
+    if (k <= 0) { this.smoothing.delete(army.id); return p; }
+    const e = k * k; // ease out
+    return { x: p.x + s.dx * e, y: p.y + s.dy * e };
   }
 
   // --- Orders ----------------------------------------------------------------

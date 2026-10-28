@@ -171,20 +171,20 @@ export class DiplomacyWindow {
     const issue = (kind, payload) => this.sim.commands.issue(kind, payload);
     if (d.propose) {
       const r = issue('treaty.propose', { nation: id, type: d.propose });
-      notice(r.ok ? `${n.shortName} accepts the ${TREATIES[d.propose].label.toLowerCase()}` : `${n.shortName} declines: ${r.error}`);
+      notice(r.pending ? `Proposal sent to ${n.shortName}: the answer comes with the next server tick` : r.ok ? `${n.shortName} accepts the ${TREATIES[d.propose].label.toLowerCase()}` : `${n.shortName} declines: ${r.error}`);
       return true;
     }
     if (d.cancel) { issue('treaty.cancel', { nation: id, type: d.cancel }); notice(`You ended the ${TREATIES[d.cancel].label.toLowerCase()} with ${n.shortName}`); return true; }
     if ('ask' in d) {
       const r = issue('war.ask-join', { nation: id, target: this.joinTarget });
-      notice(r.ok ? `${n.shortName} joins your war against ${st.getNation(this.joinTarget).shortName}` : `${n.shortName} declines: ${r.error}`);
+      notice(r.pending ? `Request sent to ${n.shortName}` : r.ok ? `${n.shortName} joins your war against ${st.getNation(this.joinTarget).shortName}` : `${n.shortName} declines: ${r.error}`);
       return true;
     }
     if ('offer' in d || 'gift' in d) {
       const t = this.trade;
       const give = { [t.give]: t.giveAmt };
       const r = 'gift' in d ? issue('trade.gift', { nation: id, give }) : issue('trade.offer', { nation: id, give, take: { [t.take]: t.takeAmt } });
-      notice(r.ok ? ('gift' in d ? `${n.shortName} thanks you for the gift (+${r.boost} opinion)` : `${n.shortName} accepts the trade`) : `${n.shortName}: ${r.error}`);
+      notice(r.pending ? `Sent to ${n.shortName}: settled on the next server tick` : r.ok ? ('gift' in d ? `${n.shortName} thanks you for the gift (+${r.boost} opinion)` : `${n.shortName} accepts the trade`) : `${n.shortName}: ${r.error}`);
       return true;
     }
     if ('peace' in d) { this.actions.openPeace?.(id); return true; }

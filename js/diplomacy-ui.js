@@ -29,6 +29,12 @@ export class DiplomacyUI {
     state.events.on('peace:offer', ({ from, to, offerId }) => { if (to === state.playerNationId) this.push({ kind: 'peace', from, offerId }); });
     state.events.on('peace:demand', ({ from, to, provinces, score, offerId }) => { if (to === state.playerNationId) this.push({ kind: 'demand', from, provinces, score, offerId }); });
     state.events.on('diplomacy:proposal', (p) => { if (p.to === state.playerNationId) this.push({ kind: 'proposal', from: p.from, p }); });
+    // Multiplayer: offers made on the server, with the server's ids (mp-client.js).
+    state.events.on('mp:offer', (o) => {
+      if (o.kind === 'proposal') this.push({ kind: 'proposal', from: o.from, p: { ...o.p, offerId: o.id } });
+      else if (o.provinces) this.push({ kind: 'demand', from: o.from, provinces: o.provinces, offerId: o.id });
+      else this.push({ kind: 'peace', from: o.from, offerId: o.id });
+    });
     state.events.on('diplomacy:called', ({ leader, enemy }) => this.push({ kind: 'called', from: leader, enemy }));
     state.events.on('map:loaded', () => { this.queue = []; this.close(); });
     this.el.addEventListener('click', (e) => this.onClick(e));
