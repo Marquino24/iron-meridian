@@ -6,7 +6,8 @@
 //   2. creates a random TICK_SECRET and stores it as a function secret and in
 //      Vault (iron_meridian_tick_secret), with the function URL
 //      (iron_meridian_tick_url). The secret is never printed or written to disk
-//   3. runs docs/supabase-multiplayer-11b.sql (safe to run again)
+//   3. runs docs/supabase-multiplayer.sql (if its tables are missing) and
+//      docs/supabase-multiplayer-11b.sql (both safe to run again)
 //   4. measures real ticks on Supabase: a throwaway WWII game, N scheduled
 //      ticks of 30 game hours (5 real minutes at the default speed), deleted after
 //   5. sets the tick interval from those numbers (5 min if a 30-game-hour tick
@@ -51,6 +52,12 @@ if (!args.includes('--measure-only')) {
       perform vault.update_secret(id, ${lit(`${URL_BASE}/functions/v1/tick`)}) from vault.secrets where name = 'iron_meridian_tick_url';
       if not found then perform vault.create_secret(${lit(`${URL_BASE}/functions/v1/tick`)}, 'iron_meridian_tick_url'); end if;
     end $$;`);
+  // Step 11A's tables first, if they aren't there yet (both files are safe to run again).
+  const has = await sql("select to_regclass('public.games') is not null as ok");
+  if (!has[0].ok) {
+    console.log('3a. docs/supabase-multiplayer.sql (step 11A: not run on this project yet)');
+    await sql(readFileSync(new URL('docs/supabase-multiplayer.sql', root), 'utf8'));
+  }
   console.log('3. docs/supabase-multiplayer-11b.sql');
   await sql(readFileSync(new URL('docs/supabase-multiplayer-11b.sql', root), 'utf8'));
 }
@@ -78,15 +85,21 @@ try {
     const body = await res.json();
     if (!res.ok || body.error) throw new Error(`tick ${i} failed: ${res.status} ${JSON.stringify(body)}`);
     ticks.push({ ...body, roundTrip: Date.now() - t0 });
-    console.log(`   tick ${body.tick}: ${body.hours} game h · server ${body.cpuMs} ms (simulation ${body.ms} ms) · round trip ${Date.now() - t0} ms · state ${(body.bytes / 1024).toFixed(0)} KB`);
+    console.log(`   tick ${body.tick}: ${body.hours} game h · server ${body.cpuMs} ms, of which computation ${body.computeMs} ms (${Object.entries(body.phase ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}) · round trip ${Date.now() - t0} ms · state ${(body.bytes / 1024).toFixed(0)} KB`);
   }
 } finally {
   await sql(`delete from public.games where id = ${lit(gid)}`);
 }
-const thirty = ticks.filter((t) => Math.abs(t.hours - 30) < 0.5).map((t) => t.ms).sort((a, b) => a - b);
+// The 2 s limit is CPU time: decide on the computation (the database waits don't count), shown with the totals.
+const thirtyTicks = ticks.filter((t) => Math.abs(t.hours - 30) < 0.5);
+const thirty = thirtyTicks.map((t) => t.computeMs ?? t.ms).sort((a, b) => a - b);
+const totals = thirtyTicks.map((t) => t.ms).sort((a, b) => a - b);
+console.log(`   30-game-hour ticks, whole tick (with database waits): median ${totals[Math.floor(totals.length / 2)]} ms, worst ${totals.at(-1)} ms`);
 const median = thirty[Math.floor(thirty.length / 2)], worst = thirty.at(-1);
-const interval = opt('interval', 'auto') !== 'auto' ? Number(opt('interval')) : worst < 1200 ? 5 : worst < 1800 ? 3 : 2;
-console.log(`   30-game-hour ticks: median ${median} ms, worst ${worst} ms → tick every ${interval} min`);
+const want = opt('interval', 'auto');
+const interval = want === 'keep' ? Number((await sql('select tick_minutes from private.mp_limits where id = 1'))[0].tick_minutes)
+  : want !== 'auto' ? Number(want) : worst < 1200 ? 5 : worst < 1800 ? 3 : 2;
+console.log(`   30-game-hour ticks, computation: median ${median} ms, worst ${worst} ms → tick every ${interval} min`);
 
 if (!args.includes('--measure-only')) {
   console.log(`5. schedule: every ${interval} min`);

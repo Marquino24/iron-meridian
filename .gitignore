@@ -7,3 +7,6 @@ data/raw/
 /research/
 /visual/
 /windows/
+
+# Supabase CLI working files
+supabase/.temp/

@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
   const t0 = performance.now();
   try {
-    const store = new SupabaseStore(admin, new URL('./game/data/', import.meta.url));
+    const store = new SupabaseStore(admin);
     const r = await tickGame(store, game);
     return reply({ ...r, cpuMs: Math.round(performance.now() - t0), by: scheduled ? 'schedule' : 'player' });
   } catch (e) {

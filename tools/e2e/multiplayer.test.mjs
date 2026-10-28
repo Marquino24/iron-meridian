@@ -122,6 +122,8 @@ check(queued >= 1, `Bea's recruit queued in Paris (${queued})`);
 await A.click('#mp-bar [data-mp="menu"]');
 await B.click('#mp-bar [data-mp="menu"]');
 await A.waitForSelector('#lobby-screen:not([hidden])');
+// Let any tick still in flight finish first (the fake server has no tick lease; the real one has claim_tick).
+await A.waitForTimeout(4000);
 const gameId = await A.evaluate(() => JSON.parse(localStorage.getItem('mock-supabase')).games[0].id);
 const t0 = await A.evaluate(() => JSON.parse(localStorage.getItem('mock-supabase')).games[0].game_time);
 const server = await ctx.newPage();

@@ -1,7 +1,10 @@
 // The game store for js/game-server.js on Supabase (service role: row-level
 // security doesn't apply; the function does its own checks in index.ts).
 // deno-lint-ignore-file no-explicit-any
+import { ERAS } from './game/data/eras.js';
 type Client = any;
+// Unpacked map text per era, kept while this worker stays warm.
+const mapText = new Map<string, string>();
 
 const must = ({ data, error }: { data: any; error: any }) => {
   if (error) throw new Error(error.message ?? String(error));
@@ -9,10 +12,17 @@ const must = ({ data, error }: { data: any; error: any }) => {
 };
 
 export class SupabaseStore {
-  constructor(private db: Client, private dataDir: URL) {}
+  constructor(private db: Client) {}
 
+  /** An era's map: gzip'd JSON bundled with the function (tools/build-functions.mjs). */
   async mapData(era: string) {
-    return JSON.parse(await Deno.readTextFile(new URL(`${era}.json`, this.dataDir)));
+    if (!mapText.has(era)) {
+      const b64 = (ERAS as Record<string, string>)[era];
+      if (!b64) throw new Error(`no map data for era ${era}`);
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      mapText.set(era, await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+    }
+    return JSON.parse(mapText.get(era)!);
   }
 
   async game(id: string) { return must(await this.db.from('games').select('*').eq('id', id).maybeSingle()); }
