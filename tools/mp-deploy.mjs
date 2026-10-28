@@ -96,7 +96,9 @@ const thirty = thirtyTicks.map((t) => t.computeMs ?? t.ms).sort((a, b) => a - b)
 const totals = thirtyTicks.map((t) => t.ms).sort((a, b) => a - b);
 console.log(`   30-game-hour ticks, whole tick (with database waits): median ${totals[Math.floor(totals.length / 2)]} ms, worst ${totals.at(-1)} ms`);
 const median = thirty[Math.floor(thirty.length / 2)], worst = thirty.at(-1);
-const interval = opt('interval', 'auto') !== 'auto' ? Number(opt('interval')) : worst < 1200 ? 5 : worst < 1800 ? 3 : 2;
+const want = opt('interval', 'auto');
+const interval = want === 'keep' ? Number((await sql('select tick_minutes from private.mp_limits where id = 1'))[0].tick_minutes)
+  : want !== 'auto' ? Number(want) : worst < 1200 ? 5 : worst < 1800 ? 3 : 2;
 console.log(`   30-game-hour ticks, computation: median ${median} ms, worst ${worst} ms → tick every ${interval} min`);
 
 if (!args.includes('--measure-only')) {
