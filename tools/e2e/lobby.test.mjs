@@ -101,7 +101,7 @@ const multi = (page) => page.locator('[data-menu="multi"]');
 {
   const { ctx, page } = await newPage(mock);
   await signIn(page, 'alice@example.com', 'Alice');
-  await page.waitForSelector('text=Pending');
+  await page.waitForSelector('#launcher >> text=Pending');
   await page.evaluate(() => window.__mockDecide('u-alice@example.com', 'approved'));
   await page.waitForSelector('#main-menu:not([hidden])');
   check(!(await multi(page).isDisabled()) && /Multiplayer · Beta/.test(await multi(page).textContent()), 'approved tester: Multiplayer · Beta enabled');
