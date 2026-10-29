@@ -301,7 +301,7 @@ function notice(text) {
 
 function orderMove(army, node) {
   const r = commands.issue('army.move', { army: army.id, to: node });
-  if (r.error) notice(r.peace != null ? `${r.error} Open one of its provinces to do it.` : r.error);
+  if (r.error) notice(r.peace != null ? `${r.error} Open one of its provinces and press Declare war.` : r.error);
   armies.preview = null;
   renderer.requestRender();
 }
@@ -703,7 +703,7 @@ async function loadGame(save) {
   const cap = state.getProvince(state.playerNation?.capitalId);
   const own = cap?.owner === state.playerNationId ? cap : state.provincesOf(state.playerNationId)[0];
   if (own) { state.setSelected(own.id); focusOn(own.center.x, own.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.0); }
-  notice(`Loaded ${m.nationName}, ${new Date(m.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}. Paused: press Space to play.`);
+  notice(`Loaded ${m.nationName}, ${new Date(m.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}. Paused: pick a speed (or press Space) to play.`);
   renderer.requestRender();
 }
 

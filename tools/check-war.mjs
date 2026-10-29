@@ -188,7 +188,7 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   check(B.level(berlin, 'mine') === 2 && economy.income(player).perDay.steel > steel0, `Factory II done, steel/day ${Math.round(steel0)} → ${Math.round(economy.income(player).perDay.steel)}`);
   check(!!B.check(berlin, 'oilwell').reason, `no oil well in Berlin: ${B.check(berlin, 'oilwell').reason}`);
   const noCoast = state.provincesOf(player).find((p) => p.isCity && !p.seaNeighbors.length);
-  if (noCoast) check(B.check(noCoast.id, 'port').reason === 'Not coastal', 'no port inland');
+  if (noCoast) check(B.check(noCoast.id, 'port').reason === 'Needs a coast', 'no port inland');
   const field2 = [...armies.list.values()].find((a) => a.nation === player && !a.garrison && a.kind === 'land');
   const nb = state.getProvince(berlin).neighbors.find((n) => state.provinces[n].owner === player);
   const h0 = armies.hopHours(field2, berlin, nb);

@@ -263,6 +263,29 @@ Details, measurements, the go-live steps and the tests are in `docs/MULTIPLAYER.
 
 The claude.ai preview and localhost run the game server in the browser, with sample games.
 
+## Tutorial and help (step 12)
+
+- **Tutorial**: the first time a player opens Single Player, the game offers a
+  5-minute guided game (Play / Skip). It's also on the era screen ("Learn to
+  play") and in Settings → Help → Replay the tutorial. You lead León (Medieval,
+  1200) against weak Castilla: resources → build → recruit → move → declare war
+  → win a battle → take a province → integration → peace keeping it → research →
+  save. Computer nations stay passive and Castilla accepts your peace terms. A
+  coach panel points at the exact button or place (a pulsing ring), never covers
+  it, and moves on only once you've really done the step. Then "You're ready":
+  start a real game or keep playing the map as a normal game.
+- **First-open tips**: the Army, Production, Buildings, Research, Diplomacy and
+  Peace windows show a one-line tip the first time; "Got it" hides it for good.
+- **Settings → Help**: How to play (controls for computer and touch, the core
+  loop, war score / peace / integration, multiplayer basics), Replay the
+  tutorial, Show tips again.
+- What a player has seen is remembered per signed-in user on that device
+  (`js/onboarding.js`, localStorage `im:onboard:<user id>`).
+- Tests: `node tools/check-tutorial.mjs` (the scenario, headless, in `npm test`);
+  `npm run test:tutorial` plays the whole tutorial in the browser by tapping
+  wherever the coach points: desktop, iPhone and Android sizes in portrait and
+  landscape, Chromium and WebKit, plus Skip, replay, tips and How to play.
+
 ## Phones, tablets and Safari
 
 - **Safe areas:** the page uses `viewport-fit=cover`, and the top bar, status bar, resource strip, command bar and side panels keep their content out of the notch / Dynamic Island, the home bar and (in landscape) the side notches.
@@ -399,6 +422,9 @@ js/
   integration.js  Conquered land settling in (45% → 100%), unrest and revolts
   save.js         Saved games: snapshot/restore of every system, gzip, IndexedDB slots, export files
   save-ui.js      Continue, save/load screen with thumbnails, weekly autosave, export/import
+  tutorial.js     Guided first game: scenario, coach panel, the 11 steps
+  tips.js         First-open tips in the windows
+  onboarding.js   What each user has seen (tutorial offer, tips)
   colonies.js     Major colonies inside their sovereign (British India, Belgian Congo) and their flags
 ```
 

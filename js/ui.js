@@ -416,17 +416,17 @@ export class UI {
         <dd><span class="terrain-chip t-${terrain.id}"></span>${terrain.label.toUpperCase()}</dd>
         <dt>CITY</dt>
         <dd>${p.isCity ? `${p.cityName && p.cityName !== p.name ? escapeHtml(p.cityName) : 'YES'}${p.isCapital ? ' — NATIONAL CAPITAL' : ''}` : 'NO'}</dd>
-        <dt>NEIGHBORS</dt>
+        <dt>NEIGHBOURS</dt>
         <dd>${p.neighbors.length} LAND${p.seaNeighbors.length ? ` · ${p.seaNeighbors.length} SEA` : ''}</dd>
         <dt>AREA</dt>
         <dd>${fmtArea(p.area, p.areaKm2)}</dd>
         <dt>${coordLabel}</dt>
         <dd>${gridRef(map, p.center.x, p.center.y)}</dd>
-        <dt>MODIFIERS</dt>
-        <dd>DEF ×${terrain.defense.toFixed(2)} · MOVE ×${terrain.moveCost.toFixed(2)}</dd>
+        <dt>TERRAIN EFFECT</dt>
+        <dd>DEFENCE ×${terrain.defense.toFixed(2)} · MARCH TIME ×${terrain.moveCost.toFixed(2)}</dd>
       </dl>
       ${this.command ? this.command.provinceHtml(p) : ''}
-      <div class="section-title">ADJACENT PROVINCES</div>
+      <div class="section-title">NEIGHBOURING PROVINCES</div>
       <ul class="neighbor-list">${neighbors || '<li class="empty">None — island province</li>'}</ul>`;
     if (owner) el.panel.querySelector('.flag-slot').replaceWith(flagCanvas(provinceFlag(map, p), 24, 16));
     this.command?.markRendered();
@@ -438,7 +438,7 @@ export class UI {
     if (!I || p.owner < 0 || p.homeOf == null || p.homeOf < 0 || p.homeOf === p.owner) return '';
     const lvl = I.level(p), days = I.daysLeft(p);
     const was = this.state.getNation(p.homeOf);
-    const unrest = I.restless(p) ? '<span class="tag red">UNREST: STATION TROOPS</span>' : '';
+    const unrest = I.restless(p) ? '<span class="tag red">UNREST: SEND TROOPS</span>' : '';
     return `<dt>INTEGRATION</dt><dd class="integ"><span class="integ-bar"><i style="width:${Math.round(lvl * 100)}%"></i></span>${Math.round(lvl * 100)}%${days ? ` · full in ${days} d` : ''}${unrest}</dd>
       <dt>TAKEN FROM</dt><dd>${escapeHtml((was?.name ?? '—').toUpperCase())}</dd>`;
   }

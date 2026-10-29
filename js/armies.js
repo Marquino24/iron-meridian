@@ -191,9 +191,9 @@ export class Armies {
    */
   findPath(army, target) {
     const st = this.state;
-    if (target == null || target < 0) return { error: 'No destination.' };
+    if (target == null || target < 0) return { error: 'Pick a place to send it.' };
     if (!this.canEnter(army.nation, target, army.kind)) {
-      if (army.kind === 'naval') return { error: 'Ships can only move through sea zones.' };
+      if (army.kind === 'naval') return { error: 'Fleets can only sail through sea zones.' };
       const owner = st.getNation(this.province(target).owner);
       return { error: `You're at peace with ${owner.name}: declare war first.`, peace: owner.id };
     }
@@ -503,12 +503,12 @@ export class Armies {
     const p = this.state.getProvince(provinceId);
     const t = this.roster.byKey[typeKey];
     if (!p || !t || p.owner < 0) return { ok: false, reason: 'Not yours' };
-    if (!p.isCity) return { ok: false, reason: 'Cities only' };
+    if (!p.isCity) return { ok: false, reason: 'Only in cities' };
     const [building, need] = UNIT_REQUIREMENT[t.role];
     const B = this.buildings;
     const have = B ? B.level(provinceId, building) : need;
     const hours = Math.round(t.build * TRAIN_FACTOR[have] * (this.research?.trainTimeMult(p.owner) ?? 1));
-    if (t.role === 'nav' && !p.seaNeighbors.length) return { ok: false, reason: 'Not coastal', hours };
+    if (t.role === 'nav' && !p.seaNeighbors.length) return { ok: false, reason: 'Needs a coast', hours };
     if (have < need) return { ok: false, reason: `Needs ${B.name(building)} ${['', 'I', 'II', 'III'][need]}`, hours };
     if (!opts.ignoreCost && !this.economy.canAfford(p.owner, t.cost)) return { ok: false, reason: 'Not enough resources', hours };
     return { ok: true, hours };
