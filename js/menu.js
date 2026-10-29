@@ -4,7 +4,7 @@
  *   MAIN MENU → Single Player → ERA → NATION → game
  *             → Sandbox       → ERA → NATION → sandbox game (free tools)
  *             → Continue / Load Game → saved games (Save Game too while a game is paused)
- *             → Settings
+ *             → Settings      → How to play
  *             → Multiplayer   → lobby (beta, see lobby-ui.js)
  *
  * Exactly one screen is visible at a time; Back always goes one step up.
@@ -13,8 +13,8 @@
 
 import { QUALITIES, deviceClass } from './settings.js';
 
-const SCREENS = { menu: '#main-menu', era: '#era-screen', nation: '#start-screen', settings: '#settings-screen', saves: '#saves-screen', lobby: '#lobby-screen' };
-const PARENT = { era: 'menu', nation: 'era', settings: null, menu: null, saves: 'menu', lobby: 'menu' };
+const SCREENS = { menu: '#main-menu', era: '#era-screen', nation: '#start-screen', settings: '#settings-screen', saves: '#saves-screen', lobby: '#lobby-screen', help: '#help-screen' };
+const PARENT = { era: 'menu', nation: 'era', settings: null, menu: null, saves: 'menu', lobby: 'menu', help: 'settings' };
 
 export class Screens {
   /**
@@ -35,6 +35,8 @@ export class Screens {
       const b = e.target.closest('[data-menu]');
       if (!b || b.disabled) return;
       const a = b.dataset.menu;
+      // The very first single-player game offers the tutorial (main.js).
+      if (a === 'single' && this.actions.offerTutorial?.()) return;
       if (a === 'single' || a === 'sandbox') this.setMode(a);
       if (a === 'single' || a === 'sandbox') this.show('era');
       if (a === 'settings') this.show('settings');
@@ -62,7 +64,7 @@ export class Screens {
 
   /** Show a screen: 'menu' | 'era' | 'nation' | 'settings' | 'game' | null (launcher). */
   show(name) {
-    if (name === 'settings' && this.current !== 'settings') this.returnTo = this.current ?? 'menu';
+    if (name === 'settings' && this.current !== 'settings' && this.current !== 'help') this.returnTo = this.current ?? 'menu';
     this.current = name;
     for (const [k, el] of Object.entries(this.el)) el.hidden = k !== name;
     document.body.dataset.screen = name ?? 'launcher';
@@ -70,7 +72,7 @@ export class Screens {
     resume.hidden = !this.gameInProgress;
     document.querySelector('[data-menu="save"]').hidden = !this.gameInProgress;
     if (this.gameInProgress) document.querySelector('[data-menu="continue"]').hidden = true;
-    if (name === 'settings') this.renderSettings();
+    if (name === 'settings') { this.renderSettings(); document.getElementById('help-note').textContent = ''; }
     if (name === 'menu') this.actions.menuShown?.();
     // Move focus into the new screen for keyboard users.
     const first = name && this.el[name]?.querySelector('[data-menu="resume"]:not([hidden]), [data-menu="continue"]:not([hidden]), .menu-item.primary, .back-btn');
@@ -83,7 +85,7 @@ export class Screens {
   }
 
   /** The map pans by itself on these screens. */
-  get ambient() { return this.current === 'menu' || this.current === 'era' || this.current === 'settings'; }
+  get ambient() { return this.current === 'menu' || this.current === 'era' || this.current === 'settings' || this.current === 'help'; }
 
   // --- Settings ----------------------------------------------------------------
 
@@ -100,6 +102,15 @@ export class Screens {
       if (t.name === 'uiScale') this.settings.set('uiScale', Number(t.value));
       if (t.name === 'volume') this.settings.set('volume', Number(t.value));
       this.renderSettings();
+    });
+    document.querySelector('#settings-form .help-btns').addEventListener('click', (e) => {
+      const a = e.target.closest('[data-help]')?.dataset.help;
+      if (a === 'open') this.show('help');
+      if (a === 'tutorial') this.actions.startTutorial?.();
+      if (a === 'tips') {
+        this.actions.resetTips?.();
+        document.getElementById('help-note').textContent = 'Tips will show again the next time you open each window.';
+      }
     });
     document.getElementById('settings-reset').addEventListener('click', () => {
       this.settings.reset();

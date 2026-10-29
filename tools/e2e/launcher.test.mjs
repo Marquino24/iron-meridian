@@ -112,6 +112,9 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   check(true, 'owner goes straight in (auto-approved)');
   check(await page.isVisible('#main-menu [data-open-admin]'), 'Admin in the main menu');
   await page.click('[data-menu="single"]');
+  // First single-player game: the tutorial offer (step 12). Skip it.
+  await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+  if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
   check(await page.isVisible('#btn-admin-fab'), 'Admin button on the era screen');
   await page.click('#era-screen [data-back]');
   await page.click('#main-menu [data-open-admin]');
@@ -133,6 +136,9 @@ const gated = (page) => page.evaluate(() => document.body.classList.contains('ga
   await shot(page, 'l6-admin-pending');
   await page.click('[data-admin="close"]');
   await page.click('[data-menu="single"]');
+  // First single-player game: the tutorial offer (step 12). Skip it.
+  await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+  if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
   await page.click('[data-era="ww2"]');
   await page.waitForSelector('#start-screen:not([hidden]) .nation-row', { timeout: 15000 });
   check(await page.isVisible('#btn-admin-fab'), 'Admin button on the nation screen');

@@ -240,6 +240,7 @@ export class SaveUI {
     const save = this.current();
     const size = await writeSlot(slot, save, makeThumb(this.state));
     this.highlight = slot;
+    this.state.events.emit('game:saved', { slot, auto: slot === AUTO_SLOT });
     if (!quiet) this.notice(`Game saved to ${slot === AUTO_SLOT ? 'the autosave' : `slot ${slot}`} (${Math.max(1, Math.round(size / 1024))} KB).`);
     return size;
   }

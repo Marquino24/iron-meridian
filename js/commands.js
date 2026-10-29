@@ -109,7 +109,7 @@ export const KINDS = {
     valid: (p) => int(p.target),
     run: ({ state, sim, nation }, p) => {
       if (p.target === nation || !state.getNation(p.target)) return fail('No such nation.');
-      return (sim.diplomacy ?? sim.combat).declareWar(nation, p.target) ? done() : fail('You cannot declare war on them now.');
+      return (sim.diplomacy ?? sim.combat).declareWar(nation, p.target) ? done() : fail('You can\'t declare war on them right now.');
     },
   },
   'treaty.propose': {

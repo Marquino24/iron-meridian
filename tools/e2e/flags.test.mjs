@@ -34,6 +34,9 @@ const band = (sel, y0, y1) => IM(([sel, y0, y1]) => {
 
 async function openEra(era) {
   await page.click('[data-menu="single"]');
+  // First single-player game: the tutorial offer (step 12). Skip it.
+  await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+  if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
   await page.click(`[data-era="${era}"]`);
   await page.waitForSelector('#start-screen:not([hidden]) .nation-row');
   await page.waitForFunction(() => window.ironMeridian.state.map && window.ironMeridian.renderer, null);

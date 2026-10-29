@@ -75,6 +75,7 @@ export class WindowManager {
     if (!w || this.state.phase !== 'playing') return;
     if (isNarrow()) for (const other of [...this.open]) if (other !== id) this.close(other);
     if (!w.el) this.create(w);
+    this.tips?.insert(id, w.el, w.body); // first-open tip (tips.js)
     if (!this.isOpen(id)) {
       this.open.push(id);
       w.el.hidden = false;

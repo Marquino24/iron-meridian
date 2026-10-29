@@ -130,9 +130,9 @@ export class Buildings {
     if (type === 'oilwell') {
       if (!this.set.industrial) return { ...out, reason: 'From WWI on' };
       if (!p.oil) return { ...out, reason: 'No oil here' };
-    } else if (!p.isCity) return { ...out, reason: 'Cities only' };
-    if (type === 'port' && !p.seaNeighbors.length) return { ...out, reason: 'Not coastal' };
-    if (level > MAX_LEVEL) return { ...out, reason: 'Max level' };
+    } else if (!p.isCity) return { ...out, reason: 'Only in cities' };
+    if (type === 'port' && !p.seaNeighbors.length) return { ...out, reason: 'Needs a coast' };
+    if (level > MAX_LEVEL) return { ...out, reason: 'Fully built' };
     if (this.research && level > this.research.maxBuildingLevel(owner, type)) {
       return { ...out, reason: `Needs ${this.research.unlockerOf(type)?.name ?? 'research'}`, needsTech: this.research.unlockerOf(type)?.id };
     }

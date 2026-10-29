@@ -130,6 +130,11 @@
         <div class="eyebrow"><span class="mode-label">SINGLE PLAYER</span> · STEP 1 OF 2</div>
       </div>
       <h2 class="screen-title">Choose an era</h2>
+      <button type="button" class="era-card tutorial-card" data-tutorial>
+        <span class="era-year">TUTORIAL · ABOUT 5 MINUTES</span>
+        <span class="era-name">Learn to play</span>
+        <span class="era-blurb">Lead León in 1200: build, recruit, march, win a small war, make peace.</span>
+      </button>
       <div id="era-grid" class="era-list" role="list" aria-label="Eras"></div>
     </div>
   </section>
@@ -142,7 +147,7 @@
         <div class="eyebrow"><span class="mode-label">SINGLE PLAYER</span> · STEP 2 OF 2</div>
       </div>
       <h2 class="screen-title" id="nation-screen-title">Choose a nation</h2>
-      <p class="tagline">Click a name or any territory on the map.</p>
+      <p class="tagline">Pick a name, or tap a country on the map.</p>
 
       <div id="seed-row" class="seed-row" hidden>
         <label for="seed-input">MAP SEED</label>
@@ -184,7 +189,7 @@
         <p id="victory-note" class="victory-note"></p>
       </div>
       <button id="btn-deploy" type="button" class="btn primary" disabled>SELECT A NATION</button>
-      <p class="hint">DRAG to pan · SCROLL / PINCH to zoom · ARROWS · ESC deselect · SPACE pause</p>
+      <p class="hint">Drag to move the map · scroll or pinch to zoom · Space pauses</p>
       <p id="data-source" class="data-source"></p>
     </div>
   </section>
@@ -231,9 +236,76 @@
           </div>
           <p class="setting-note">There's no sound yet; this setting is saved for when there is.</p>
         </fieldset>
+        <fieldset>
+          <legend>Help</legend>
+          <div class="help-btns">
+            <button type="button" class="btn small" data-help="open">How to play</button>
+            <button type="button" class="btn small" data-help="tutorial">Replay the tutorial</button>
+            <button type="button" class="btn small ghost" data-help="tips">Show tips again</button>
+          </div>
+          <p class="setting-note" id="help-note" role="status"></p>
+        </fieldset>
         <button type="button" class="link-btn" id="settings-reset">Reset to defaults</button>
         <p class="setting-note credits">Flags: <a href="https://github.com/lipis/flag-icons" target="_blank" rel="noopener">flag-icons</a> by Panayiotis Lipiridis (MIT) for today's flags; historical flags from Wikimedia Commons (licences listed in docs/FLAGS.md, mostly public domain). Nations with no known flag for their date show generated heraldry on a shield. WWII Germany flies the black-white-red tricolour, not the swastika flag.</p>
       </form>
+    </div>
+  </section>
+
+  <!-- How to play (Settings → How to play) -->
+  <section id="help-screen" class="screen side" hidden aria-label="How to play">
+    <div class="side-panel screen-left help-panel">
+      <div class="screen-head">
+        <button type="button" class="back-btn" data-back>‹ Settings</button>
+        <div class="eyebrow">HELP</div>
+      </div>
+      <h2 class="screen-title">How to play</h2>
+      <div class="help-body">
+        <section>
+          <h3>The basics</h3>
+          <ol class="help-loop">
+            <li><b>Pick a nation.</b> Any era, any country.</li>
+            <li><b>Watch your resources</b> in the top bar. The small number is your daily income.</li>
+            <li><b>Build</b> in your cities to earn more or defend better.</li>
+            <li><b>Recruit</b> troops in your cities.</li>
+            <li><b>Move</b> armies: select one, then pick where it goes.</li>
+            <li><b>Declare war</b> from a foreign province or the Diplomacy window.</li>
+            <li><b>Win battles</b> and stay in enemy provinces to take them.</li>
+            <li><b>Make peace</b> to keep what you took.</li>
+            <li><b>Research</b> techs to grow stronger over time.</li>
+          </ol>
+        </section>
+        <section>
+          <h3>Controls</h3>
+          <div class="help-cols">
+            <dl>
+              <dt>Computer</dt>
+              <dd>Drag to pan, scroll to zoom, arrow keys to move.</dd>
+              <dd>Click a province or army to select it; with an army selected, click a destination.</dd>
+              <dd>Drag with Shift held to select several armies.</dd>
+              <dd>Space pauses. Esc closes a window or clears the selection.</dd>
+              <dd>Windows: A Army, P Production, B Buildings, R Research, D Diplomacy.</dd>
+            </dl>
+            <dl>
+              <dt>Phone and tablet</dt>
+              <dd>Drag to pan, pinch to zoom.</dd>
+              <dd>Tap a province or army to select it; with an army selected, tap a destination.</dd>
+              <dd>Tap a stack of markers to zoom in and pick one. Hold two fingers still to draw a box around several armies.</dd>
+              <dd>The bar at the bottom opens the windows. The pause button sits next to the date.</dd>
+            </dl>
+          </div>
+        </section>
+        <section>
+          <h3>War score, peace and integration</h3>
+          <p><b>War score</b> runs from −100 to +100: land you hold, battles you win and losses you inflict. Open the peace window from an enemy province or the Diplomacy window.</p>
+          <p><b>Peace terms:</b> tick the provinces you want to keep. You can only ask for land you took in this war, next to your old border, never their capital. Each costs war score; the better your score, the likelier they accept. A refusal means a week before they talk again. After peace, a truce stops new wars between you for 90 days.</p>
+          <p><b>Integration:</b> new land starts half integrated. It pays less and can rebel if left without troops; it reaches 100% over a few months.</p>
+        </section>
+        <section>
+          <h3>Multiplayer (beta)</h3>
+          <p>Multiplayer games live on a server and keep running while you're away: other players and the computer keep playing, so check in now and then.</p>
+          <p>Your orders show as <b>pending</b> until the server applies them, usually within a few seconds, at most a few minutes. If you stay away too long, the computer runs your nation until you return.</p>
+        </section>
+      </div>
     </div>
   </section>
 
@@ -272,6 +344,33 @@
   <section id="end-screen" class="report end-screen" hidden aria-label="Game over"></section>
   <section id="peace-window" class="report peace-window" hidden aria-label="Peace talks"></section>
   <section id="diplo-modal" class="report diplo" hidden></section>
+  <section id="tutorial-offer" class="report tut-modal" hidden aria-label="Tutorial">
+    <div class="tut-card" role="dialog" aria-modal="true" aria-labelledby="tut-offer-title">
+      <div class="eyebrow">FIRST GAME?</div>
+      <h2 id="tut-offer-title">Learn the basics in 5 minutes</h2>
+      <p>A short guided game: build, recruit, march, win a small war, make peace, research and save.</p>
+      <div class="btn-row">
+        <button type="button" class="btn primary" data-offer="play">Play the tutorial</button>
+        <button type="button" class="btn ghost" data-offer="skip">Skip, choose an era</button>
+      </div>
+      <p class="tut-note">You can replay it any time from Settings.</p>
+    </div>
+  </section>
+  <section id="tutorial-done" class="report tut-modal" hidden aria-label="Tutorial complete">
+    <div class="tut-card" role="dialog" aria-modal="true" aria-labelledby="tut-done-title">
+      <div class="eyebrow">TUTORIAL COMPLETE</div>
+      <h2 id="tut-done-title">You're ready</h2>
+      <ul class="tut-recap">
+        <li>Resources pay for everything</li><li>Cities build and recruit</li><li>Armies move, fight and take land</li>
+        <li>Peace keeps what you took</li><li>Research makes you stronger</li><li>Save often</li>
+      </ul>
+      <p>In a real game the other nations act on their own: they trade, ally, and may attack you.</p>
+      <div class="btn-row">
+        <button type="button" class="btn primary" data-done="real">Start a real game</button>
+        <button type="button" class="btn ghost" data-done="stay">Keep playing this map</button>
+      </div>
+    </div>
+  </section>
 
   <button id="btn-admin-fab" type="button" class="btn admin-fab admin-btn" data-open-admin hidden>ADMIN</button>
   <section id="admin-panel" class="admin" hidden></section>

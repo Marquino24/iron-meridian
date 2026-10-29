@@ -78,6 +78,7 @@ export class PeaceUI {
         <div><div class="eyebrow">PEACE TALKS · DAY ${days} OF THE WAR</div><h2>Peace with ${esc(n.name)}</h2></div>
         <button type="button" class="icon-btn" data-peace="close" aria-label="Close">✕</button>
       </header>
+      ${this.tips?.html('peace') ?? ''}
       <section class="peace-score">
         <div class="ps-total ${ws.total >= 0 ? 'pos' : 'neg'}"><b>${sign(ws.total)}</b><small>war score</small></div>
         <div class="ps-bar" aria-hidden="true"><i style="left:${50 + Math.min(0, ws.total) / 2}%;width:${Math.abs(ws.total) / 2}%" class="${ws.total >= 0 ? 'pos' : 'neg'}"></i><span></span></div>

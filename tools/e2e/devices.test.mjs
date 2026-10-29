@@ -124,6 +124,9 @@ async function run(browserName, deviceName, orient) {
   await look(page, 'load game');
   await page.tap('#saves-screen [data-back]');
   await page.tap('[data-menu="single"]');
+  // First single-player game: the tutorial offer (step 12). Skip it.
+  await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+  if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.tap('[data-offer="skip"]');
   await page.waitForSelector('#era-screen:not([hidden])');
   await look(page, 'era select');
   await page.tap('[data-era="ww2"]');

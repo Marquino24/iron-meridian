@@ -110,7 +110,7 @@ export class Research {
     const r = this.of(nation);
     if (!t) return { ok: false, reason: 'Unknown tech' };
     const s = this.status(nation, id);
-    if (s === 'done') return { ok: false, reason: 'Researched' };
+    if (s === 'done') return { ok: false, reason: 'Already researched' };
     if (s === 'active') return { ok: false, reason: 'In progress' };
     if (s === 'locked') {
       const missing = t.req.filter((q) => !r.done.has(q)).map((q) => this.byId[q].name);
@@ -146,7 +146,7 @@ export class Research {
     const t = this.byId[id];
     if (!t) return { ok: false, reason: 'Unknown tech' };
     const st = this.status(nation, id);
-    if (st === 'done' || st === 'active') return { ok: false, reason: st === 'done' ? 'Researched' : 'In progress' };
+    if (st === 'done' || st === 'active') return { ok: false, reason: st === 'done' ? 'Already researched' : 'In progress' };
     if (r.queue.includes(id)) return { ok: false, reason: 'Already queued' };
     if (r.queue.length >= QUEUE_MAX) return { ok: false, reason: `Queue full (${QUEUE_MAX})` };
     const coming = (q) => r.done.has(q) || r.active.some((a) => a.id === q) || r.queue.includes(q);

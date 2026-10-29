@@ -221,6 +221,9 @@ await shot(page, '8-france');
 await page.click('#btn-menu');
 await page.waitForSelector('#main-menu:not([hidden])');
 await page.click('[data-menu="single"]');
+// First single-player game: the tutorial offer (step 12). Skip it.
+await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
 check((await page.textContent('#era-screen .eyebrow')).includes('SINGLE PLAYER'), 'single player label back');
 await page.click('[data-era="ww1"]');
 await page.waitForSelector('#start-screen:not([hidden]) .nation-row');

@@ -37,6 +37,9 @@ await shot(page, '1-menu-rome');
 
 // WWII Germany.
 await page.click('[data-menu="single"]');
+// First single-player game: the tutorial offer (step 12). Skip it.
+await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
 await page.click('[data-era="ww2"]');
 await page.waitForSelector('#start-screen:not([hidden]) .nation-row');
 check(await IM(() => document.body.dataset.theme) === 'ww2', 'theme follows the chosen era');

@@ -87,6 +87,9 @@ check(await page.locator('[data-menu="load"]').isVisible(), 'Load Game on the ma
 
 // --- A game in WWII, Hard, mid-war ---
 await page.click('[data-menu="single"]');
+// First single-player game: the tutorial offer (step 12). Skip it.
+await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
 await page.click('[data-era="ww2"]');
 await page.waitForSelector('#start-screen:not([hidden]) .nation-row');
 await click('#difficulty [data-difficulty="hard"]');
