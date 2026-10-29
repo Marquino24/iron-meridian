@@ -88,6 +88,9 @@ const multi = (page) => page.locator('[data-menu="multi"]');
   check(true, 'Back returns to the menu');
   // Single player still starts normally after visiting the lobby.
   await page.click('[data-menu="single"]');
+  // First single-player game: the tutorial offer (step 12). Skip it.
+  await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+  if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
   await page.click('[data-era="ww2"]');
   await page.waitForSelector('#start-screen:not([hidden]) .nation-row');
   check(true, 'single player still reachable');

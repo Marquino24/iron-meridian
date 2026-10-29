@@ -25,6 +25,7 @@ export class Camera {
     this.minZoom = 0.5;
     this.maxZoom = 8;
     this.maxZoomRel = 6;         // max zoom as a multiple of refZoom (per map)
+    this.maxZoomAbs = 0;         // …but always enough to show a typical province this large (main.js)
     this.velX = 0;               // inertia, screen px / s
     this.velY = 0;
     this.flight = null;          // active flyTo animation
@@ -36,10 +37,11 @@ export class Camera {
     this.updateLimits();
   }
 
-  setWorld(w, h, maxZoomRel = 6) {
+  setWorld(w, h, maxZoomRel = 6, maxZoomAbs = 0) {
     this.worldW = w;
     this.worldH = h;
     this.maxZoomRel = maxZoomRel;
+    this.maxZoomAbs = maxZoomAbs;
     this.updateLimits();
   }
 
@@ -49,7 +51,9 @@ export class Camera {
     // levels for labels/fly-to use the geometric-mean scale instead.
     this.refZoom = Math.max(this.fitZoom, Math.sqrt((this.viewW * this.viewH) / (this.worldW * this.worldH)));
     this.minZoom = this.fitZoom * 0.6;
-    this.maxZoom = this.refZoom * this.maxZoomRel;
+    // Small screens: refZoom shrinks with the screen but markers and fingers don't,
+    // so a typical province can always be zoomed to a comfortable tapping size.
+    this.maxZoom = Math.max(this.refZoom * this.maxZoomRel, this.maxZoomAbs);
     this.zoom = clamp(this.zoom, this.minZoom, this.maxZoom);
     this.targetZoom = clamp(this.targetZoom, this.minZoom, this.maxZoom);
     this.clampPosition();

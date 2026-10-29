@@ -55,6 +55,9 @@ import { SandboxUI } from './sandbox-ui.js';
 import { SaveUI } from './save-ui.js';
 import { PeaceUI } from './peace-ui.js';
 import { restore } from './save.js';
+import { Onboarding } from './onboarding.js';
+import { Tips } from './tips.js';
+import { Tutorial, SCENARIO, setupScenario } from './tutorial.js';
 
 const canvas = document.getElementById('map-canvas');
 const state = new GameState();
@@ -166,7 +169,8 @@ function overviewFrame() {
 /** Install a freshly built map and frame it. */
 function installMap(map) {
   // Real-world maps need deeper zoom (Europe's provinces are small).
-  camera.setWorld(map.width, map.height, map.kind === 'world' ? 16 : 6);
+  // A typical province can always be zoomed to ~150 px across (phones: room for markers and fingers).
+  camera.setWorld(map.width, map.height, map.kind === 'world' ? 16 : 6, 150 / map.provinceScale);
   state.loadMap(map);
   const f = overviewFrame();
   camera.fit();
@@ -237,6 +241,25 @@ function focusOverview() {
   camera.flyTo(f.x, f.y, f.zoom, 0.6);
 }
 
+/** Start a game as nation `id` on the loaded map (the tutorial passes its own difficulty and win condition). */
+function startGame(id, { difficulty = settings.difficulty, victoryConfig = victoryUI.config() } = {}) {
+  state.setSandbox(screens.mode === 'sandbox');
+  state.setPlayerNation(id);
+  buildings.start();
+  economy.start();
+  armies.spawnInitial(id);
+  ai.start(id, difficulty);
+  state.setFocusedNation(-1);
+  screens.gameInProgress = true;
+  screens.show('game');
+  state.setPhase('playing');
+  victory.start(victoryConfig);
+  saveUI.arm();
+  const cap = state.getProvince(state.getNation(id).capitalId);
+  state.setSelected(cap.id);
+  focusOn(cap.center.x, cap.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.2);
+}
+
 const ui = new UI(state, {
   selectEra: (id) => chooseEra(id),
   newMap: loadMap,
@@ -244,23 +267,7 @@ const ui = new UI(state, {
     const f = nationFrame(id);
     if (f) camera.flyTo(f.x, f.y, f.zoom, 0.8);
   },
-  deploy(id) {
-    state.setSandbox(screens.mode === 'sandbox');
-    state.setPlayerNation(id);
-    buildings.start();
-    economy.start();
-    armies.spawnInitial(id);
-    ai.start(id, settings.difficulty);
-    state.setFocusedNation(-1);
-    screens.gameInProgress = true;
-    screens.show('game');
-    state.setPhase('playing');
-    victory.start(victoryUI.config());
-    saveUI.arm();
-    const cap = state.getProvince(state.getNation(id).capitalId);
-    state.setSelected(cap.id);
-    focusOn(cap.center.x, cap.center.y, Math.max(camera.refZoom * 1.5, detailZoom(80)), 1.2);
-  },
+  deploy(id) { startGame(id); },
   focusProvince(id) {
     const p = state.getProvince(id);
     if (!p) return;
@@ -367,6 +374,12 @@ const windows = new WindowManager(state, [
     },
   }),
 ]);
+
+// What this player has seen: the tutorial offer, first-open tips (per user, see onboarding.js).
+const onboarding = new Onboarding();
+const tips = new Tips(onboarding);
+windows.tips = tips;
+peaceUI.tips = tips;
 
 // Research button badge: idle slots while there's something you could research.
 let badgeTimer = 0;
@@ -653,6 +666,14 @@ const screens = new Screens({
     continueGame() { saveUI.continueLatest().catch((e) => notice(e.message)); },
     openSaves(mode) { saveUI.open(mode); },
     openLobby() { if (!lobbyUI) return; screens.show('lobby'); lobbyUI.open(); },
+    offerTutorial() {
+      if (onboarding.offered) return false;
+      tutorialOffer.hidden = false;
+      tutorialOffer.querySelector('[data-offer="play"]').focus({ preventScroll: true });
+      return true;
+    },
+    startTutorial() { startTutorial(); },
+    resetTips() { onboarding.resetTips(); },
     menuShown() { saveUI.refreshMenu(); },
   },
 });
@@ -687,6 +708,69 @@ async function loadGame(save) {
 }
 
 const saveUI = new SaveUI(state, sim, { feed, screens, loadGame, notice });
+
+// --- Tutorial (step 12): offered on the first single-player game, replayable from Settings ---
+
+const tutorialOffer = document.getElementById('tutorial-offer');
+function declineTutorial() {
+  tutorialOffer.hidden = true;
+  onboarding.markOffered();
+  screens.setMode('single');
+  screens.show('era');
+}
+tutorialOffer.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-offer]')?.dataset.offer;
+  if (a === 'play') startTutorial();
+  if (a === 'skip') declineTutorial();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !tutorialOffer.hidden) { e.stopPropagation(); declineTutorial(); } }, true);
+document.querySelector('#era-screen [data-tutorial]').addEventListener('click', () => startTutorial());
+
+/** After the tutorial: a normal game again (computer nations play, tips and autosave on). */
+function endTutorialMode() {
+  tips.quiet = false;
+  saveUI.arm();
+}
+const tutorial = new Tutorial({
+  state, sim, camera, canvas, renderer, windows, screens, onboarding,
+  focusNode: (n) => focusNode(n),
+  zoomNode(n) { const p = armies.pos?.[n]; if (p) focusOn(p.x, p.y, camera.zoom * 1.8, 0.4); },
+  notice,
+  actions: {
+    startReal() { endTutorialMode(); screens.setMode('single'); screens.show('era'); },
+    keepPlaying() { endTutorialMode(); screens.actions.resume(); },
+    skipped() { endTutorialMode(); notice('Tutorial skipped: this is a normal game now. Replay it any time from Settings.'); },
+  },
+});
+
+let tutorialLoading = false;
+async function startTutorial() {
+  if (tutorialLoading) return;
+  tutorialLoading = true;
+  tutorialOffer.hidden = true;
+  onboarding.markOffered();
+  try {
+    if (mpClient?.active) mpClient.leave();
+    screens.setMode('single');
+    notice('Loading the tutorial…');
+    await loadEra(SCENARIO.era); // always a fresh map
+    const id = state.nations.find((n) => n.name === SCENARIO.nation)?.id;
+    if (state.map?.era?.id !== SCENARIO.era || id == null) throw new Error('Could not load the tutorial map.');
+    startGame(id, { difficulty: 'easy', victoryConfig: { mode: 'none', timeLimit: 0 } });
+    state.setSpeed(1);
+    const sc = setupScenario(state, sim);
+    if (!sc) throw new Error('Could not set up the tutorial.');
+    saveUI.nextAuto = Infinity; // no autosave over a real game's
+    tips.quiet = true;
+    toastEl.hidden = true; // "Loading the tutorial…": the coach takes over
+    tutorial.begin(sc);
+  } catch (e) {
+    console.error(e);
+    notice(e.message);
+  } finally {
+    tutorialLoading = false;
+  }
+}
 
 /** A wide, slowly drifting view of the world behind the menus. */
 function menuCamera() {
@@ -734,6 +818,7 @@ state.events.on('map:loaded', (map) => {
 screens.show(null);
 launcher = new Launcher(authEnabled() ? new AuthService() : new DemoAuthService());
 launcher.run().then(() => {
+  onboarding.setUser(launcher.auth.user?.id);
   setupMultiplayer();
   screens.show('menu');
   menuCamera();
@@ -813,6 +898,7 @@ function frame(now) {
   updateBadges(dt);
   victoryUI.update(dt);
   saveUI.update();
+  tutorial.update();
 
   renderer.render();
   adaptQuality(dt);
@@ -822,4 +908,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Handy for debugging from the console.
-window.ironMeridian = { get mpClient() { return mpClient; }, get lobbyUI() { return lobbyUI; }, commands, state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame, peaceUI };
+window.ironMeridian = { get mpClient() { return mpClient; }, get lobbyUI() { return lobbyUI; }, commands, state, camera, renderer, loadMap, loadEra, screens, settings, setMapStyle, sim, feed, windows, ai, sandboxUI, victoryUI, saveUI, loadGame, peaceUI, tutorial, onboarding, startTutorial, input };

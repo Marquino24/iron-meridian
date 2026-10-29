@@ -98,6 +98,7 @@ export class AI {
     this.clockHours = 0;
     this.stats = { thinks: 0, ms: 0, frames: 0, maxFrameMs: 0, maxStepMs: 0 };
     this.current = null;         // the think in progress (a generator)
+    this.forcePeace = null;      // tutorial: this nation accepts any valid peace
   }
 
   get D() { return DIFFICULTY[this.difficulty] ?? DIFFICULTY.normal; }
@@ -748,7 +749,8 @@ export class AI {
     if (pids.length) { const v = C.validTerms(player, n, pids); if (!v.ok) return v; }
     const now = this.state.clock.time;
     if (info.peaceRefusedAt != null && now - info.peaceRefusedAt < 7 * 864e5) return { ok: false, reason: 'They refused a week ago and won\'t talk again yet.' };
-    const chance = this.peaceChance(n, player, pids);
+    // The tutorial's enemy always agrees (tutorial.js).
+    const chance = this.forcePeace === n ? 1 : this.peaceChance(n, player, pids);
     if (Math.random() < chance) {
       C.makePeace(n, player, pids.length ? { cede: player, keep: pids } : {});
       return { ok: true, chance };

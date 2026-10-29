@@ -29,6 +29,9 @@ await page.waitForSelector('[data-action="demo"], #main-menu:not([hidden])');
 if (await page.locator('[data-action="demo"]').count()) await page.click('[data-action="demo"]');
 await page.waitForSelector('#main-menu:not([hidden])');
 await page.click('[data-menu="single"]');
+// First single-player game: the tutorial offer (step 12). Skip it.
+await page.waitForSelector('#tutorial-offer:not([hidden]), #era-screen:not([hidden])');
+if (await page.locator('#tutorial-offer:not([hidden])').count()) await page.click('[data-offer="skip"]');
 await page.click(`[data-era="${ERA}"]`);
 await page.waitForSelector('#start-screen:not([hidden]) .nation-row');
 await page.fill('#nation-search', NATION);
