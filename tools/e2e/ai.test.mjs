@@ -3,6 +3,7 @@
 //   node tools/e2e/ai.test.mjs [screenshot-dir] [--cpu=4] [--seconds=40] [--quality=low|medium|high]
 // --cpu=4 throttles the CPU 4× (a rough stand-in for an older iPad).
 import { chromium } from 'playwright-core';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
@@ -13,7 +14,7 @@ const QUALITY = process.argv.find((a) => a.startsWith('--quality='))?.slice(10) 
 const DAYS = Number(process.argv.find((a) => a.startsWith('--days='))?.slice(7) ?? 60);
 const ERA = process.env.ERA ?? 'ww2';
 const NATION = process.env.NATION ?? 'Poland';
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: chromePath() });
 const errors = [];
 let failures = 0;
 const check = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) failures++; };

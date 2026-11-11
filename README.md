@@ -453,6 +453,7 @@ js/
 | Cold War (1960) | historical-basemaps | 1960 | GPL-3.0 |
 | Modern | [Natural Earth](https://www.naturalearthdata.com) 1:10m admin-1 regions (states, provinces) and 1:50m countries | current release | Public domain |
 | City points for 20th-century eras and Modern | Natural Earth 1:50m populated places | — | Public domain |
+| Province names, historical eras (step 13) | Natural Earth 1:10m populated places, admin-1 regions, geography regions, rivers, lakes; [Pleiades](https://pleiades.stoa.org) for Rome (Latin and Greek names). Details: [docs/NAMES.md](docs/NAMES.md) | — | Public domain; Pleiades CC BY 3.0 |
 | Satellite imagery | [NASA Blue Marble Next Generation](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/) | August 2004 | Public domain |
 | Terrain imagery and relief | Natural Earth II and shaded relief, 1:50m rasters | — | Public domain |
 

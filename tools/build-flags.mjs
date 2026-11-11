@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { FLAG_SOURCES, COLONY_FLAGS } from './flag-sources.mjs';
 import { CUSTOM_FLAGS } from './flag-custom.mjs';
+import { chromePath } from './chrome-path.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ERAS = ['rome', 'medieval', 'ww1', 'ww2', 'coldwar', 'modern'];
@@ -88,7 +89,7 @@ function sized(svg, w, h, ow, oh) {
   });
 }
 
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: chromePath() });
 const page = await browser.newPage();
 await page.setContent('<html><body></body></html>');
 
@@ -207,7 +208,7 @@ lines.push('## Sources', '');
 lines.push('- **flag-icons** by Panayiotis Lipiridis, https://github.com/lipis/flag-icons — MIT license (below).');
 lines.push('- **Wikimedia Commons** files, each with the license stated on its page (listed below). Most are in the public domain; the few under CC BY-SA or similar keep that license in the rendered sprite sheets (the tile is an adaptation), with the author and link given below.');
 lines.push('- **Drawn for this game**: Roman vexillum, Han banner, simple medieval banners of arms, and three colonial flags: British India\'s Star of India ensign (badge simplified: rays, garter and star, without the motto), the Belgian Congo\'s blue flag with a gold star, French Indochina\'s yellow flag with the tricolor canton (tools/flag-custom.mjs).', '');
-lines.push('Colonial flags (step 7B): major colonies fly their own colonial flag where one existed: separate colony nations listed above, and colonies that are part of their sovereign on the map (British India and the Belgian Congo in 1914 and 1938), whose provinces, garrisons and locally raised armies show it. Minor colonies keep the ruler\'s flag.', '');
+lines.push('Colonial flags (step 7B, extended in step 13): colonies fly their own colonial flag or ensign where a real one existed in that year: separate colony nations (marked "colonial flag" below), and colonies that are part of their sovereign on the map, whose provinces, garrisons and locally raised armies show it (js/colonies.js): British India and the Belgian Congo (1914, 1938), Nigeria and the Gold Coast (1914, 1938), and in 1938 Burma, Malaya, Sierra Leone, Kenya, Uganda, Tanganyika and Southern Rhodesia. Most are British blue ensigns with the colony\'s badge, from Wikimedia Commons with the license on each file\'s page. Colonies that had no flag of their own keep the ruler\'s flag: the Dutch East Indies flew the Dutch tricolor, French, Portuguese, Italian, Spanish and Japanese colonies their ruler\'s flag, and the German colonial flags proposed in 1914 were never adopted.', '');
 lines.push('| Flag | License | Author | Used for |', '|---|---|---|---|');
 for (const cr of [...credits.values()].sort((a, b) => a.source.localeCompare(b.source))) {
   const name = cr.url ? `[${cr.source}](${cr.url})` : cr.source;

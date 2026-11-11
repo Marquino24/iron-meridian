@@ -16,11 +16,13 @@ UA = 'IronMeridianFlagBuild/1.0 (browser strategy game; https://github.com/marqu
 os.makedirs(CACHE, exist_ok=True)
 
 titles = json.loads(subprocess.check_output(['node', '-e', '''
-import("%s/tools/flag-sources.mjs").then(({ FLAG_SOURCES }) => {
+import("%s/tools/flag-sources.mjs").then(({ FLAG_SOURCES, COLONY_FLAGS }) => {
   const t = new Set();
-  for (const era of Object.values(FLAG_SOURCES)) for (const v of Object.values(era)) {
-    const s = v.replace(/^col:/, '');
-    if (s.startsWith('wc:')) t.add(s.slice(3));
+  for (const era of [...Object.values(FLAG_SOURCES), ...Object.values(COLONY_FLAGS)]) for (const v of Object.values(era)) {
+    for (const spec of [v].flat()) {
+      const s = spec.replace(/^(col|ens):/, '');
+      if (s.startsWith('wc:')) t.add(s.slice(3));
+    }
   }
   console.log(JSON.stringify([...t]));
 });''' % ROOT]))

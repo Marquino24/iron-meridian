@@ -12,6 +12,7 @@
 // end, also when a step fails. Keys and passwords are never printed.
 import { chromium } from 'playwright-core';
 import { randomBytes } from 'node:crypto';
+import { chromePath } from './chrome-path.mjs';
 
 const REF = 'kzdixrmlqcedgiqsrsdy';
 const URL_BASE = `https://${REF}.supabase.co`;
@@ -64,7 +65,7 @@ try {
   check(true, 'two test accounts created, approved, signed in (owner list for the test)');
 
   // --- Browsers on the live site ---
-  browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  browser = await chromium.launch({ executablePath: chromePath() });
   const errors = [];
   for (const p of people) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
