@@ -3,11 +3,12 @@
 //   python3 -m http.server 3000   (in the project root), then:
 //   node tools/e2e/sandbox.test.mjs [screenshot-dir] [--mobile]
 import { chromium } from 'playwright-core';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
 const MOBILE = process.argv.includes('--mobile');
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: chromePath() });
 const errors = [];
 let failures = 0;
 const check = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) failures++; };
@@ -26,7 +27,7 @@ const IM = (fn, arg) => page.evaluate(fn, arg);
 const nationId = (name) => IM((name) => window.ironMeridian.state.nations.find((n) => n.shortName === name || n.name === name)?.id, name);
 const select = async (key, id) => { await page.selectOption(`.sb-panel select[data-nation="${key}"]`, String(id)); await page.waitForTimeout(150); };
 const tool = async (id) => { await click(`.sb-tools [data-tool="${id}"]`); await page.waitForSelector(`.sb-panel[data-tool="${id}"]:not([hidden])`); };
-/** Screen point of a province's centre after flying there. */
+/** Screen point of a province's center after flying there. */
 const flyToProvince = async (pid, rel = 6) => {
   await IM(([pid, rel]) => { const { state, camera } = window.ironMeridian; const p = state.provinces[pid]; camera.flyTo(p.center.x, p.center.y, camera.refZoom * rel, 0.01); }, [pid, rel]);
   await page.waitForTimeout(400);

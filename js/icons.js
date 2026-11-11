@@ -4,8 +4,8 @@
  * canvas (Path2D, cached).
  *
  * An icon is a list of layers [pathData, fill] on a 24×24 grid. A fill of
- * 'currentColor' takes the colour the caller asks for (white on map markers,
- * the text colour in the HUD); other fills are fixed (gold coins, red barrels).
+ * 'currentColor' takes the color the caller asks for (white on map markers,
+ * the text color in the HUD); other fills are fixed (gold coins, red barrels).
  */
 
 const CC = 'currentColor';
@@ -293,7 +293,7 @@ function paths(name) {
   return pathCache.get(name);
 }
 
-/** Draw an icon centred at (x, y), `size` px tall, on a canvas. */
+/** Draw an icon centered at (x, y), `size` px tall, on a canvas. */
 export function drawIcon(ctx, name, x, y, size, color = '#fff') {
   const s = size / 24;
   ctx.save();

@@ -11,7 +11,7 @@
  *   units.js, and worn-down units hit softer. Unit levels and research
  *   (defense and attack bonuses) scale attack and defense. Land armies caught at sea
  *   fight at a quarter of their attack and half their defense.
- *   An army below 20% strength retreats to a safe neighbouring node (if
+ *   An army below 20% strength retreats to a safe neighboring node (if
  *   there is none it fights on). The battle ends when one side is gone.
  * - Occupation: an army standing in enemy or unclaimed land with no enemy
  *   army there captures it after a few hours (longer for cities/capitals).
@@ -344,7 +344,7 @@ export class Combat {
   /**
    * Homeland levies: a nation at war that has lost a fifth of its home
    * provinces raises free infantry in a city it still holds (two units past
-   * 40%). Invaded nations dig in, so swallowing a neighbour whole takes time.
+   * 40%). Invaded nations dig in, so swallowing a neighbor whole takes time.
    */
   raiseLevies() {
     const st = this.state, A = this.armies;
@@ -438,7 +438,7 @@ export class Combat {
     A.changed();
   }
 
-  /** A safe neighbouring node to fall back to, or -1. */
+  /** A safe neighboring node to fall back to, or -1. */
   retreatTarget(army, attacker) {
     const A = this.armies;
     const safe = (n) => n !== army.node && A.canEnter(army.nation, n, army.kind) && !this.hostilesAt(n, army.nation).length;

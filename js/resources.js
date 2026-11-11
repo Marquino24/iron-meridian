@@ -85,7 +85,7 @@ export function assignDeposits(map) {
       const { x, y } = project(lon, lat);
       let id = map.pickAt(x, y);
       if (id < 0) {
-        // Offshore or just outside a coast: nearest province centre.
+        // Offshore or just outside a coast: nearest province center.
         let bd = Infinity;
         for (const p of map.provinces) {
           const d = Math.hypot(p.center.x - x, p.center.y - y);

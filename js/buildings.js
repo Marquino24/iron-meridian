@@ -16,7 +16,7 @@
  * Level III of each building needs a tech (research.js); some techs also
  * make construction faster or cheaper.
  * One construction per city at a time; it's paid up front and refunded if
- * cancelled. A captured city keeps its buildings but loses the construction.
+ * canceled. A captured city keeps its buildings but loses the construction.
  */
 
 import { resourceSet } from './resources.js';
@@ -37,7 +37,7 @@ export const BUILDINGS = {
   roads: { cost: { money: 120, steel: 20 }, hours: 48, glyph: '≡', effect: 'roads' },
 };
 
-/** Era-flavoured names. */
+/** Era-flavored names. */
 const NAMES = {
   rome: { farm: 'Latifundium', mine: 'Iron Mine', barracks: 'Castra', port: 'Harbor', fort: 'Walls', roads: 'Roman Roads' },
   medieval: { farm: 'Manor Farm', mine: 'Iron Mine', barracks: 'Barracks', port: 'Harbor', fort: 'Castle Walls', roads: 'Roads' },
@@ -89,7 +89,7 @@ export class Buildings {
     this.set = resourceSet(this.eraId);
   }
 
-  /** A building level changed (pid) or many did (no pid). Starting/cancelling doesn't change yields. */
+  /** A building level changed (pid) or many did (no pid). Starting/canceling doesn't change yields. */
   changed(pid, yields = true) {
     if (yields) { if (pid >= 0) this.economy.refreshProvince(pid); else this.economy.invalidate(); }
     this.state.events.emit('buildings', pid ?? null);

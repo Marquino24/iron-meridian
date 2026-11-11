@@ -4,14 +4,14 @@
  * Values:
  *   'fi:xx'        flag-icons (MIT) 4×3 flag with ISO code xx — today's flag,
  *                  used for older eras only where the design was the same then
- *   'wc:File.svg'  a Wikimedia Commons file (licence recorded at build time)
+ *   'wc:File.svg'  a Wikimedia Commons file (license recorded at build time)
  *   'own:id'       drawn here as SVG (tools/flag-custom.mjs): Roman vexillum, Han banner, a few arms
  *   'col:<src>'    a colony / protectorate / occupied land: its sovereign's flag
  *   'ens:<src>'    a colony flying its own colonial flag or ensign (step 7B)
  *   (missing)      no known flag or banner for that date: the game draws a
  *                  generated heraldic shield instead (clearly not a real flag)
  *
- * WWII Germany flies the black-white-red tricolour (the 1933–35 national
+ * WWII Germany flies the black-white-red tricolor (the 1933–35 national
  * flag), not the swastika flag — illegal to display in Germany and avoided by
  * commercial WWII games.
  */
@@ -24,8 +24,19 @@
  * fly the colonial flag. Minor colonies keep the ruler's flag.
  */
 export const COLONY_FLAGS = {
-  ww1: { 'British India': 'ens:own:star-of-india', 'Belgian Congo': 'ens:own:belgian-congo' },
-  ww2: { 'British India': 'ens:own:star-of-india', 'Belgian Congo': 'ens:own:belgian-congo' },
+  ww1: {
+    'British India': 'ens:own:star-of-india', 'Belgian Congo': 'ens:own:belgian-congo',
+    // Step 13: British blue ensigns with the colony's badge.
+    'Nigeria': 'ens:wc:Flag of Nigeria (1914–1952).svg', 'Gold Coast': 'ens:wc:Flag of the Gold Coast (1877–1957).svg',
+  },
+  ww2: {
+    'British India': 'ens:own:star-of-india', 'Belgian Congo': 'ens:own:belgian-congo',
+    'Nigeria': 'ens:wc:Flag of Nigeria (1914–1952).svg', 'Gold Coast': 'ens:wc:Flag of the Gold Coast (1877–1957).svg',
+    'Kenya': 'ens:wc:Flag of Kenya (1921–1963).svg', 'Tanganyika': 'ens:wc:Flag of Tanganyika (1923–1961).svg',
+    'Uganda': 'ens:wc:Flag of the Uganda Protectorate.svg', 'Southern Rhodesia': 'ens:wc:Flag of Southern Rhodesia (1924–1964).svg',
+    'Sierra Leone': 'ens:wc:Flag of Sierra Leone (1916–1961).svg', 'Malaya': 'ens:wc:Flag of Malaya (1896–1950).svg',
+    'Burma': 'ens:wc:Flag of Burma (1939–1941, 1945–1948).svg', // the blue ensign with the peacock, from 1939 (the game starts September 1939)
+  },
 };
 
 // Flags used by several colonies / dependencies.
@@ -102,13 +113,13 @@ export const FLAG_SOURCES = {
     'Papua New Guinea': AU,
     'New Zealand': 'fi:nz',
     'Iceland': 'col:fi:dk',
-    'Malaya': UK,
+    'Malaya': ['ens:wc:Flag of Malaya (1896–1950).svg', UK], // step 13: own colonial flag
     'Romania': 'fi:ro',
-    'Uganda': UK,
+    'Uganda': ['ens:wc:Flag of the Uganda Protectorate.svg', UK], // step 13: own colonial flag
     'Ecuador': 'fi:ec',
     'Bulgaria': 'fi:bg',
     'Uruguay': 'fi:uy',
-    'Guyana': UK,
+    'Guyana': ['ens:wc:Flag of British Guiana (1906–1919).svg', UK], // step 13: own colonial flag
     'Tunisia': 'fi:tn',
     'Philippines': US_1912,
     'Rio De Oro': 'col:wc:Flag of Spain (1785–1873, 1875–1931).svg',
@@ -128,7 +139,7 @@ export const FLAG_SOURCES = {
     'Panama': 'fi:pa',
     'Switzerland': 'fi:ch',
     'Sierra Leone': UK,
-    'Ceylon': UK,
+    'Ceylon': ['ens:wc:Flag of Ceylon (1875–1948).svg', UK], // step 13: own colonial flag
     'Costa Rica': 'fi:cr',
     'Armenia': 'col:fi:ru',
     'Spanish Morocco': 'col:wc:Flag of Spain (1785–1873, 1875–1931).svg',
@@ -137,12 +148,12 @@ export const FLAG_SOURCES = {
     'Lesotho': UK,
     'Portuguese Guinea': PT,
     'Montenegro': 'wc:Flag of Montenegro (1905–1918).svg',
-    'Belize': UK,
+    'Belize': ['ens:wc:Flag of British Honduras (1870–1919).svg', UK], // step 13: own colonial flag
     'Equatorial Guinea': 'col:wc:Flag of Spain (1785–1873, 1875–1931).svg',
     'Swaziland': UK,
     'Haiti': 'fi:ht',
     'El Salvador': 'fi:sv',
-    'Fiji': UK,
+    'Fiji': ['ens:wc:Flag of Fiji (1908–1924).svg', UK], // step 13: own colonial flag
     'Puerto Rico': US_1912,
     'Gambia, The': UK,
     'Luxembourg': 'fi:lu',
@@ -151,8 +162,8 @@ export const FLAG_SOURCES = {
     'Guadeloupe': FR,
     'Dominica': UK,
     'Netherlands Antilles': NL,
-    'Barbados': UK,
-    'Malta': UK,
+    'Barbados': ['ens:wc:Flag of Barbados (1870–1966).svg', UK], // step 13: own colonial flag
+    'Malta': ['ens:wc:Flag of Malta (1898–1923).svg', UK], // step 13: own colonial flag
     'Saint Lucia': UK,
     'Saint Vincent and the Grenadines': UK,
     'Niue': NZ,
@@ -200,7 +211,7 @@ export const FLAG_SOURCES = {
     'Chile': 'fi:cl',
     'Egypt': 'wc:Flag of Egypt (1922–1958).svg',
     'Bolivia': 'fi:bo',
-    // Black-white-red tricolour, not the swastika flag (see the note above).
+    // Black-white-red tricolor, not the swastika flag (see the note above).
     'German Reich': 'wc:Flag of the German Empire.svg',
     'Colombia': 'fi:co',
     'Spain': 'wc:Flag of Spain (1931–1939).svg',
@@ -217,7 +228,7 @@ export const FLAG_SOURCES = {
     'Ecuador': 'fi:ec',
     'Laos': 'ens:own:french-indochina', // part of French Indochina
     'Uruguay': 'fi:uy',
-    'Guyana': UK,
+    'Guyana': ['ens:wc:Flag of British Guiana (1919–1955).svg', UK], // step 13: own colonial flag
     'Tunisia': 'fi:tn',
     'Hungary': 'fi:hu',
     'Greece': 'wc:Flag of Greece (1822-1978).svg',
@@ -231,7 +242,7 @@ export const FLAG_SOURCES = {
     'Nicaragua': 'fi:ni',
     'Trucial Oman': UK,
     'Honduras': 'fi:hn',
-    'Malawi': UK,
+    'Malawi': ['ens:wc:Flag of Nyasaland (1925–1964).svg', UK], // step 13: own colonial flag
     'Estonia': 'fi:ee',
     'Guatemala': 'fi:gt',
     'Cuba': 'fi:cu',
@@ -239,33 +250,33 @@ export const FLAG_SOURCES = {
     'French Guiana': FR,
     'Panama': 'fi:pa',
     'Switzerland': 'fi:ch',
-    'Ceylon': UK,
+    'Ceylon': ['ens:wc:Flag of Ceylon (1875–1948).svg', UK], // step 13: own colonial flag
     'Togo': FR,
     'Costa Rica': 'fi:cr',
     'Dominican Republic': 'fi:do',
     'Albania': 'wc:Flag of Albania (1934–1939).svg',
-    'Israel': UK,
+    'Israel': ['ens:wc:Ensign of the Palestine Mandate (1927–1948).svg', UK], // step 13: own colonial flag
     'Burundi': BE,
     'Guinea-Bissau': PT,
     'Haiti': 'fi:ht',
     'French Somaliland': FR,
-    'Belize': UK,
+    'Belize': ['ens:wc:Flag of British Honduras (1919–1981).svg', UK], // step 13: own colonial flag
     'El Salvador': 'fi:sv',
-    'Fiji': UK,
+    'Fiji': ['ens:wc:Flag of Fiji (1924–1970).svg', UK], // step 13: own colonial flag
     'Puerto Rico': US_1912,
     'Brunei': 'wc:Flag of Brunei 1906-1959.svg',
     'Gambia, The': UK,
-    'Jamaica': UK,
+    'Jamaica': ['ens:wc:Flag of Jamaica (1906–1957).svg', UK], // step 13: own colonial flag
     'Luxembourg': 'fi:lu',
-    'Trinidad': UK,
+    'Trinidad': ['ens:wc:Flag of Trinidad and Tobago (1889–1958).svg', UK], // step 13: own colonial flag
     'Samoa': NZ,
-    'Bahamas': UK,
+    'Bahamas': ['ens:wc:Flag of the Bahamas (1923–1953).svg', UK], // step 13: own colonial flag
     'Martinique': FR,
     'Guadeloupe': FR,
     'Dominica': UK,
     'Netherlands Antilles': NL,
     'Andorra': 'fi:ad',
-    'Barbados': UK,
+    'Barbados': ['ens:wc:Flag of Barbados (1870–1966).svg', UK], // step 13: own colonial flag
     'Saint Lucia': UK,
     'Saint Vincent and the Grenadines': UK,
     'Niue': NZ,
@@ -321,13 +332,13 @@ export const FLAG_SOURCES = {
     'Colombia': 'fi:co',
     'Mauritania': 'wc:Flag of Mauritania (1959–2017).svg',
     'France': 'fi:fr',
-    'Tanganyika': UK,
+    'Tanganyika': ['ens:wc:Flag of Tanganyika (1923–1961).svg', UK], // step 13: own colonial flag
     'Venezuela': 'wc:Flag of Venezuela (1954–2006).svg',
     'Nigeria': 'fi:ng',
     'Namibia': 'col:wc:Flag of South Africa (1928–1982).svg',
     'Afghanistan': 'wc:Flag of Afghanistan (1931–1973).svg',
     'Mozambique': PT,
-    'Zambia': UK,
+    'Zambia': ['ens:wc:Flag of Northern Rhodesia (1939–1964).svg', UK], // step 13: own colonial flag
     'Spain': 'wc:Flag of Spain (1945–1977).svg',
     'Burma': 'wc:Flag of Burma (1948–1974).svg',
     'Poland': 'fi:pl',
@@ -335,7 +346,7 @@ export const FLAG_SOURCES = {
     'Madagascar': 'fi:mg',
     'Somalia': 'fi:so',
     'Central African Republic': 'fi:cf',
-    'Kenya': UK,
+    'Kenya': ['ens:wc:Flag of Kenya (1921–1963).svg', UK], // step 13: own colonial flag
     'Iraq': 'wc:Flag of Iraq (1959–1963).svg',
     'Thailand': 'fi:th',
     'Morocco': 'fi:ma',
@@ -345,7 +356,7 @@ export const FLAG_SOURCES = {
     'United Kingdom': 'fi:gb',
     'Paraguay': 'fi:py',
     'Italy': 'fi:it',
-    'Zimbabwe': UK,
+    'Zimbabwe': ['ens:wc:Flag of Southern Rhodesia (1924–1964).svg', UK], // step 13: own colonial flag
     'Papua New Guinea': AU,
     'Yugoslavia': 'wc:Flag of Yugoslavia (1946-1992).svg',
     'Romania': 'wc:Flag of Romania (1952–1965).svg',
@@ -367,10 +378,10 @@ export const FLAG_SOURCES = {
     'German Democratic Republic': 'wc:Flag of East Germany.svg',
     'Czechoslovakia': 'fi:cz',
     'Ghana': 'fi:gh',
-    'Uganda': UK,
+    'Uganda': ['ens:wc:Flag of the Uganda Protectorate.svg', UK], // step 13: own colonial flag
     'Senegal': 'own:mali-federation',
     'Uruguay': 'fi:uy',
-    'Guyana': UK,
+    'Guyana': ['ens:wc:Flag of British Guiana (1955–1966).svg', UK], // step 13: own colonial flag
     'Tunisia': 'fi:tn',
     'Philippines': 'fi:ph',
     'Bulgaria': 'wc:Flag of Bulgaria (1948–1967).svg',
@@ -379,7 +390,7 @@ export const FLAG_SOURCES = {
     'Nepal': 'fi:np',
     'Hungary': 'fi:hu',
     'Austria': 'fi:at',
-    'Suriname': NL,
+    'Suriname': ['ens:wc:Flag of Suriname (1959–1975).svg', NL], // step 13: own colonial flag
     'Ireland': 'fi:ie',
     'Greece': 'wc:Flag of Greece (1822-1978).svg',
     'South Korea': 'fi:kr',
@@ -387,7 +398,7 @@ export const FLAG_SOURCES = {
     'Portugal': 'fi:pt',
     'Nicaragua': 'fi:ni',
     'Honduras': 'fi:hn',
-    'Malawi': UK,
+    'Malawi': ['ens:wc:Flag of Nyasaland (1925–1964).svg', UK], // step 13: own colonial flag
     'United Arab Emirates': UK,
     'Benin': 'fi:bj',
     'Jordan': 'fi:jo',
@@ -398,7 +409,7 @@ export const FLAG_SOURCES = {
     'French Guiana': FR,
     'Panama': 'fi:pa',
     'Switzerland': 'fi:ch',
-    'Sierra Leone': UK,
+    'Sierra Leone': ['ens:wc:Flag of Sierra Leone (1916–1961).svg', UK], // step 13: own colonial flag
     'Belgium': 'fi:be',
     'Togo': 'fi:tg',
     'Sri Lanka': 'wc:Flag of Ceylon (1951–1972).svg',
@@ -414,23 +425,23 @@ export const FLAG_SOURCES = {
     'Burundi': BE,
     'Rwanda': BE,
     'Djibouti': FR,
-    'Belize': UK,
+    'Belize': ['ens:wc:Flag of British Honduras (1919–1981).svg', UK], // step 13: own colonial flag
     'Equatorial Guinea': 'col:wc:Flag of Spain (1945–1977).svg',
     'Kuwait': 'wc:Flag of Kuwait (1940-1961).svg',
     'Swaziland': UK,
     'Haiti': 'fi:ht',
     'El Salvador': 'fi:sv',
     'Lebanon': 'fi:lb',
-    'Fiji': UK,
+    'Fiji': ['ens:wc:Flag of Fiji (1924–1970).svg', UK], // step 13: own colonial flag
     'Cyprus': 'fi:cy',
     'Puerto Rico': 'fi:pr',
     'Brunei': 'fi:bn',
     'Gambia, The': UK,
-    'Jamaica': UK,
+    'Jamaica': ['ens:wc:Flag of Jamaica (1957–1962).svg', UK], // step 13: own colonial flag
     'Luxembourg': 'fi:lu',
-    'Trinidad': UK,
+    'Trinidad': ['ens:wc:Flag of Trinidad and Tobago (1958–1962).svg', UK], // step 13: own colonial flag
     'Samoa': 'fi:ws',
-    'Bahamas': UK,
+    'Bahamas': ['ens:wc:Flag of the Bahamas (1953–1964).svg', UK], // step 13: own colonial flag
     'Andorra': 'fi:ad',
     'Niue': NZ,
     'Tonga': 'fi:to',

@@ -16,7 +16,7 @@
  *      real shape (polygon-clipping). Every bit of land lands in a province.
  *   7. For every province edge, find what lies across it: another province
  *      or a sea zone (sea zones = Voronoi cells of ocean sample points).
- *   8. Terrain from real mountain ranges / climate bands, names, colours,
+ *   8. Terrain from real mountain ranges / climate bands, names, colors,
  *      flags → compact JSON (quantized, delta-encoded rings).
  */
 
@@ -30,6 +30,11 @@ import polygonClipping from 'polygon-clipping';
 import { project, WORLD_WIDTH, WORLD_HEIGHT, LAT_MIN, LAT_MAX, unproject } from '../js/projection.js';
 import { createRng, createNameGenerator, hashSeed } from '../js/map.js';
 import { ERAS, SOURCES, NE_PLACES, NON_STATE_RE, FOUNDED, RENAMES } from './era-config.mjs';
+import { nameProvinces, loadSources as loadNameSources } from './province-names.mjs';
+import { buildWorldMap } from '../js/world.js';
+import { getEra } from '../js/eras.js';
+
+let nameSources = null;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW = path.join(ROOT, 'data/raw');
@@ -65,7 +70,7 @@ function ensureRaw(file, url) {
   if (!fs.existsSync(p)) {
     fs.mkdirSync(RAW, { recursive: true });
     console.log(`  downloading ${url}`);
-    // curl honours the environment's proxy settings; Node's fetch does not.
+    // curl honors the environment's proxy settings; Node's fetch does not.
     execFileSync('curl', ['-sSfL', '--retry', '3', url, '-o', p]);
   }
   return JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -294,7 +299,7 @@ async function simplifyAndProject(src) {
       const p = project(lon, lat);
       return [p.x, p.y];
     })));
-    // Re-run through polygon-clipping (union with itself) to normalise orientation and drop slivers.
+    // Re-run through polygon-clipping (union with itself) to normalize orientation and drop slivers.
     const clean = openMultiPolygon(polygonClipping.union(projected));
     if (clean.length) shapes.set(f.properties.G, clean);
   }
@@ -394,7 +399,7 @@ function budgetFor(areas, target, weightOf = () => 1) {
   return new Map([...areas].map(([key, a]) => [key, Math.max(1, Math.round(lo * w(a, weightOf(key))))]));
 }
 
-/** "North", "South-East"… for the part of a split region relative to its centre. */
+/** "North", "South-East"… for the part of a split region relative to its center. */
 const COMPASS = ['East', 'North-East', 'North', 'North-West', 'West', 'South-West', 'South', 'South-East'];
 function compassName(dx, dy, spread) {
   if (Math.hypot(dx, dy) < spread * 0.35) return 'Central';
@@ -560,7 +565,7 @@ async function buildEra(era, places) {
   }
 
   // Curated key cities of the major powers (era-config majorCities): their real
-  // industrial centres, which the population-ranked pick above misses.
+  // industrial centers, which the population-ranked pick above misses.
   if (era.majorCities) {
     stats.curatedCities = 0;
     for (const [ci, c] of countries.entries()) {
@@ -656,7 +661,7 @@ async function buildEra(era, places) {
     });
   }
 
-  // Generated capitals for nations without a real one: the province nearest the territory's centre.
+  // Generated capitals for nations without a real one: the province nearest the territory's center.
   for (const [ci, c] of countries.entries()) {
     if (c.unclaimed || c.capital) continue;
     const own = provinces.filter((p) => p.country === ci);
@@ -739,7 +744,7 @@ async function buildEra(era, places) {
     p.name = p.regionName ?? p.city?.name ?? names();
   }
 
-  // --- Nations: order by size, colours (neighbours differ), flags ------------------------------------
+  // --- Nations: order by size, colors (neighbors differ), flags ------------------------------------
   const nationOrder = countries
     .map((c, ci) => ({ c, ci }))
     .filter(({ c, ci }) => !c.unclaimed && provinces.some((p) => p.country === ci))
@@ -852,6 +857,13 @@ async function buildEra(era, places) {
     width: WORLD_WIDTH, height: WORLD_HEIGHT, q: Q,
     nations, provinces: provOut, seas: seaOut,
   };
+  // Real names for provinces without a city (step 13): historical places, regions, rivers — never invented.
+  if (era.source === 'hb') {
+    const map = buildWorldMap(data, getEra(era.id));
+    for (const p of map.provinces) p.generatedCity = p.isCity && !p.cityName && provinces[p.id].city?.generated;
+    const { names: real } = nameProvinces(era.id, map, nameSources ??= loadNameSources(RAW));
+    for (const [pid, name] of real) data.provinces[pid].n = name;
+  }
   fs.mkdirSync(OUT, { recursive: true });
   const json = JSON.stringify(data);
   fs.writeFileSync(path.join(OUT, `${era.id}.json`), json);
@@ -869,7 +881,7 @@ async function buildEra(era, places) {
   return { id: era.id, provinces: land, nations: nations.length, kb: json.length / 1024 };
 }
 
-/** Point well inside a (multi)polygon: grid search maximising distance to the outline. */
+/** Point well inside a (multi)polygon: grid search maximizing distance to the outline. */
 function interiorCenter(mp) {
   const big = mp.slice().sort((a, b) => polyArea(b) - polyArea(a))[0];
   const [x0, y0, x1, y1] = bboxOf(big);

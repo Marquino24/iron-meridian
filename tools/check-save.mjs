@@ -76,7 +76,7 @@ A.sim.armies.spawnInitial(me);
 A.sim.ai.start(me, 'normal');
 A.state.setPhase('playing');
 A.sim.victory.start({ mode: 'points', timeLimit: 0 });
-// War with the weakest neighbour; send every field army at its capital; research something.
+// War with the weakest neighbor; send every field army at its capital; research something.
 const target = [...A.sim.ai.neighborsOf(me)].sort((x, y) => A.sim.ai.powerOf(x) - A.sim.ai.powerOf(y))[0];
 A.sim.diplomacy.declareWar(me, target);
 const cap = A.state.getNation(target).capitalId;

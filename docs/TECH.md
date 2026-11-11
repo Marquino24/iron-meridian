@@ -60,9 +60,9 @@ Old saves: 28 of 28 old techs carry over.
 | Infrastructure | II | ★ **Viae Militares** | ★ Armies move 40% faster through provinces with Roads | Roman Concrete | attack |
 | Infrastructure | II | Limes Frontier | Walls level III unlocked; +10% defense | Roman Concrete | defend |
 | Infrastructure | III | ★ **Valetudinaria** | ★ Armies recover strength 100% faster on your land | Fabricae Workshops | defend |
-| Infrastructure | III | Standardised Bricks | Construction 20% cheaper | Aqueducts | grow |
+| Infrastructure | III | Standardized Bricks | Construction 20% cheaper | Aqueducts | grow |
 | Infrastructure | III | Cursus Publicus | +10% movement speed | Viae Militares | grow |
-| Infrastructure | IV | Imperial Road Network | +15% movement speed; +10% all production | Standardised Bricks, Cursus Publicus | grow |
+| Infrastructure | IV | Imperial Road Network | +15% movement speed; +10% all production | Standardized Bricks, Cursus Publicus | grow |
 
 ## Medieval (1200)
 
@@ -78,10 +78,10 @@ Old saves: 27 of 28 old techs carry over; refunded: i5.
 | Military | I | Stirrups | Barracks level III unlocked | — | grow |
 | Military | I | Crossbows | Longbowmen level 2 (+15% attack, defense, HP) | — | attack |
 | Military | II | Destriers | Knights level 2 (+15% attack, defense, HP) | Stirrups | attack |
-| Military | II | Plate Armour | Men-at-arms level 3 (+30% attack, defense, HP) | Chainmail | attack |
+| Military | II | Plate Armor | Men-at-arms level 3 (+30% attack, defense, HP) | Chainmail | attack |
 | Military | II | ★ **Feudal Levy** | ★ Homeland levies rise 50% sooner and bring one more unit; Recruitment 10% faster | Chainmail | defend |
 | Military | II | Stern Rudder | Cog level 2 (+15% attack, defense, HP) | Shipwrights' Guilds | attack |
-| Military | III | ★ **Siege Engines** | Longbowmen level 3 (+30% attack, defense, HP); ★ Cities and capitals fall to your sieges 40% faster | Crossbows, Plate Armour | attack |
+| Military | III | ★ **Siege Engines** | Longbowmen level 3 (+30% attack, defense, HP); ★ Cities and capitals fall to your sieges 40% faster | Crossbows, Plate Armor | attack |
 | Military | III | Military Orders | Knights level 3 (+30% attack, defense, HP); +10% Knights attack | Destriers | attack |
 | Military | III | Carracks | Cog level 3 (+30% attack, defense, HP) | Stern Rudder | attack |
 | Military | IV | ★ **Crusading Zeal** | ★ War exhaustion 40% lower; +10% Men-at-arms attack | Siege Engines, Military Orders | attack |
@@ -92,7 +92,7 @@ Old saves: 27 of 28 old techs carry over; refunded: i5.
 | Economy | II | Town Charters | +15% manpower | Three-Field System | grow |
 | Economy | II | Hanseatic Trade | +15% gold | Blast Furnace | grow |
 | Economy | III | Universities | +1 research slot; +15% gold | Banking Houses | grow |
-| Economy | III | Heavy Plough | +15% grain; +15% manpower | Town Charters | grow |
+| Economy | III | Heavy Plow | +15% grain; +15% manpower | Town Charters | grow |
 | Economy | III | Water-Powered Forges | +15% iron | Hanseatic Trade | grow |
 | Infrastructure | I | Pack Trains | +10% movement speed | — | grow |
 | Infrastructure | I | Stone Bridges | Roads level III unlocked | — | grow |
@@ -120,21 +120,21 @@ Old saves: 27 of 28 old techs carry over; refunded: i7.
 | Military | I | Indirect Fire | Artillery level 2 (+15% attack, defense, HP) | — | attack |
 | Military | II | ★ **Trench Systems** | ★ Entrenchment: armies defending your own land +25% defense; Fortifications level III unlocked | Machine Guns | defend |
 | Military | II | Stormtrooper Tactics | Infantry level 3 (+30% attack, defense, HP) | Machine Guns | attack |
-| Military | II | Armoured Cars | Cavalry level 2 (+15% attack, defense, HP) | Cavalry Remounts | attack |
+| Military | II | Armored Cars | Cavalry level 2 (+15% attack, defense, HP) | Cavalry Remounts | attack |
 | Military | II | ★ **Aerial Reconnaissance** | ★ +25% attack in the first day of every battle | Indirect Fire | attack |
 | Military | II | Fire Control | Dreadnought level 2 (+15% attack, defense, HP) | Dry Docks | attack |
 | Military | III | ★ **Chemical Warfare** | ★ Enemy terrain and fortification bonus cut by 40% when you attack | Indirect Fire, Trench Systems | attack |
 | Military | III | Creeping Barrage | Artillery level 3 (+30% attack, defense, HP) | Indirect Fire, Stormtrooper Tactics | attack |
-| Military | III | Landships | Cavalry level 3 (+30% attack, defense, HP); +10% Cavalry attack | Armoured Cars | attack |
+| Military | III | Landships | Cavalry level 3 (+30% attack, defense, HP); +10% Cavalry attack | Armored Cars | attack |
 | Military | III | Super-Dreadnoughts | Dreadnought level 3 (+30% attack, defense, HP) | Fire Control | attack |
 | Economy | I | Nitrogen Fertiliser | Farms level III unlocked; +10% food | — | grow |
 | Economy | I | General Staff Office | +1 research slot | — | grow |
 | Economy | I | Bessemer Steel | Factory level III unlocked; +10% steel | — | grow |
 | Economy | II | War Bonds | +10% money | General Staff Office | grow |
-| Economy | II | Total Mobilisation | +15% manpower | Nitrogen Fertiliser | grow |
+| Economy | II | Total Mobilization | +15% manpower | Nitrogen Fertiliser | grow |
 | Economy | II | Oil Refining | Oil Well level III unlocked; Synthetic oil: +15% of your steel output | Bessemer Steel | grow |
 | Economy | III | Research Laboratories | +1 research slot; +15% money | War Bonds | grow |
-| Economy | III | Occupation Authorities | Conquered land integrates 40% faster; +15% food | Total Mobilisation | hold |
+| Economy | III | Occupation Authorities | Conquered land integrates 40% faster; +15% food | Total Mobilization | hold |
 | Economy | III | Open-Hearth Steel | +15% steel | Oil Refining | grow |
 | Infrastructure | I | Motor Lorries | +10% movement speed | — | grow |
 | Infrastructure | I | Railways | Railways level III unlocked | — | grow |
@@ -156,14 +156,14 @@ Old saves: 28 of 28 old techs carry over.
 | Branch | Tier | Tech | Effects | Requires | AI tag |
 |---|---|---|---|---|---|
 | Military | I | Semi-Automatic Rifles | Infantry level 2 (+15% attack, defense, HP) | — | attack |
-| Military | I | Armoured Divisions | Barracks level III unlocked | — | grow |
+| Military | I | Armored Divisions | Barracks level III unlocked | — | grow |
 | Military | I | Radio-Directed Fire | Artillery level 2 (+15% attack, defense, HP) | — | attack |
-| Military | II | Sloped Armour | Tank level 2 (+15% attack, defense, HP) | Armoured Divisions | attack |
+| Military | II | Sloped Armor | Tank level 2 (+15% attack, defense, HP) | Armored Divisions | attack |
 | Military | II | Combined Arms | Infantry level 3 (+30% attack, defense, HP) | Semi-Automatic Rifles | attack |
 | Military | II | Fortified Lines | Fortifications level III unlocked; +10% defense | Semi-Automatic Rifles | defend |
 | Military | II | Sonar and Depth Charges | Destroyer level 2 (+15% attack, defense, HP) | Liberty Shipyards | attack |
 | Military | III | Rocket Artillery | Artillery level 3 (+30% attack, defense, HP) | Radio-Directed Fire, Combined Arms | attack |
-| Military | III | Heavy Tanks | Tank level 3 (+30% attack, defense, HP); +10% Tank attack | Sloped Armour | attack |
+| Military | III | Heavy Tanks | Tank level 3 (+30% attack, defense, HP); +10% Tank attack | Sloped Armor | attack |
 | Military | III | ★ **Fleet Carriers** | Destroyer level 3 (+30% attack, defense, HP); ★ Carrier escort: your armies at sea lose 50% less defense | Sonar and Depth Charges | attack |
 | Military | IV | ★ **Blitzkrieg Doctrine** | ★ Blitzkrieg: 35% faster through and occupying enemy land | Combined Arms, Heavy Tanks | attack |
 | Economy | I | Hybrid Crops | Farms level III unlocked; +10% food | — | grow |
@@ -176,14 +176,14 @@ Old saves: 28 of 28 old techs carry over.
 | Economy | III | Big Science | +1 research slot; +15% money | War Finance | grow |
 | Economy | III | Rationing | +15% food; +15% manpower | Women in Industry | grow |
 | Economy | III | Alloy Steels | +15% steel | Synthetic Fuel | grow |
-| Infrastructure | I | Motorised Supply | +10% movement speed | — | grow |
+| Infrastructure | I | Motorized Supply | +10% movement speed | — | grow |
 | Infrastructure | I | Motorways | Railways level III unlocked | — | grow |
 | Infrastructure | I | Liberty Shipyards | Port level III unlocked | — | grow |
 | Infrastructure | II | Prefabricated Construction | Construction 20% faster | Motorways | grow |
-| Infrastructure | II | Mass Production | Recruitment 15% faster | Motorised Supply | grow |
-| Infrastructure | II | Fuel Logistics | +10% movement speed | Motorised Supply | grow |
+| Infrastructure | II | Mass Production | Recruitment 15% faster | Motorized Supply | grow |
+| Infrastructure | II | Fuel Logistics | +10% movement speed | Motorized Supply | grow |
 | Infrastructure | II | Military Government | Conquered land integrates 30% faster | Motorways | hold |
-| Infrastructure | III | Standardised Parts | Construction 20% cheaper | Prefabricated Construction | grow |
+| Infrastructure | III | Standardized Parts | Construction 20% cheaper | Prefabricated Construction | grow |
 | Infrastructure | III | Strategic Logistics | +15% movement speed; +10% all production | Prefabricated Construction, Fuel Logistics | grow |
 
 ## Cold War (1960)
@@ -197,14 +197,14 @@ Old saves: 28 of 28 old techs carry over.
 | Branch | Tier | Tech | Effects | Requires | AI tag |
 |---|---|---|---|---|---|
 | Military | I | Assault Rifles | Mech Infantry level 2 (+15% attack, defense, HP) | — | attack |
-| Military | I | Mechanised Divisions | Military Base level III unlocked | — | grow |
+| Military | I | Mechanized Divisions | Military Base level III unlocked | — | grow |
 | Military | I | Self-Propelled Guns | Artillery level 2 (+15% attack, defense, HP) | — | attack |
-| Military | II | Composite Armour | Main Battle Tank level 2 (+15% attack, defense, HP) | Mechanised Divisions | attack |
+| Military | II | Composite Armor | Main Battle Tank level 2 (+15% attack, defense, HP) | Mechanized Divisions | attack |
 | Military | II | ★ **Airmobile Infantry** | Mech Infantry level 3 (+30% attack, defense, HP); ★ Air assault: rough terrain slows your armies 50% less | Assault Rifles | attack |
 | Military | II | Hardened Bunkers | Fortifications level III unlocked; +10% defense | Assault Rifles | defend |
 | Military | II | Guided Missiles | Frigate level 2 (+15% attack, defense, HP) | Container Ports | attack |
 | Military | III | Counter-Battery Radar | Artillery level 3 (+30% attack, defense, HP) | Self-Propelled Guns, Airmobile Infantry | attack |
-| Military | III | AirLand Battle | Main Battle Tank level 3 (+30% attack, defense, HP); +10% Main Battle Tank attack | Composite Armour | attack |
+| Military | III | AirLand Battle | Main Battle Tank level 3 (+30% attack, defense, HP); +10% Main Battle Tank attack | Composite Armor | attack |
 | Military | III | Nuclear Submarines | Frigate level 3 (+30% attack, defense, HP) | Guided Missiles | attack |
 | Military | III | ★ **Air Interdiction** | ★ Air interdiction: enemy armies move 40% slower in your land | Self-Propelled Guns | defend |
 | Economy | I | Green Revolution | Agriculture level III unlocked; +10% food | — | grow |
@@ -237,12 +237,12 @@ Old saves: 28 of 28 old techs carry over.
 
 | Branch | Tier | Tech | Effects | Requires | AI tag |
 |---|---|---|---|---|---|
-| Military | I | Body Armour | Infantry level 2 (+15% attack, defense, HP) | — | attack |
+| Military | I | Body Armor | Infantry level 2 (+15% attack, defense, HP) | — | attack |
 | Military | I | Network-Centric Brigades | Military Base level III unlocked | — | grow |
 | Military | I | Loitering Munitions | Rocket Artillery level 2 (+15% attack, defense, HP) | — | attack |
 | Military | II | Active Protection Systems | MBT level 2 (+15% attack, defense, HP) | Network-Centric Brigades | attack |
-| Military | II | Special Forces | Infantry level 3 (+30% attack, defense, HP) | Body Armour | attack |
-| Military | II | Missile Defence | Fortifications level III unlocked; +10% defense | Body Armour | defend |
+| Military | II | Special Forces | Infantry level 3 (+30% attack, defense, HP) | Body Armor | attack |
+| Military | II | Missile Defense | Fortifications level III unlocked; +10% defense | Body Armor | defend |
 | Military | II | Aegis Combat System | Destroyer level 2 (+15% attack, defense, HP) | Automated Ports | attack |
 | Military | III | ★ **Precision Strikes** | Rocket Artillery level 3 (+30% attack, defense, HP); ★ Precision strikes: conquered land starts 15% more integrated | Loitering Munitions, Special Forces | hold |
 | Military | III | Multi-Domain Operations | MBT level 3 (+30% attack, defense, HP); +10% MBT attack | Active Protection Systems | attack |
@@ -263,7 +263,7 @@ Old saves: 28 of 28 old techs carry over.
 | Infrastructure | II | 3D-Printed Construction | Construction 20% faster | Smart Highways | grow |
 | Infrastructure | II | Robotic Assembly | Recruitment 15% faster | Logistics Software | grow |
 | Infrastructure | II | Rapid Deployment | +10% movement speed | Logistics Software | grow |
-| Infrastructure | II | Stabilisation Operations | Conquered land integrates 30% faster | Smart Highways | hold |
+| Infrastructure | II | Stabilization Operations | Conquered land integrates 30% faster | Smart Highways | hold |
 | Infrastructure | III | Modular Building | Construction 20% cheaper | 3D-Printed Construction | grow |
 | Infrastructure | III | 5G Networks | +15% movement speed; +10% all production | 3D-Printed Construction, Rapid Deployment | grow |
 | Infrastructure | IV | ★ **Cyber Warfare** | ★ Cyber warfare: nations at war with you earn 20% less money; +15% money | 5G Networks | attack |
@@ -286,17 +286,17 @@ Old saves: 27 of 28 old techs carry over; refunded: i7.
 | Military | II | ★ **Bastion Lines** | Fortifications level III unlocked; ★ Entrenchment: armies defending your own land +20% defense | Line Drill | defend |
 | Military | II | Ironclad Hulls | Destroyer level 2 (+15% attack, defense, HP) | Deepwater Harbors | attack |
 | Military | III | ★ **Siege Doctrine** | Rocket Artillery level 3 (+30% attack, defense, HP); ★ Cities and capitals fall to your sieges 35% faster | Gunnery Schools, Veteran Cadres | attack |
-| Military | III | Armoured Spearheads | MBT level 3 (+30% attack, defense, HP); +10% MBT attack | Mounted Columns | attack |
+| Military | III | Armored Spearheads | MBT level 3 (+30% attack, defense, HP); +10% MBT attack | Mounted Columns | attack |
 | Military | III | Battle Fleet | Destroyer level 3 (+30% attack, defense, HP) | Ironclad Hulls | attack |
-| Military | IV | ★ **Lightning War** | ★ Blitzkrieg: 30% faster through and occupying enemy land | Siege Doctrine, Armoured Spearheads | attack |
+| Military | IV | ★ **Lightning War** | ★ Blitzkrieg: 30% faster through and occupying enemy land | Siege Doctrine, Armored Spearheads | attack |
 | Economy | I | Granaries | Agriculture level III unlocked; +10% food | — | grow |
 | Economy | I | Royal Academy | +1 research slot | — | grow |
 | Economy | I | Foundries | Factory level III unlocked; +10% steel | — | grow |
 | Economy | II | Treasury Reform | +10% money | Royal Academy | grow |
-| Economy | II | Labour Guilds | +15% manpower | Granaries | grow |
+| Economy | II | Labor Guilds | +15% manpower | Granaries | grow |
 | Economy | II | Oil Prospecting | Oil Field level III unlocked; Synthetic oil: +15% of your steel output | Foundries | grow |
 | Economy | III | Grand Institutes | +1 research slot; +15% money | Treasury Reform | grow |
-| Economy | III | Settler Harvests | +15% food; +15% manpower; Conquered land integrates 30% faster | Labour Guilds | hold |
+| Economy | III | Settler Harvests | +15% food; +15% manpower; Conquered land integrates 30% faster | Labor Guilds | hold |
 | Economy | III | Circuit Works | +25% electronics | Oil Prospecting | grow |
 | Economy | IV | ★ **Doomsday Deterrent** | ★ Deterrent: nations without one need 50% more strength to attack you | Grand Institutes, Circuit Works | defend |
 | Infrastructure | I | Supply Wagons | +10% movement speed | — | grow |

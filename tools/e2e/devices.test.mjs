@@ -7,6 +7,7 @@
 //   node tools/e2e/devices.test.mjs [screenshot-dir] [--browser=webkit|chromium] [--device=iphone|ipad] [--orient=portrait|landscape]
 import { chromium, webkit } from 'playwright-core';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
@@ -19,7 +20,7 @@ const DEVICES = {
   ipad: { w: 820, h: 1180, dpr: 2, ua: 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
     safe: { portrait: { top: 24, bottom: 20, left: 0, right: 0 }, landscape: { top: 24, bottom: 20, left: 0, right: 0 } } },
 };
-const BROWSERS = { chromium: () => chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }), webkit: () => webkit.launch() };
+const BROWSERS = { chromium: () => chromium.launch({ executablePath: chromePath() }), webkit: () => webkit.launch() };
 const MIN_TAP = 44;     // Apple's minimum touch target (CSS px)
 const MIN_TEXT = 11;    // smallest readable text (CSS px)
 

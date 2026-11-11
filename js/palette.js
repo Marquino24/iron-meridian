@@ -1,8 +1,8 @@
 /**
- * palette.js — Colour helpers shared by the map and the HUD.
+ * palette.js — Color helpers shared by the map and the HUD.
  *
- * vivid() turns the muted, atlas-style nation colours of the era data into
- * saturated game colours while keeping each nation's hue (so France stays
+ * vivid() turns the muted, atlas-style nation colors of the era data into
+ * saturated game colors while keeping each nation's hue (so France stays
  * blue and the USSR red) and evening out lightness so no nation is murky.
  */
 
@@ -28,12 +28,12 @@ function toHex(h, s, l) {
 }
 
 const cache = new Map();
-/** Saturated version of a nation colour (same hue). */
+/** Saturated version of a nation color (same hue). */
 export function vivid(hex) {
   if (!/^#[0-9a-f]{6}$/i.test(hex ?? '')) return hex;
   if (!cache.has(hex)) {
     const [h, s, l] = toHsl(hex);
-    // Greys stay grey-ish; everything else gets a strong, clean saturation.
+    // Greys stay gray-ish; everything else gets a strong, clean saturation.
     const s2 = s < 0.08 ? s : Math.min(0.78, 0.44 + s * 0.7);
     const l2 = Math.max(0.42, Math.min(0.58, 0.48 + (l - 0.5) * 0.6));
     cache.set(hex, toHex(h, s2, l2));
@@ -41,7 +41,7 @@ export function vivid(hex) {
   return cache.get(hex);
 }
 
-/** Lighter / darker variant of a hex colour (amount −1..1). */
+/** Lighter / darker variant of a hex color (amount −1..1). */
 export function shade(hex, amount) {
   const [h, s, l] = toHsl(hex);
   return toHex(h, s, Math.max(0, Math.min(1, l + amount)));

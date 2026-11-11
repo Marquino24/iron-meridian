@@ -2,11 +2,12 @@
 //   python3 -m http.server 3000   (in the project root), then:
 //   node tools/e2e/flags.test.mjs [screenshot-dir] [--mobile]
 import { chromium } from 'playwright-core';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
 const MOBILE = process.argv.includes('--mobile');
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: chromePath() });
 const errors = [];
 let failures = 0;
 const check = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) failures++; };
@@ -21,7 +22,7 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !/fonts\.g/.test(m.text())) errors.push(m.text()); });
 const IM = (fn, arg) => page.evaluate(fn, arg);
 
-/** Average colour of a horizontal band of a canvas (fractions of its height). */
+/** Average color of a horizontal band of a canvas (fractions of its height). */
 const band = (sel, y0, y1) => IM(([sel, y0, y1]) => {
   const c = document.querySelector(sel);
   const g = c.getContext('2d');
@@ -69,7 +70,7 @@ await page.click('#btn-deploy');
 await page.waitForFunction(() => document.body.classList.contains('in-game'));
 await IM(() => { window.ironMeridian.ai.enabled = false; window.ironMeridian.state.setSpeed(0); });
 await page.waitForTimeout(1200);
-// Black-white-red tricolour (no swastika): three clean horizontal bands.
+// Black-white-red tricolor (no swastika): three clean horizontal bands.
 const [top, mid, bot] = [await band('#player-flag', 0.06, 0.22), await band('#player-flag', 0.4, 0.6), await band('#player-flag', 0.8, 0.94)];
 check(top.every((v) => v < 60), `Reich flag top band black ${top}`);
 check(mid.every((v) => v > 200), `middle band white ${mid}`);

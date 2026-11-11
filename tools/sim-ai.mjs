@@ -114,13 +114,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`   first wars: ${r.events.wars.slice(0, 6).join('; ')}`);
     const D = r.ai.sim.diplomacy;
     const kinds = (re) => r.events.diplomacy.filter((t) => re.test(t)).length;
-    console.log(`   diplomacy: ${kinds(/formed an alliance/)} alliances, ${kinds(/non-aggression/)} pacts, ${kinds(/joins the war/)} allies called in, ${kinds(/broke/)} treaties broken, ${kinds(/ended the/)} cancelled; blocs now: ${new Set(D.blocs().values()).size}`);
+    console.log(`   diplomacy: ${kinds(/formed an alliance/)} alliances, ${kinds(/non-aggression/)} pacts, ${kinds(/joins the war/)} allies called in, ${kinds(/broke/)} treaties broken, ${kinds(/ended the/)} canceled; blocs now: ${new Set(D.blocs().values()).size}`);
     console.log(`   e.g. ${r.events.diplomacy.slice(0, 5).join('; ')}`);
-    // How neighbours feel about each other (sample).
+    // How neighbors feel about each other (sample).
     const ops = [];
     for (const n of r.state.map.nations) for (const o of r.ai.neighborsOf(n.id)) ops.push(D.opinion(n.id, o).value);
     ops.sort((a, b) => a - b);
-    if (ops.length) console.log(`   neighbour opinions: min ${ops[0]}, median ${ops[ops.length >> 1]}, 90th pct ${ops[Math.floor(ops.length * 0.9)]}, max ${ops[ops.length - 1]}`);
+    if (ops.length) console.log(`   neighbor opinions: min ${ops[0]}, median ${ops[ops.length >> 1]}, 90th pct ${ops[Math.floor(ops.length * 0.9)]}, max ${ops[ops.length - 1]}`);
     if (r.events.conquered.length) console.log(`   conquered: ${r.events.conquered.slice(0, 6).join('; ')}`);
   }
 }

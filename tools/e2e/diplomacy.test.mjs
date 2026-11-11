@@ -3,11 +3,12 @@
 //   python3 -m http.server 3000   (in the project root), then:
 //   node tools/e2e/diplomacy.test.mjs [screenshot-dir] [--mobile]
 import { chromium } from 'playwright-core';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
 const MOBILE = process.argv.includes('--mobile');
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: chromePath() });
 const errors = [];
 let failures = 0;
 const check = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) failures++; };
@@ -77,7 +78,7 @@ const reasons = await page.textContent('.dip-op');
 check(/Historical ties/.test(reasons), 'Italy: opinion with reasons (historical ties)');
 await click('.dip-detail [data-propose="alliance"]');
 await page.waitForTimeout(200);
-check(await IM(([a, b]) => window.ironMeridian.sim.diplomacy.has(a, b, 'alliance'), [me, italy]), `alliance with Italy signed${await IM(([a, b]) => { const D = window.ironMeridian.sim.diplomacy; return D.has(a, b, 'alliance') ? '' : ` (refused: ${D.accepts(b, a, 'alliance').reason})`; }, [me, italy])}`);
+check(await IM(([a, b]) => window.ironMeridian.sim.diplomacy.has(a, b, 'alliance'), [me, italy]), `alliance with Italy signed${await IM(([a, b]) => { const D = window.ironMeridian.sim.diplomacy; return D.has(a, b, 'alliance') ? '' : ` (refused: ${D.accepts(b, a, 'alliance').reason} Reasons: ${JSON.stringify(D.opinion(b, a).reasons)})`; }, [me, italy])}`);
 check(/Alliance/.test(await page.textContent(`.dip-table tr[data-nation="${italy}"]`)), 'relation column shows Alliance');
 await shot(page, '2-diplomacy');
 

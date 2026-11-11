@@ -799,7 +799,7 @@ state.events.on('select:army', (id) => {
     const s = camera.worldToScreen(p.x, p.y);
     const i = hudInsets();
     const m = 40;
-    // Phones: always centre it, so the land around it (where you'll tap next) is in view.
+    // Phones: always center it, so the land around it (where you'll tap next) is in view.
     if (window.innerWidth <= 760) focusOn(p.x, p.y, camera.zoom, 0.5);
     else if (s.x < i.left + m || s.x > camera.viewW - i.right - m || s.y < i.top + m || s.y > camera.viewH - i.bottom - m) focusOn(p.x, p.y, camera.zoom, 0.5);
   });
@@ -826,7 +826,7 @@ launcher.run().then(() => {
 
 /**
  * Multiplayer lobby, behind MULTIPLAYER_PREVIEW (config.js): owners only
- * before; now ('everyone') approved testers too, labelled as a beta. When it's
+ * before; now ('everyone') approved testers too, labeled as a beta. When it's
  * off, the menu keeps "Multiplayer · Coming soon".
  */
 let lobbyUI = null;

@@ -219,7 +219,7 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   // The old skeleton's ids (m1…i9) name the WWII techs with the same effects.
   const L = legacyMap('ww2', R.tree);
   check(R.status(player, L.m1) === 'available' && R.status(player, L.m4) === 'locked', 'tier-1 available, tier-2 locked');
-  check(/Requires Armoured Divisions/.test(R.check(player, L.m4).reason), `locked reason: ${R.check(player, L.m4).reason}`);
+  check(/Requires Armored Divisions/.test(R.check(player, L.m4).reason), `locked reason: ${R.check(player, L.m4).reason}`);
   const m0 = economy.get(player).money;
   check(R.start(player, L.m1).ok && Math.abs(m0 - economy.get(player).money - R.byId[L.m1].cost.money) < 1e-6, 'start research, cost paid');
   check(/slot busy/.test(R.start(player, L.m3).error ?? ''), 'one slot to start');
@@ -246,7 +246,7 @@ function conquer(g, enemyName, limitHours = 24 * 60) {
   check(armies.unitType(inf).attack > armies.roster.byKey.infantry.attack, `level 2 stats: attack ${armies.roster.byKey.infantry.attack} → ${armies.unitType(inf).attack}`);
   // Building level III needs research.
   B.setLevel(berlin, 'barracks', 2);
-  check(/Needs Armoured Divisions/.test(B.check(berlin, 'barracks', { ignoreCost: true }).reason ?? ''), `Barracks III locked: ${B.check(berlin, 'barracks', { ignoreCost: true }).reason}`);
+  check(/Needs Armored Divisions/.test(B.check(berlin, 'barracks', { ignoreCost: true }).reason ?? ''), `Barracks III locked: ${B.check(berlin, 'barracks', { ignoreCost: true }).reason}`);
   R.grant(player, L.m2);
   check(B.check(berlin, 'barracks', { ignoreCost: true }).ok, 'Barracks III after research');
   // Production, slots, queue.

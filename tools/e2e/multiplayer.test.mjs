@@ -8,11 +8,12 @@
 //   node tools/e2e/multiplayer.test.mjs [screenshot-dir]
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
 const mock = fs.readFileSync(new URL('./mock-supabase.js', import.meta.url), 'utf8');
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: chromePath() });
 const errors = [];
 let failures = 0;
 const check = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) failures++; };

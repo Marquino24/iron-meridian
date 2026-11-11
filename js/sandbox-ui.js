@@ -96,7 +96,7 @@ export class SandboxUI {
     else this.defaults();
   }
 
-  /** Pickers start on the nation you play (B on a neighbour). */
+  /** Pickers start on the nation you play (B on a neighbor). */
   defaults() {
     const me = this.state.playerNationId;
     for (const k of Object.keys(this.pick)) if (this.pick[k] < 0 || !this.state.getNation(this.pick[k])) this.pick[k] = me;
@@ -197,7 +197,7 @@ export class SandboxUI {
     return parts.join('|');
   }
 
-  /** Nation dropdown with colour swatch and a "pick on map" button. */
+  /** Nation dropdown with color swatch and a "pick on map" button. */
   picker(key, label) {
     const s = this.state;
     const id = this.pick[key];

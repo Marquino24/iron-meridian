@@ -4,11 +4,12 @@
 //   python3 -m http.server 3000   (in the project root), then:
 //   node tools/e2e/visual.test.mjs [screenshot-dir] [--mobile]
 import { chromium } from 'playwright-core';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
 const MOBILE = process.argv.includes('--mobile');
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: chromePath() });
 const errors = [];
 let failures = 0;
 const check = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) failures++; };
@@ -52,7 +53,7 @@ await page.waitForTimeout(1200);
 await page.click('#province-panel [data-action="close"]');
 await IM(() => window.ironMeridian.state.setSpeed(0));
 
-// Map style switch: three big labelled buttons, clouds toggle on satellite only.
+// Map style switch: three big labeled buttons, clouds toggle on satellite only.
 const styles = await page.$$eval('#style-toggle [data-style]', (b) => b.map((x) => x.textContent.trim()));
 check(styles.join() === 'Political,Satellite,Terrain', `style switch labels: ${styles.join(', ')}`);
 check(await page.locator('#style-toggle [data-style] svg').count() === 3, 'style buttons have icons');

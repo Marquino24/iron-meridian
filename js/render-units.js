@@ -384,7 +384,7 @@ function tagAt(r, p, text, color) {
 
 /**
  * Army marker: a round badge with the main unit type's icon inside a
- * nation-coloured ring, a unit-count pill and a small HP bar. The body is a
+ * nation-colored ring, a unit-count pill and a small HP bar. The body is a
  * cached sprite; the count and bar are drawn live.
  */
 function drawMarker(r, x, y, rad, o) {
@@ -417,7 +417,7 @@ function drawMarker(r, x, y, rad, o) {
     g.arc(m, m + 1.2, rad + 0.5, 0, Math.PI * 2);
     g.fillStyle = 'rgba(0,0,0,0.5)';
     g.fill();
-    // Ring in the nation's colour.
+    // Ring in the nation's color.
     g.beginPath();
     g.arc(m, m, rad, 0, Math.PI * 2);
     g.fillStyle = color;

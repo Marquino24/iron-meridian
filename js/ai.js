@@ -9,7 +9,7 @@
  *   - research: keeps the shared queue filled, ordered by personality;
  *   - army: recruits a mix it can afford, keeps garrisons in the capital and
  *     border cities, gathers new units into field armies;
- *   - war: declares war on a neighbour when clearly stronger (or to take back
+ *   - war: declares war on a neighbor when clearly stronger (or to take back
  *     lost provinces), picks targets by value, weakness and distance, attacks
  *     with whole armies, pulls back damaged ones, reinforces threatened
  *     cities, and offers a white peace when the war goes badly.
@@ -63,7 +63,7 @@ const MIN_ATTACK_UNITS = 3;
 /** Overseas landings: coastal provinces considered per enemy, and the extra strength they need. */
 const LANDING_SITES = 6;
 const LANDING_MARGIN = 1.3;
-/** A neighbour this big (share of all provinces, and 1.25× us) can be a coalition's target. */
+/** A neighbor this big (share of all provinces, and 1.25× us) can be a coalition's target. */
 const COALITION_SHARE = 0.08;
 /** War score a computer nation needs to demand land from you, and to keep land in a peace with another computer nation. */
 const DEMAND_SCORE = 25;
@@ -91,7 +91,7 @@ export class AI {
 
   reset() {
     this.brains = new Map();     // nation → brain
-    this.neighbors = new Map();  // nation → Set of neighbouring nations
+    this.neighbors = new Map();  // nation → Set of neighboring nations
     this.dirtyNeighbors = new Set();
     this.strength = new Map();
     this.strengthAt = -Infinity;
@@ -224,7 +224,11 @@ export class AI {
     return army.kind === 'naval' ? p * 0.3 : p;
   }
 
-  powerOf(nation) { return this.strength.get(nation) ?? 0; }
+  /** Military strength (refreshed every 6 game hours; computed on first use, e.g. opinions read before the AI's first think). */
+  powerOf(nation) {
+    if (this.strengthAt === -Infinity) this.refreshStrength();
+    return this.strength.get(nation) ?? 0;
+  }
 
   /** Nations sharing a land border (and, for big powers, a sea zone) with this one. */
   neighborsOf(nation) {
@@ -361,7 +365,7 @@ export class AI {
     }
   }
 
-  // Armies: garrisons, gathering, defence, attack.
+  // Armies: garrisons, gathering, defense, attack.
   doArmies(ctx) {
     const { n, P, cities, border, enemies, b } = ctx;
     const A = this.sim.armies, C = this.sim.combat, D = this.D;
@@ -552,7 +556,7 @@ export class AI {
     return cands.reduce((best, c) => (Math.hypot(c.center.x - tc.x, c.center.y - tc.y) < Math.hypot(best.center.x - tc.x, best.center.y - tc.y) ? c : best)).id;
   }
 
-  /** Neighbour we'd most like to fight (weakest relative to us, holding our land first). */
+  /** Neighbor we'd most like to fight (weakest relative to us, holding our land first). */
   likelyTarget(n) {
     const C = this.sim.combat;
     let best = -1, bs = -Infinity;
@@ -612,7 +616,7 @@ export class AI {
     if (enemies.length >= P.maxWars) return;
     // warChance is per month; minor nations start wars far less often.
     const major = this.state.getNation(n).major;
-    // Restraint: a nation its neighbours already fear starts fewer new wars.
+    // Restraint: a nation its neighbors already fear starts fewer new wars.
     const restraint = this.fearedBy(n) >= 2 ? 0.4 : 1;
     const perHour = (P.warChance * D.chance * (major ? 1 : 0.3) * restraint * (ERA_WAR_RATE[this.state.map.era?.id] ?? 1)) / 730;
     if (Math.random() > perHour * b.every) return;
@@ -631,7 +635,7 @@ export class AI {
 
   /**
    * Treaties: alliances with friends who share an enemy or a threat, pacts with
-   * strong neighbours, trade offers to the player when short of something.
+   * strong neighbors, trade offers to the player when short of something.
    * AI–AI deals are signed at once (and reported in the feed); deals with the
    * player become proposals (popups).
    */
@@ -670,7 +674,7 @@ export class AI {
   }
 
   /**
-   * The neighbour nation n would attack now (or -1): weak enough by its
+   * The neighbor nation n would attack now (or -1): weak enough by its
    * personality's ratio (more so if it holds n's land), not a friend, ally or
    * bound by a truce or pact, ranked by strength ratio and enmity.
    */
@@ -760,8 +764,8 @@ export class AI {
   }
 
   /**
-   * Coalitions: a nation that fears a bigger neighbour (opinion -20 or
-   * worse, mostly from "Dangerous expansion") joins a war that neighbour is
+   * Coalitions: a nation that fears a bigger neighbor (opinion -20 or
+   * worse, mostly from "Dangerous expansion") joins a war that neighbor is
    * already fighting, on the victim's side, when together they stand a chance.
    */
   doCoalition({ n, P }) {
@@ -773,7 +777,7 @@ export class AI {
       if (C.atWar(n, m) || Dp.has(n, m, 'alliance') || Dp.has(n, m, 'nap') || C.truceUntil(n, m) != null) continue;
       if ((sizes.get(m) ?? 0) < Math.max(COALITION_SHARE * total, 1.25 * (sizes.get(n) ?? 0))) continue;
       const victims = C.enemiesOf(m).filter((v) => v !== n && !Dp.has(n, v, 'nap') && !C.atWar(n, v));
-      // Feared, or about to swallow a neighbour whole (a victim down to half its homeland).
+      // Feared, or about to swallow a neighbor whole (a victim down to half its homeland).
       const dying = victims.some((v) => this.homeLost(v) >= 0.5);
       if (Dp.opinion(n, m).value > (dying ? 0 : -20)) continue;
       if (!victims.length) continue;
@@ -791,7 +795,7 @@ export class AI {
     return home ? lost / home : 0;
   }
 
-  /** How many neighbours fear nation n (their opinion of it is -20 or worse). */
+  /** How many neighbors fear nation n (their opinion of it is -20 or worse). */
   fearedBy(n) {
     const Dp = this.sim.diplomacy;
     if (!Dp) return 0;

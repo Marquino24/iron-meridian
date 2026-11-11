@@ -13,7 +13,7 @@ import { drawFlag } from './flags.js';
 import { TREATIES, RELATION_LABEL, RELATION_ORDER } from './diplomacy.js';
 import { RESOURCES } from './resources.js';
 
-const FILTERS = [['all', 'All met'], ['allies', 'Allies'], ['war', 'At war'], ['neighbors', 'Neighbours']];
+const FILTERS = [['all', 'All met'], ['allies', 'Allies'], ['war', 'At war'], ['neighbors', 'Neighbors']];
 const SORTS = [['opinion', 'Opinion'], ['power', 'Power'], ['relation', 'Relation'], ['name', 'Name']];
 
 export class DiplomacyWindow {

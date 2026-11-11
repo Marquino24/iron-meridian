@@ -7,6 +7,7 @@
 //   python3 -m http.server 3000   (in the project root), then:
 //   node tools/e2e/tutorial.test.mjs [screenshot-dir] [--browser=chromium|webkit] [--device=desktop|iphone|android] [--orient=portrait|landscape]
 import { chromium, webkit } from 'playwright-core';
+import { chromePath } from '../chrome-path.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000/';
 const SHOTS = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
@@ -27,7 +28,7 @@ const view = touch
 if (touch && BROWSER === 'webkit') delete view.isMobile; // WebKit takes the viewport and touch as given
 const tag = `${BROWSER}-${DEVICE}${touch ? `-${ORIENT}` : ''}`;
 
-const browser = await (BROWSER === 'webkit' ? webkit.launch() : chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }));
+const browser = await (BROWSER === 'webkit' ? webkit.launch() : chromium.launch({ executablePath: chromePath() }));
 const errors = [];
 let failures = 0;
 const check = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) failures++; };
@@ -77,12 +78,27 @@ while (Date.now() - t0 < 240000) {
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/${tag}-stuck-${s.id}.png` });
     break;
   }
+  // Read-only steps: Next, whatever the ring does (the resource chips change width as the numbers tick).
+  if (s.next) {
+    await page.waitForTimeout(500); // the coach slides into place (0.25 s)
+    s = await snap();
+    if (!s.next) continue;
+    if (s.ring && overlap(s.coach, s.ring)) { covered++; console.log(`FAIL coach covers its target at ${s.id}`); }
+    if (shots[s.id]) { await shot(page, shots[s.id]); delete shots[s.id]; }
+    await press('.coach [data-coach="next"]');
+    await page.waitForTimeout(250);
+    continue;
+  }
   // Let flights and windows settle: the ring must hold still before a tap.
   await page.waitForTimeout(250);
   const s2 = await snap();
-  if (s2.id !== s.id || JSON.stringify(s2.ring) !== JSON.stringify(s.ring)) continue;
+  if (s2.id !== s.id || JSON.stringify(s2.ring) !== JSON.stringify(s.ring) || JSON.stringify(s2.coach) !== JSON.stringify(s.coach)) continue;
   s = s2;
-  if (s.ring && overlap(s.coach, s.ring)) { covered++; console.log(`FAIL coach covers its target at ${s.id} (${s.hint})`); }
+  if (s.ring && overlap(s.coach, s.ring)) {
+    covered++;
+    console.log(`FAIL coach covers its target at ${s.id} (${s.hint}): coach ${JSON.stringify(s.coach)} ring ${JSON.stringify(s.ring)}`);
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/${tag}-covered-${s.id}.png` });
+  }
   if (shots[s.id] && !s.wait && (s.next || s.ring)) { await shot(page, shots[s.id]); delete shots[s.id]; }
   if (s.next) { await press('.coach [data-coach="next"]'); continue; }
   if (s.wait || !s.ring) { await page.waitForTimeout(400); continue; }

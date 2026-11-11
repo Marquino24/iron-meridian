@@ -76,7 +76,7 @@ export function drawFlag(ctx, flag, x, y, w, h) {
 
 // --- Generated heraldry --------------------------------------------------------------
 
-/** The heraldic tinctures; a nation's generated colours snap to the nearest. */
+/** The heraldic tinctures; a nation's generated colors snap to the nearest. */
 const TINCTURES = { or: '#e3b23c', argent: '#eef0f2', gules: '#c4202b', azure: '#2554a8', vert: '#2f8a3e', sable: '#1d1e22', purpure: '#71307e' };
 const METALS = new Set(['or', 'argent']);
 
@@ -96,14 +96,14 @@ function nearest(hex, allowed = Object.keys(TINCTURES)) {
 }
 
 /**
- * A heater shield on a dark ground: field from the nation's first colour, an
+ * A heater shield on a dark ground: field from the nation's first color, an
  * ordinary (fess, pale, cross, bend…) from its pattern in a contrasting
- * tincture — a metal on a colour or a colour on a metal, as heralds require.
+ * tincture — a metal on a color or a color on a metal, as heralds require.
  */
 function drawHeraldry(ctx, flag, x, y, w, h) {
   const colors = flag?.colors ?? ['#2554a8', '#e3b23c', '#c4202b'];
   const field = nearest(colors[0]);
-  // Rule of tincture: a colour on a metal, or a metal on a colour.
+  // Rule of tincture: a color on a metal, or a metal on a color.
   const other = Object.keys(TINCTURES).filter((k) => METALS.has(k) !== METALS.has(field));
   const charge = nearest(colors[1], other);
   const F = TINCTURES[field], C = TINCTURES[charge];
