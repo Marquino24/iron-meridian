@@ -283,7 +283,7 @@ export class SaveUI {
   async offer(save, thumb) {
     const name = fileName(save.meta);
     const r = await offerFile(name, await exportText(save, thumb));
-    this.notice(r === 'declined' ? 'Export cancelled.' : `Exported ${name}`);
+    this.notice(r === 'declined' ? 'Export canceled.' : `Exported ${name}`);
   }
 
   /** Read a file into the first free slot (or the oldest one when all are taken). */

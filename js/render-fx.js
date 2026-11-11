@@ -269,7 +269,7 @@ export class MapFx {
     return c;
   }
 
-  /** Capital: a nation-coloured round badge with a gold ring and a white castle. */
+  /** Capital: a nation-colored round badge with a gold ring and a white castle. */
   drawCapital(ctx, x, y, r, color, glow) {
     r = Math.round(r * 2) / 2;
     const pad = glow ? 7 : 3;
@@ -308,7 +308,7 @@ export class MapFx {
     ctx.drawImage(c, x - S / 2, y - S / 2, S, S);
   }
 
-  /** City: a light rounded badge with a building, framed in the owner's colour. */
+  /** City: a light rounded badge with a building, framed in the owner's color. */
   drawCity(ctx, x, y, r, color, big) {
     r = Math.round(r * 2) / 2;
     const S = (r + 3) * 2;

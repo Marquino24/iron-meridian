@@ -184,7 +184,7 @@ const C = {
 
 /**
  * Key cities of the 20th-century major powers. The automatic city pick uses
- * today's populations, which drops historic industrial centres (Hamburg,
+ * today's populations, which drops historic industrial centers (Hamburg,
  * Essen, Manchester…) below modern megacities; these lists make sure each
  * major power has its real cities. Cities outside the country in a given
  * era are skipped by the build.

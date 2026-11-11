@@ -8,7 +8,7 @@
  *
  * One research slot to start; a tier I Economy tech adds a second and a
  * tier III one a third. A tech is paid up front, takes game time, and can be
- * cancelled for a refund. Up to 5 more techs can wait in a queue: the first
+ * canceled for a refund. Up to 5 more techs can wait in a queue: the first
  * one whose requirements are done and that you can afford starts as soon as
  * a slot is free.
  */

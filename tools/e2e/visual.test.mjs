@@ -52,7 +52,7 @@ await page.waitForTimeout(1200);
 await page.click('#province-panel [data-action="close"]');
 await IM(() => window.ironMeridian.state.setSpeed(0));
 
-// Map style switch: three big labelled buttons, clouds toggle on satellite only.
+// Map style switch: three big labeled buttons, clouds toggle on satellite only.
 const styles = await page.$$eval('#style-toggle [data-style]', (b) => b.map((x) => x.textContent.trim()));
 check(styles.join() === 'Political,Satellite,Terrain', `style switch labels: ${styles.join(', ')}`);
 check(await page.locator('#style-toggle [data-style] svg').count() === 3, 'style buttons have icons');

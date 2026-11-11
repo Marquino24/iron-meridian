@@ -31,7 +31,7 @@ for (const era of ERAS.filter((e) => !e.fictional)) {
   const links = P.reduce((s, p) => s + p.neighbors.length, 0);
   if (asym > links * 0.05) errs.push(`asymmetric adjacency ${asym}/${links}`);
   const isolatedMainland = P.filter((p) => !p.neighbors.length && !p.coastal).length;
-  if (isolatedMainland) errs.push(`${isolatedMainland} provinces with no neighbours and no coast`);
+  if (isolatedMainland) errs.push(`${isolatedMainland} provinces with no neighbors and no coast`);
   const cities = P.filter((p) => p.isCity).length;
   console.log(`${era.id.padEnd(8)} ${P.length} provinces, ${map.nations.length} nations (${map.nations.filter((n) => n.major).length} major), ${cities} cities, ${map.seaZones.length} sea zones, ${map.borders.length} border segments, pick misses ${pickMiss}, asymmetric links ${asym}/${links}${errs.length ? '  FAIL: ' + errs.join('; ') : '  ok'}`);
   if (errs.length) failed++;

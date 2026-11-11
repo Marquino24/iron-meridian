@@ -140,7 +140,7 @@ export class Diplomacy {
     return map;
   }
 
-  /** Nations `n` knows: neighbours, majors, and anyone it traded, fought or signed with. */
+  /** Nations `n` knows: neighbors, majors, and anyone it traded, fought or signed with. */
   met(n) {
     let s = this.metBy.get(n);
     if (!s) {
@@ -188,7 +188,7 @@ export class Diplomacy {
     set.delete(type);
     this.version++;
     const other = by === a ? b : a;
-    this.remember(other, by, 'cancelled', `Cancelled our ${TREATIES[type].label.toLowerCase()}`, type === 'alliance' ? -25 : -12, 365);
+    this.remember(other, by, 'cancelled', `Canceled our ${TREATIES[type].label.toLowerCase()}`, type === 'alliance' ? -25 : -12, 365);
     // Guests leave when passage ends.
     if (type !== 'nap' && !this.hasAccess(a, b)) { this.sim.armies.withdraw(a, b); this.sim.armies.withdraw(b, a); }
     const st = this.state, me = st.playerNationId;
@@ -275,7 +275,7 @@ export class Diplomacy {
 
   /** `joiner` enters `leader`'s war against `enemy`. */
   /**
-   * A province changed hands in a war: its neighbours and the victim's allies
+   * A province changed hands in a war: its neighbors and the victim's allies
    * take note ("Dangerous expansion"; stacks, fades over two years). This is
    * what turns the region against a runaway conqueror (the AI's coalitions).
    */
@@ -285,16 +285,16 @@ export class Diplomacy {
     const witnesses = new Set([...(ai?.neighborsOf(conqueror) ?? []), ...this.allies(victim)]);
     witnesses.delete(conqueror);
     const weight = p.isCapital ? 8 : p.isCity ? 4 : 2.5;
-    for (const o of witnesses) this.remember(o, conqueror, 'expansion', 'Dangerous expansion: conquering its neighbours', -weight, 2 * 365);
+    for (const o of witnesses) this.remember(o, conqueror, 'expansion', 'Dangerous expansion: conquering its neighbors', -weight, 2 * 365);
   }
 
   joinWar(joiner, enemy, leader, why) {
     const st = this.state, me = st.playerNationId;
-    // The alliance obliges: no betrayal penalty for honouring it.
+    // The alliance obliges: no betrayal penalty for honoring it.
     this.treaties.get(key(joiner, enemy))?.clear();
     this.sim.combat.truces.delete(key(joiner, enemy));
     if (!this.declareWar(joiner, enemy, { ally: leader })) return false;
-    this.remember(leader, joiner, 'joined', why === 'defend' ? 'Came to our defence' : why === 'coalition' ? 'Stood with us against a conqueror' : 'Joined our war', 25, 2 * 365);
+    this.remember(leader, joiner, 'joined', why === 'defend' ? 'Came to our defense' : why === 'coalition' ? 'Stood with us against a conqueror' : 'Joined our war', 25, 2 * 365);
     st.events.emit('feed', {
       kind: 'diplomacy', tone: 'war', nation: joiner, involvesPlayer: joiner === me || enemy === me || leader === me,
       text: why === 'coalition'
@@ -471,12 +471,12 @@ export class Diplomacy {
       if (taken) add(`Took ${taken} of our province${taken === 1 ? '' : 's'}`, -Math.min(40, 4 * taken));
       if (ai?.neighborsOf(of)?.has(toward)) {
         const ratio = ai.powerOf(toward) / Math.max(1, ai.powerOf(of));
-        if (ratio > 1.5) add('Border tension: a much stronger neighbour', -Math.min(20, 6 * ratio));
+        if (ratio > 1.5) add('Border tension: a much stronger neighbor', -Math.min(20, 6 * ratio));
         else if (ratio > 1.1) add('Border tension', -5);
       }
       const pers = ai?.personalityOf(of);
       if (pers === 'aggressive') add('Aggressive temperament', -5);
-      else if (pers === 'defensive' && C.enemiesOf(toward).length === 0) add('Peaceful neighbour', 5);
+      else if (pers === 'defensive' && C.enemiesOf(toward).length === 0) add('Peaceful neighbor', 5);
       for (const m of this.memory.get(k) ?? []) add(m.text, this.memoryNow(m, now));
     }
     reasons.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));

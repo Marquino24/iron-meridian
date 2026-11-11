@@ -416,17 +416,17 @@ export class UI {
         <dd><span class="terrain-chip t-${terrain.id}"></span>${terrain.label.toUpperCase()}</dd>
         <dt>CITY</dt>
         <dd>${p.isCity ? `${p.cityName && p.cityName !== p.name ? escapeHtml(p.cityName) : 'YES'}${p.isCapital ? ' — NATIONAL CAPITAL' : ''}` : 'NO'}</dd>
-        <dt>NEIGHBOURS</dt>
+        <dt>NEIGHBORS</dt>
         <dd>${p.neighbors.length} LAND${p.seaNeighbors.length ? ` · ${p.seaNeighbors.length} SEA` : ''}</dd>
         <dt>AREA</dt>
         <dd>${fmtArea(p.area, p.areaKm2)}</dd>
         <dt>${coordLabel}</dt>
         <dd>${gridRef(map, p.center.x, p.center.y)}</dd>
         <dt>TERRAIN EFFECT</dt>
-        <dd>DEFENCE ×${terrain.defense.toFixed(2)} · MARCH TIME ×${terrain.moveCost.toFixed(2)}</dd>
+        <dd>DEFENSE ×${terrain.defense.toFixed(2)} · MARCH TIME ×${terrain.moveCost.toFixed(2)}</dd>
       </dl>
       ${this.command ? this.command.provinceHtml(p) : ''}
-      <div class="section-title">NEIGHBOURING PROVINCES</div>
+      <div class="section-title">NEIGHBORING PROVINCES</div>
       <ul class="neighbor-list">${neighbors || '<li class="empty">None — island province</li>'}</ul>`;
     if (owner) el.panel.querySelector('.flag-slot').replaceWith(flagCanvas(provinceFlag(map, p), 24, 16));
     this.command?.markRendered();

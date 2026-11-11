@@ -1574,9 +1574,9 @@ button.slot { text-align: left; font-family: var(--font-ui); color: var(--text);
 .diplo .btn.primary { width: auto; min-width: 150px; }
 
 /* =========================================================================
-   Step 6A: colourful, premium theme — era palettes, glossy controls, cards.
+   Step 6A: colorful, premium theme — era palettes, glossy controls, cards.
    Every era sets the same variables on body[data-theme]; the components
-   below only read variables, so a new era is one block of colours.
+   below only read variables, so a new era is one block of colors.
    ========================================================================= */
 
 :root, body {
@@ -1746,7 +1746,7 @@ body[data-theme="modern"], body[data-theme="fictional"] {
 .command-bar kbd { border-radius: 4px; }
 .cb-badge { box-shadow: 0 0 10px rgba(255, 60, 40, 0.8); }
 
-/* ---------- Windows: coloured headers, cards ---------- */
+/* ---------- Windows: colored headers, cards ---------- */
 .win {
   clip-path: none; border-radius: var(--radius); overflow: hidden; background: var(--panel); border: 1px solid var(--line-strong);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -1793,7 +1793,7 @@ body[data-theme="modern"], body[data-theme="fictional"] {
 .b-glyph { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(180deg, #f7f3ea, #cfd6e2); }
 .b-glyph .ico { width: 24px; height: 24px; }
 
-/* Colour-fill progress and health bars. */
+/* Color-fill progress and health bars. */
 .hpbar, .progress { border-radius: 999px; overflow: hidden; background: rgba(0, 0, 0, 0.45); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); }
 .hpbar i, .progress i { border-radius: 999px; background: linear-gradient(180deg, color-mix(in srgb, var(--bar-a) 80%, #fff), var(--bar-a) 45%, var(--bar-b)); box-shadow: 0 0 8px color-mix(in srgb, var(--bar-a) 60%, transparent); }
 .hpbar i.mid { background: linear-gradient(180deg, #ffe07a, #ffc23d 45%, #e08a12); box-shadow: 0 0 8px rgba(255, 194, 61, 0.5); }

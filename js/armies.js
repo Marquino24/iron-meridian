@@ -5,7 +5,7 @@
  * Movement graph: every land province and every sea zone is a node.
  *   node <  P  → province id
  *   node >= P  → sea zone (node - P)
- * Land armies walk between neighbouring provinces and can embark from a
+ * Land armies walk between neighboring provinces and can embark from a
  * coastal province into an adjacent sea zone (slow, and weak if attacked),
  * then land on any coast of a sea zone. Fleets only use sea zones.
  *

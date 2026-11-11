@@ -42,7 +42,7 @@ export function findScenario(state, sim) {
     if (score > ts) { ts = score; target = t; }
   }
   if (!target) return null;
-  // The march: a border province of yours next to the target, else the capital's neighbour nearest it.
+  // The march: a border province of yours next to the target, else the capital's neighbor nearest it.
   const hours = (p) => (army ? A.findPath(army, p.id).hours ?? Infinity : 0);
   const near = (p) => Math.hypot(p.center.x - target.center.x, p.center.y - target.center.y);
   const mine = (ids) => ids.map((q) => state.provinces[q]).filter((p) => p.owner === me && p.id !== cap.id);
@@ -275,7 +275,7 @@ export class Tutorial {
     const spot = spots.find((x) => onMap(x.s));
     if (spot) this.tapWorld = { node, x: spot.wx, y: spot.wy };
     let best = spot?.s ?? null;
-    // Covered by markers, or under the HUD: zoom in / re-centre (at most once a second).
+    // Covered by markers, or under the HUD: zoom in / re-center (at most once a second).
     if (!best && performance.now() - (this.zoomedAt ?? 0) > 1000) {
       this.zoomedAt = performance.now();
       if (spots.length) this.focusNode(node); else this.zoomNode?.(node);
@@ -356,8 +356,8 @@ export class Tutorial {
 
   /**
    * Put the coach where it doesn't overlap the target: phones try the top and
-   * bottom bands, then slide down the screen; wider screens try bottom centre,
-   * top centre, then the sides.
+   * bottom bands, then slide down the screen; wider screens try bottom center,
+   * top center, then the sides.
    */
   place(target) {
     const el = this.coach;

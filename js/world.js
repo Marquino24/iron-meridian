@@ -8,8 +8,8 @@
  *                    s: [x, y] seed (quantized), a: area, c: 1 city / 2 capital,
  *                    g: region name (unclaimed only),
  *                    r: rings (delta-encoded quantized coords),
- *                    e: per ring, per edge: neighbour province id (≥0) or -1-seaId }
- *   seas[i] = { p: polygon, c: [x, y], nb: neighbour sea ids, cp: coastal provinces }
+ *                    e: per ring, per edge: neighbor province id (≥0) or -1-seaId }
+ *   seas[i] = { p: polygon, c: [x, y], nb: neighbor sea ids, cp: coastal provinces }
  */
 
 import { FLAG_INDEX } from './flag-index.js';
@@ -120,7 +120,7 @@ export function buildWorldMap(data, era) {
     };
   });
 
-  // Make adjacency symmetric (simplified borders occasionally see a neighbour from one side only).
+  // Make adjacency symmetric (simplified borders occasionally see a neighbor from one side only).
   const neighborSets = provinces.map((p) => new Set(p.neighbors));
   provinces.forEach((p) => p.neighbors.forEach((n) => neighborSets[n].add(p.id)));
   provinces.forEach((p, i) => { p.neighbors = [...neighborSets[i]]; });

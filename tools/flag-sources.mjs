@@ -4,14 +4,14 @@
  * Values:
  *   'fi:xx'        flag-icons (MIT) 4×3 flag with ISO code xx — today's flag,
  *                  used for older eras only where the design was the same then
- *   'wc:File.svg'  a Wikimedia Commons file (licence recorded at build time)
+ *   'wc:File.svg'  a Wikimedia Commons file (license recorded at build time)
  *   'own:id'       drawn here as SVG (tools/flag-custom.mjs): Roman vexillum, Han banner, a few arms
  *   'col:<src>'    a colony / protectorate / occupied land: its sovereign's flag
  *   'ens:<src>'    a colony flying its own colonial flag or ensign (step 7B)
  *   (missing)      no known flag or banner for that date: the game draws a
  *                  generated heraldic shield instead (clearly not a real flag)
  *
- * WWII Germany flies the black-white-red tricolour (the 1933–35 national
+ * WWII Germany flies the black-white-red tricolor (the 1933–35 national
  * flag), not the swastika flag — illegal to display in Germany and avoided by
  * commercial WWII games.
  */
@@ -200,7 +200,7 @@ export const FLAG_SOURCES = {
     'Chile': 'fi:cl',
     'Egypt': 'wc:Flag of Egypt (1922–1958).svg',
     'Bolivia': 'fi:bo',
-    // Black-white-red tricolour, not the swastika flag (see the note above).
+    // Black-white-red tricolor, not the swastika flag (see the note above).
     'German Reich': 'wc:Flag of the German Empire.svg',
     'Colombia': 'fi:co',
     'Spain': 'wc:Flag of Spain (1931–1939).svg',

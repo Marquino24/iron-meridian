@@ -107,7 +107,7 @@ const multi = (page) => page.locator('[data-menu="multi"]');
   check(!(await multi(page).isDisabled()) && /Multiplayer · Beta/.test(await multi(page).textContent()), 'approved tester: Multiplayer · Beta enabled');
   await multi(page).click();
   await page.waitForSelector('#lobby-screen:not([hidden])');
-  check(/MULTIPLAYER · BETA/.test(await page.textContent('#lobby-screen .eyebrow')) && /Beta:/.test(await page.textContent('.lobby-note')), 'lobby labelled as a beta');
+  check(/MULTIPLAYER · BETA/.test(await page.textContent('#lobby-screen .eyebrow')) && /Beta:/.test(await page.textContent('.lobby-note')), 'lobby labeled as a beta');
   await ctx.close();
 }
 

@@ -63,7 +63,7 @@ const foe = await IM(() => {
   const { sim, state } = window.ironMeridian;
   const me = state.playerNationId;
   const { ai } = window.ironMeridian;
-  // The strongest neighbour declares.
+  // The strongest neighbor declares.
   const n = [...ai.neighborsOf(me)].sort((a, b) => ai.powerOf(b) - ai.powerOf(a))[0];
   sim.combat.declareWar(n, me);
   state.events.emit('war:declared', { a: n, b: me, ai: true });
@@ -84,7 +84,7 @@ await page.click('[data-diplo="accept"]');
 check(await IM((n) => !window.ironMeridian.sim.combat.atWar(n, window.ironMeridian.state.playerNationId), foe), 'peace accepted: war over');
 check(await IM((n) => window.ironMeridian.sim.combat.truceUntil(n, window.ironMeridian.state.playerNationId) != null, foe), 'truce in force');
 
-// The player offers peace in a war the AI is winning big (should refuse) — use a fresh war with a strong neighbour.
+// The player offers peace in a war the AI is winning big (should refuse) — use a fresh war with a strong neighbor.
 const soviet = await IM(() => {
   const { sim, state } = window.ironMeridian;
   const { ai } = window.ironMeridian;

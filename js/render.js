@@ -48,7 +48,7 @@ const COLORS = {
   unclaimed: '#8b8f7d',
 };
 
-/** Alliance bloc outlines (one colour per bloc). */
+/** Alliance bloc outlines (one color per bloc). */
 const BLOC_COLORS = ['#3df5a0', '#ff6ad5', '#45c8ff', '#ffb03b', '#c49bff', '#ff5f5f', '#d8ff4a'];
 
 const FONT_UI = '"Rajdhani", "Segoe UI", system-ui, sans-serif';
@@ -804,7 +804,7 @@ export class Renderer {
       cache.coast.stroke(ctx, view);
     }
 
-    // Alliance blocs: every member outlined in its bloc's colour.
+    // Alliance blocs: every member outlined in its bloc's color.
     const blocs = state.phase === 'playing' ? this.sim?.diplomacy?.blocs() : null;
     if (blocs?.size) {
       for (const [nation, bloc] of blocs) {

@@ -330,7 +330,7 @@ export function nameProvinces(eraId, map, sources) {
   for (const p of fallback) {
     const { lon, lat } = unproject(p.center.x, p.center.y);
     let a = adminAt(sources.admin1, lon, lat);
-    // A seed on a coast or a small island can miss every polygon: nearest region by bbox centre.
+    // A seed on a coast or a small island can miss every polygon: nearest region by bbox center.
     if (!a) {
       let bd = Infinity;
       for (const r of sources.admin1) {
