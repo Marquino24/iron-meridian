@@ -30,6 +30,11 @@ import polygonClipping from 'polygon-clipping';
 import { project, WORLD_WIDTH, WORLD_HEIGHT, LAT_MIN, LAT_MAX, unproject } from '../js/projection.js';
 import { createRng, createNameGenerator, hashSeed } from '../js/map.js';
 import { ERAS, SOURCES, NE_PLACES, NON_STATE_RE, FOUNDED, RENAMES } from './era-config.mjs';
+import { nameProvinces, loadSources as loadNameSources } from './province-names.mjs';
+import { buildWorldMap } from '../js/world.js';
+import { getEra } from '../js/eras.js';
+
+let nameSources = null;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW = path.join(ROOT, 'data/raw');
@@ -852,6 +857,13 @@ async function buildEra(era, places) {
     width: WORLD_WIDTH, height: WORLD_HEIGHT, q: Q,
     nations, provinces: provOut, seas: seaOut,
   };
+  // Real names for provinces without a city (step 13): historical places, regions, rivers — never invented.
+  if (era.source === 'hb') {
+    const map = buildWorldMap(data, getEra(era.id));
+    for (const p of map.provinces) p.generatedCity = p.isCity && !p.cityName && provinces[p.id].city?.generated;
+    const { names: real } = nameProvinces(era.id, map, nameSources ??= loadNameSources(RAW));
+    for (const [pid, name] of real) data.provinces[pid].n = name;
+  }
   fs.mkdirSync(OUT, { recursive: true });
   const json = JSON.stringify(data);
   fs.writeFileSync(path.join(OUT, `${era.id}.json`), json);
