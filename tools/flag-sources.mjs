@@ -35,7 +35,7 @@ export const COLONY_FLAGS = {
     'Kenya': 'ens:wc:Flag of Kenya (1921–1963).svg', 'Tanganyika': 'ens:wc:Flag of Tanganyika (1923–1961).svg',
     'Uganda': 'ens:wc:Flag of the Uganda Protectorate.svg', 'Southern Rhodesia': 'ens:wc:Flag of Southern Rhodesia (1924–1964).svg',
     'Sierra Leone': 'ens:wc:Flag of Sierra Leone (1916–1961).svg', 'Malaya': 'ens:wc:Flag of Malaya (1896–1950).svg',
-    'Burma': 'ens:wc:Flag of Burma (1937–1948).svg',
+    'Burma': 'ens:wc:Flag of Burma (1939–1941, 1945–1948).svg', // the blue ensign with the peacock, from 1939 (the game starts September 1939)
   },
 };
 

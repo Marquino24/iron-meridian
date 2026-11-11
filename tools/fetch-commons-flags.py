@@ -40,6 +40,11 @@ def get(url, out=None):
         return code, body
     return 429, None
 
+def is_svg(path):
+    """An SVG file, not an HTML error page that happens to mention <svg."""
+    head = open(path, errors='replace').read(4000)
+    return '<svg' in head and not head.lstrip().lower().startswith(('<!doctype html', '<html'))
+
 def key(title):
     return hashlib.sha1(title.encode()).hexdigest()[:16]
 
@@ -49,7 +54,7 @@ missing = []
 for t in titles:
     k = key(t)
     svg = os.path.join(CACHE, k + '.svg')
-    have_svg = os.path.exists(svg) and os.path.getsize(svg) > 100 and '<svg' in open(svg, errors='replace').read(4000)
+    have_svg = os.path.exists(svg) and os.path.getsize(svg) > 100 and is_svg(svg)
     if os.path.exists(svg) and not have_svg:
         os.remove(svg)  # an error page saved in place of the file
     m = meta.get(t, {})
@@ -74,7 +79,7 @@ for t in titles:
     have_png = os.path.exists(png) and open(png, 'rb').read(4) == b'\x89PNG'
     orig = 'https:' + html.unescape(file_url.group(1)).removeprefix('https:')
     code = 200 if have_svg or have_png else get(orig, svg)[0]
-    if code == 200 and not have_png and '<svg' not in open(svg, errors='replace').read(4000):
+    if code == 200 and not have_png and not is_svg(svg):
         os.remove(svg); code = 'not-svg'
     raster = have_png
     if code != 200 and not have_png:
