@@ -78,7 +78,7 @@ const reasons = await page.textContent('.dip-op');
 check(/Historical ties/.test(reasons), 'Italy: opinion with reasons (historical ties)');
 await click('.dip-detail [data-propose="alliance"]');
 await page.waitForTimeout(200);
-check(await IM(([a, b]) => window.ironMeridian.sim.diplomacy.has(a, b, 'alliance'), [me, italy]), `alliance with Italy signed${await IM(([a, b]) => { const D = window.ironMeridian.sim.diplomacy; return D.has(a, b, 'alliance') ? '' : ` (refused: ${D.accepts(b, a, 'alliance').reason})`; }, [me, italy])}`);
+check(await IM(([a, b]) => window.ironMeridian.sim.diplomacy.has(a, b, 'alliance'), [me, italy]), `alliance with Italy signed${await IM(([a, b]) => { const D = window.ironMeridian.sim.diplomacy; return D.has(a, b, 'alliance') ? '' : ` (refused: ${D.accepts(b, a, 'alliance').reason} Reasons: ${JSON.stringify(D.opinion(b, a).reasons)})`; }, [me, italy])}`);
 check(/Alliance/.test(await page.textContent(`.dip-table tr[data-nation="${italy}"]`)), 'relation column shows Alliance');
 await shot(page, '2-diplomacy');
 

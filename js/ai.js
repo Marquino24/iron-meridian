@@ -224,7 +224,11 @@ export class AI {
     return army.kind === 'naval' ? p * 0.3 : p;
   }
 
-  powerOf(nation) { return this.strength.get(nation) ?? 0; }
+  /** Military strength (refreshed every 6 game hours; computed on first use, e.g. opinions read before the AI's first think). */
+  powerOf(nation) {
+    if (this.strengthAt === -Infinity) this.refreshStrength();
+    return this.strength.get(nation) ?? 0;
+  }
 
   /** Nations sharing a land border (and, for big powers, a sea zone) with this one. */
   neighborsOf(nation) {
